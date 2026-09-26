@@ -51,7 +51,7 @@ var IC = {
   left: '<path d="m15 6-6 6 6 6"/>', right: '<path d="m9 6 6 6-6 6"/>',
   plus: '<path d="M12 5v14M5 12h14"/>', more: '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
   ext: '<path d="M14 4h6v6M20 4 10 14M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
-  down: '<path d="m6 9 6 6 6-6"/>', clip: '<path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/>', upload: '<path d="M12 15V4M7 9l5-5 5 5M5 20h14"/>', expand: '<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>', shrink: '<path d="M20 10h-6V4M4 14h6v6M14 10l7-7M10 14l-7 7"/>', check: '<path d="m5 12 5 5 9-10"/>', file: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5z"/><path d="M14 3v5h5"/>', home: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/>', bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>', book: '<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20a2 2 0 0 0 2 1h13v-3"/><path d="M8 7h7M8 10.5h5"/>', clipboard: '<rect x="5" y="4.5" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 10h7M8.5 13.5h7M8.5 17h4"/>', shuffle: '<path d="M3 7h3.5c4 0 5.5 10 10 10H21M3 17h3.5c1.8 0 3-1.9 4.2-4.2M13.3 9.2C14.5 7.4 15.4 7 17 7h4"/><path d="m18 4 3 3-3 3M18 14l3 3-3 3"/>', history: '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4h4"/><path d="M12 8v4.5l3 2"/>', chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>', lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>', download: '<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>', sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>', user: '<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1-4 4-6 7.5-6s6.5 2 7.5 6"/>', doc: '<path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M8.5 12.5h7M8.5 16h7"/>', tablet: '<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M11 18h2"/>', up: '<path d="m6 15 6-6 6 6"/>', copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>', cap: '<path d="M2.5 9 12 4.5 21.5 9 12 13.5z"/><path d="M6.5 11v5c1.5 1.5 3.4 2.3 5.5 2.3s4-.8 5.5-2.3v-5M21.5 9v5.5"/>', sheet: '<rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9h17M3.5 14h17M9.5 9v11"/>', bed: '<path d="M3 18V6M3 14h18v4M21 14v-2.5A2.5 2.5 0 0 0 18.5 9H11v5"/><circle cx="7" cy="11" r="2"/>', cloud: '<path d="M7 18.5a4.5 4.5 0 0 1-.5-9 6 6 0 0 1 11.6 1.6A3.8 3.8 0 0 1 17.5 18.5z"/>', stethoscope: '<path d="M6 3v5a4 4 0 0 0 8 0V3"/><path d="M10 12v2a5 5 0 0 0 10 0v-1"/><circle cx="20" cy="11" r="2"/>', refresh: '<path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5M20 20v-4h-4"/>', stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="2"/>', send: '<path d="M4 12 20 4l-6 16-3-7z"/><path d="m11 13 9-9"/>', panel: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M9 4.5v15"/>', logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/>', shield: '<path d="M12 3 5 6v5c0 4.5 3 8.4 7 10 4-1.6 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/>'
+  down: '<path d="m6 9 6 6 6-6"/>', sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>', moon: '<path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/>', clip: '<path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/>', upload: '<path d="M12 15V4M7 9l5-5 5 5M5 20h14"/>', expand: '<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>', shrink: '<path d="M20 10h-6V4M4 14h6v6M14 10l7-7M10 14l-7 7"/>', check: '<path d="m5 12 5 5 9-10"/>', file: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5z"/><path d="M14 3v5h5"/>', home: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/>', bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>', book: '<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2z"/><path d="M4 20a2 2 0 0 0 2 1h13v-3"/><path d="M8 7h7M8 10.5h5"/>', clipboard: '<rect x="5" y="4.5" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 10h7M8.5 13.5h7M8.5 17h4"/>', shuffle: '<path d="M3 7h3.5c4 0 5.5 10 10 10H21M3 17h3.5c1.8 0 3-1.9 4.2-4.2M13.3 9.2C14.5 7.4 15.4 7 17 7h4"/><path d="m18 4 3 3-3 3M18 14l3 3-3 3"/>', history: '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4h4"/><path d="M12 8v4.5l3 2"/>', chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>', lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>', download: '<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>', sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>', user: '<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1-4 4-6 7.5-6s6.5 2 7.5 6"/>', doc: '<path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M8.5 12.5h7M8.5 16h7"/>', tablet: '<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M11 18h2"/>', up: '<path d="m6 15 6-6 6 6"/>', copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>', cap: '<path d="M2.5 9 12 4.5 21.5 9 12 13.5z"/><path d="M6.5 11v5c1.5 1.5 3.4 2.3 5.5 2.3s4-.8 5.5-2.3v-5M21.5 9v5.5"/>', sheet: '<rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9h17M3.5 14h17M9.5 9v11"/>', bed: '<path d="M3 18V6M3 14h18v4M21 14v-2.5A2.5 2.5 0 0 0 18.5 9H11v5"/><circle cx="7" cy="11" r="2"/>', cloud: '<path d="M7 18.5a4.5 4.5 0 0 1-.5-9 6 6 0 0 1 11.6 1.6A3.8 3.8 0 0 1 17.5 18.5z"/>', stethoscope: '<path d="M6 3v5a4 4 0 0 0 8 0V3"/><path d="M10 12v2a5 5 0 0 0 10 0v-1"/><circle cx="20" cy="11" r="2"/>', refresh: '<path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5M20 20v-4h-4"/>', stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="2"/>', send: '<path d="M4 12 20 4l-6 16-3-7z"/><path d="m11 13 9-9"/>', panel: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M9 4.5v15"/>', logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/>', shield: '<path d="M12 3 5 6v5c0 4.5 3 8.4 7 10 4-1.6 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/>'
 };
 function ico(n, s) { s = s || 18; return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + IC[n] + '</svg>'; }
 
@@ -193,7 +193,7 @@ var SECTIONS = [
     f('anast', 'Анастомоз', 'Anastomosis', 'seg', { options: YN, show: function (d) { return hasSurg(d) && P_TEO.concat(P_APR, P_HART, P_STFORM).indexOf(d.proc) < 0; } }),
     f('stoma', 'Стома', 'Stoma', 'sel', { options: STOMAS, show: function (d) { return hasSurg(d) && P_TEO.concat(P_STCLOSE).indexOf(d.proc) < 0; } }),
     f('stomaSite', 'Место выведения стомы', 'Stoma site', 'sel', { options: ['Правая подвздошная область', 'Левая подвздошная область', 'Справа от пупка', 'Слева от пупка', 'Эпигастральная область'], show: function (d) { return hasSurg(d) && d.stoma && d.stoma !== 'Нет'; } }),
-    f('drain', 'Дренирование', 'Drains', 'multi', { options: ['Малый таз', 'Правый боковой канал', 'Левый боковой канал', 'Подпечёночное пространство', 'Промежностная рана', 'Не дренировалось'], dd: true, show: hasSurg }),
+    f('drain', 'Дренирование', 'Drains', 'multi', { options: ['Малый таз', 'Правый латеральный канал', 'Левый латеральный канал', 'Подпечёночное пространство', 'Промежностная рана', 'Не дренировалось'], dd: true, show: hasSurg }),
     f('postRoute', 'Перевод после операции', 'Transfer after surgery', 'seg', { options: ['Палата пробуждения', 'Реанимация (ОАРИТ)'], show: hasProc, wide: true })
   ]},
   { id: 'cx', phase: 'post', title: ['Послеоперационные осложнения', 'Postoperative complications'], when: function (d) { return hasProc(d); }, fields: [
@@ -231,8 +231,8 @@ var MODULES = [
     f('mrT', 'mrT', 'mrT', 'sel', { options: ['mrT1', 'mrT2', 'mrT3a', 'mrT3b', 'mrT3c', 'mrT3d', 'mrT4a', 'mrT4b'] }),
     f('mrCRM', 'CRM (мезоректальная фасция)', 'CRM (mesorectal fascia)', 'seg', { options: ['Отрицательный', 'Положительный'] }),
     f('emvi', 'EMVI', 'EMVI', 'seg', { options: ['Отрицательный', 'Положительный'] }),
-    f('mrLat', 'Увеличенные боковые лимфоузлы', 'Enlarged lateral nodes', 'seg', { options: YN }),
-    f('llBefore', 'Размер бокового узла до лечения', 'Lateral node size before treatment', 'num', { unit: 'u.mm', show: function (d) { return d.mrLat === 'Да'; } }),
+    f('mrLat', 'Увеличенные латеральные тазовые лимфоузлы', 'Enlarged lateral nodes', 'seg', { options: YN }),
+    f('llBefore', 'Размер латерального лимфоузла до лечения', 'Lateral node size before treatment', 'num', { unit: 'u.mm', show: function (d) { return d.mrLat === 'Да'; } }),
     f('llAfter', 'Размер после неоадъюванта', 'Size after neoadjuvant', 'num', { unit: 'u.mm', show: function (d) { return d.mrLat === 'Да' && hasTac(d, NEO_T); } })
   ]},
   { id: 'neoMod', sec: 'tx', title: ['Неоадъювантная терапия', 'Neoadjuvant therapy'], why: ['проводилась неоадъювантная терапия', 'neoadjuvant therapy given'], when: function (d) { return hasTac(d, NEO_T); }, fields: [
@@ -294,9 +294,9 @@ var MODULES = [
     f('mre', 'Мезоректумэктомия', 'Mesorectal excision', 'seg', { options: ['Тотальная (ТМЭ)', 'Частичная (ПМЭ)'] }),
     f('nerve', 'Сохранение вегетативных нервов таза', 'Pelvic autonomic nerve preservation', 'sel', { options: ['Полное', 'Частичное', 'Не сохранены'] }),
     f('isrType', 'Тип интерсфинктерной резекции', 'Intersphincteric resection type', 'sel', { options: ['Парциальная', 'Субтотальная', 'Тотальная'], show: function (d) { return d.proc === 'Интерсфинктерная резекция прямой кишки'; } }),
-    f('llnd', 'Боковая (латеральная) лимфодиссекция', 'Lateral lymph node dissection', 'seg', { options: YN })
+    f('llnd', 'Латеральная тазовая лимфодиссекция', 'Lateral lymph node dissection', 'seg', { options: YN })
   ]},
-  { id: 'llndMod', sec: 'op', title: ['Боковая лимфодиссекция', 'Lateral lymph node dissection'], why: ['боковая лимфодиссекция: да', 'lateral node dissection: yes'], when: function (d) { return inP(P_RECTAL)(d) && d.llnd === 'Да'; }, fields: [
+  { id: 'llndMod', sec: 'op', title: ['Латеральная лимфодиссекция', 'Lateral lymph node dissection'], why: ['латеральная лимфодиссекция: да', 'lateral node dissection: yes'], when: function (d) { return inP(P_RECTAL)(d) && d.llnd === 'Да'; }, fields: [
     f('llSt', 'Удалённые группы лимфоузлов (JSCCR)', 'Node stations removed (JSCCR)', 'nodes', { wide: true })
   ]},
   { id: 'opAn', sec: 'op', title: ['Анастомоз', 'Anastomosis'], why: ['анастомоз: да', 'anastomosis: yes'], when: function (d) { return hasSurg(d) && d.anast === 'Да'; }, fields: [
@@ -387,7 +387,7 @@ var MODULES = [
     f('tme', 'Качество мезоректума по Quirke (оценивает патоморфолог)', 'Mesorectal quality, Quirke (pathologist)', 'sel', { options: ['Полное (мезоректум цел)', 'Почти полное (дефекты до 5 мм)', 'Неполное (дефекты до мышечного слоя)'] }),
     f('pCRM', 'Циркулярный край (CRM)', 'Circumferential margin (CRM)', 'seg', { options: ['Отрицательный', 'Положительный'] }),
     f('dm', 'Дистальный край резекции в препарате', 'Distal resection margin in specimen', 'num', { unit: 'u.cm' }),
-    f('llRem', 'Боковых лимфоузлов удалено', 'Lateral nodes removed', 'num', { show: function (d) { return d.llnd === 'Да'; } }),
+    f('llRem', 'Латеральных лимфоузлов удалено', 'Lateral nodes removed', 'num', { show: function (d) { return d.llnd === 'Да'; } }),
     f('llPos', 'Из них поражено', 'Positive lateral nodes', 'num', { show: function (d) { return d.llnd === 'Да'; } })
   ]},
   { id: 'rectLate', sec: 'late', title: ['Функция после резекции прямой кишки', 'Function after rectal resection'], why: ['резекция прямой кишки с анастомозом', 'rectal resection with anastomosis'], when: function (d) { return inP(P_AR)(d) && d.anast === 'Да'; }, fields: [
@@ -618,6 +618,11 @@ function migrate(db) {
       r.proto = pr;
     });
     db.mig.p7 = 1;
+  }
+  if (!db.mig.p8) {
+    var LR = { 'Правый боковой канал': 'Правый латеральный канал', 'Левый боковой канал': 'Левый латеральный канал' };
+    db.patients.forEach(function (p) { Object.keys(p.d).forEach(function (k) { var v = p.d[k]; if (Array.isArray(v)) p.d[k] = v.map(function (x) { return LR[x] || x; }); else if (LR[v]) p.d[k] = LR[v]; }); });
+    db.mig.p8 = 1;
   }
   if (!db.cols.pubs) db.cols.pubs = [];
   plannerAuto(db);
@@ -1005,7 +1010,7 @@ function llndText(d) {
   var sides = { rt: 0, lt: 0 };
   var parts = st.map(function (c) { var m = c.split(' '); if (m[1]) sides[m[1]] = 1; return m[0] + (m[1] ? ' ' + m[1] : '') + ' (' + lc(names[m[0]] || '') + (m[1] ? (m[1] === 'rt' ? ', справа' : ', слева') : '') + ')'; });
   var side = sides.rt && sides.lt ? 'с двух сторон' : sides.rt ? 'справа' : sides.lt ? 'слева' : '';
-  return 'Выполнена боковая лимфодиссекция' + (side ? ' ' + side : '') + ': удалены группы лимфоузлов ' + parts.join(', ') + '.';
+  return 'Выполнена латеральная лимфодиссекция' + (side ? ' ' + side : '') + ': удалены группы лимфоузлов ' + parts.join(', ') + '.';
 }
 function anSentence(d) {
   var a = d.anDet || [], tech = '', conf = '', form = '', rows = '';
@@ -1069,7 +1074,7 @@ function opTitle(d) {
   var extra = [];
   if (d.anast === 'Да' && P_STCLOSE.indexOf(p) < 0) extra.push('с формированием ' + (anName(d) + ' ').replace(/ый /g, 'ого ').replace(/ий /g, 'его ').trim().replace(/анастомоз$/, 'анастомоза'));
   if (d.stoma && d.stoma !== 'Нет') extra.push((d.anast === 'Да' && /Петлевая/.test(d.stoma) ? 'превентивной ' : '') + lc(d.stoma).replace(/ая /g, 'ой ').replace(/ая$/, 'ой').replace(/стома$/, 'стомы'));
-  if (d.llnd === 'Да') extra.push('боковой лимфодиссекцией');
+  if (d.llnd === 'Да') extra.push('латеральной лимфодиссекцией');
   if (d.conv === 'Да') extra.push('конверсией');
   return s + (extra.length ? ', ' + extra.join(', ') : '');
 }
@@ -1136,7 +1141,7 @@ function buildProtocol(p) {
     if (d.isrType) rr += ' Трансанально выполнена ' + lc(d.isrType).replace(/ая$/, 'ая') + ' интерсфинктерная резекция.';
     body.push(rr);
   }
-  if (d.llnd === 'Да') body.push(llndText(d) || 'Выполнена боковая лимфодиссекция.');
+  if (d.llnd === 'Да') body.push(llndText(d) || 'Выполнена латеральная лимфодиссекция.');
   if (P_EVISC.indexOf(pr) >= 0) body.push('Выполнена ' + (d.evType ? lc(d.evType) + ' ' : '') + 'тазовая эвисцерация' + (d.evOrg && d.evOrg.length ? ' с удалением: ' + d.evOrg.map(lc).join(', ') : '') + '.' + (d.urRec && d.urRec !== 'Нет' ? ' Реконструкция мочевых путей: ' + lc(d.urRec) + '.' : ''));
   if (P_COLECT.indexOf(pr) >= 0) body.push('Выполнена ' + lc(pr) + (d.colInd ? ' по поводу: ' + lc(d.colInd) : '') + '.');
   if (P_TEO.indexOf(pr) >= 0) body.push('На расстоянии' + (d.teoDist ? ' ' + d.teoDist + ' см' : '') + ' от анального края выполнено ' + (d.teoDepth === 'Подслизистое' ? 'подслизистое' : 'полностенное') + ' иссечение образования' + (d.lesSize ? ' размером ' + d.lesSize + ' мм' : '') + (d.enbloc === 'Да' ? ' единым блоком' : '') + '.' + (d.periEntry === 'Да' ? ' При иссечении вскрыта брюшная полость, дефект ушит.' : '') + (d.defClose === 'Да' ? ' Дефект стенки ушит.' : d.defClose === 'Нет' ? ' Дефект стенки оставлен открытым.' : ''));
@@ -1165,7 +1170,7 @@ function buildProtocol(p) {
   tail.push('Осложнения: ' + (ic.length ? ic.map(lc).join(', ') : 'без осложнений') + '.');
   var sp = specimen(d), sps = [];
   if (sp) sps.push('1. ' + uc(sp) + '.');
-  if (d.llnd === 'Да' && (d.llSt || []).length) sps.push((sps.length + 1) + '. Лимфоузлы боковых групп: ' + d.llSt.join(', ') + '.');
+  if (d.llnd === 'Да' && (d.llSt || []).length) sps.push((sps.length + 1) + '. Латеральные лимфоузлы: ' + d.llSt.join(', ') + '.');
   if (sps.length) tail.push('Макропрепарат: ' + sps.join(' ') + ' Направлен на гистологическое исследование.');
   return L1.join('\n') + '\n\nХод операции: ' + body.join(' ') + '\n\n' + tail.join('\n');
 }
@@ -2730,7 +2735,7 @@ function renderUsers() {
 function renderPortal() {
   var a = S.auth || (S.auth = { mode: 'login', role: 'resident' });
   var h = '<div class="portal"><section class="pt-media"><div class="pt-img" style="background-image:url(media/nroc-hero-hd.webp)"></div><div class="pt-over"><div class="pt-top"><img src="media/nroc-logo-white.png" alt="NROC"><span>' + LL('Национальный научный онкологический центр', 'National Research Oncology Center') + '</span></div><div class="pt-copy"><div class="pt-kick">' + LL('Колоректальный сектор', 'Colorectal unit') + '</div><h1>' + LL('Клинический регистр и исследовательская платформа', 'Clinical registry and research platform') + '</h1><p>' + LL('Пациенты, операции, МДГ и M&M, исследования и публикации сектора в одном рабочем пространстве с ИИ-ассистентом.', 'Patients, operations, MDT and M&M, studies and publications in one workspace with an AI assistant.') + '</p></div><ul class="pt-feat"><li>' + ico('users', 16) + LL('Единая карточка: до, во время и после операции', 'One record: before, during and after surgery') + '</li><li>' + ico('flask', 16) + LL('Протоколы исследований, рандомизация, анкеты', 'Study protocols, randomisation, PROMs') + '</li><li>' + ico('sparkle', 16) + LL('ИИ-ассистент: анализ, доказательства, черновики', 'AI assistant: analysis, evidence, drafts') + '</li></ul><div class="pt-foot">Astana · ' + new Date().getFullYear() + '</div></div></section>';
-  h += '<section class="pt-form"><div class="pt-lang">' + langSeg() + '</div><div class="pt-card">';
+  h += '<section class="pt-form"><div class="pt-lang">' + themeBtn() + langSeg() + '</div><div class="pt-card">';
   if (a.mode === 'wait') {
     h += '<div class="pt-icon">' + ico('clock', 26) + '</div><h2>' + LL('Заявка отправлена', 'Request sent') + '</h2><p class="muted">' + LL('Администратор сектора подтвердит учётную запись и роль. После этого войдите с той же почтой и паролем.', 'The unit administrator will approve your account and role. Then sign in with the same email and password.') + '</p><button type="button" class="btn primary wide" data-act="amode" data-v="login">' + LL('Ко входу', 'Back to sign-in') + '</button>';
   } else {
@@ -2751,6 +2756,9 @@ function renderPortal() {
   h += '</div><div class="pt-mode">' + (CLOUD.on ? '<span class="dot ok"></span>' + LL('Общая база · ', 'Shared database · ') + esc(CLOUD.cfg.projectId) + (CLOUD.err ? ' · <span class="due">' + esc(CLOUD.err) + '</span>' : !CLOUD.ready ? LL(' · подключение…', ' · connecting…') : '') : '<span class="dot"></span>' + LL('Локальный режим: данные в этом браузере', 'Local mode: data in this browser')) + ' · <button type="button" class="linkbtn" data-act="cloudsetup">' + LL('Облако', 'Cloud') + '</button></div></section></div>';
   return h;
 }
+function themeCur() { return UI.theme || (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); }
+function themeApply() { var th = themeCur(); document.documentElement.setAttribute('data-theme', th); var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', th === 'dark' ? '#000000' : '#FFFFFF'); }
+function themeBtn() { var d = themeCur() === 'dark'; return '<button type="button" class="iconbtn themebtn" data-act="theme" aria-label="' + (d ? LL('Светлая тема', 'Light theme') : LL('Тёмная тема', 'Dark theme')) + '" title="' + (d ? LL('Светлая тема', 'Light theme') : LL('Тёмная тема', 'Dark theme')) + '">' + ico(d ? 'sun' : 'moon', 18) + '</button>'; }
 function langSeg() { return '<div class="seg lang" role="group" aria-label="' + t('a11y.lang') + '"><button type="button" class="' + (LANG === 'ru' ? 'on' : '') + '" data-act="lang" data-v="ru">RU</button><button type="button" class="' + (LANG === 'en' ? 'on' : '') + '" data-act="lang" data-v="en">EN</button></div>'; }
 function fbRules() {
   var adm = (S.cs && S.cs.admins ? S.cs.admins.split(/[\s,;]+/) : cfgAdmins()).filter(Boolean).map(function (x) { return "'" + x.toLowerCase() + "'"; }).join(', ') || "'you@example.com'";
@@ -2815,11 +2823,11 @@ function demoDB() {
 
 /* ======================= v10: AI assistant (Gemini) ======================= */
 var AI = { key: '', model: 'gemini-2.5-flash', st: 'off', err: '', deid: true, threads: {}, busy: false };
-try { AI.key = sessionStorage.getItem('crr.aikey') || ''; AI.model = localStorage.getItem('crr.aimodel') || AI.model; AI.deid = localStorage.getItem('crr.aideid') !== '0'; } catch (e) {}
+try { AI.key = localStorage.getItem('crr.aikey') || ''; AI.model = localStorage.getItem('crr.aimodel') || AI.model; AI.deid = localStorage.getItem('crr.aideid') !== '0'; } catch (e) {}
 var AI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 var AI_MODELS = [['gemini-2.5-flash', 'Gemini 2.5 Flash', LL('быстрая, по умолчанию', 'fast, default')], ['gemini-2.5-pro', 'Gemini 2.5 Pro', LL('глубже, медленнее', 'deeper, slower')], ['gemini-2.5-flash-lite', 'Gemini 2.5 Flash-Lite', LL('самая быстрая', 'fastest')]];
 function aiReady() { return AI.st === 'ok' && !!AI.key; }
-function aiSetKey(k) { AI.key = String(k || '').trim(); AI.shared = false; if (!AI.key && AI.sharedKey) { try { sessionStorage.removeItem('crr.aikey'); } catch (e) {} AI.key = AI.sharedKey; AI.shared = true; aiCheck(); return; } try { if (AI.key) sessionStorage.setItem('crr.aikey', AI.key); else sessionStorage.removeItem('crr.aikey'); } catch (e) {} aiCheck(); }
+function aiSetKey(k) { AI.key = String(k || '').trim(); AI.shared = false; if (!AI.key && AI.sharedKey) { try { localStorage.removeItem('crr.aikey'); } catch (e) {} AI.key = AI.sharedKey; AI.shared = true; aiCheck(); return; } try { if (AI.key) localStorage.setItem('crr.aikey', AI.key); else localStorage.removeItem('crr.aikey'); } catch (e) {} aiCheck(); }
 function aiLoadShared() {
   if (!CLOUD.on || !CLOUD.db) return;
   CLOUD.db.collection('config').doc('ai').get().then(function (d) {
@@ -3061,7 +3069,7 @@ function renderAIPill() {
   if (open) {
     h += '<div class="pop right aipop"><div class="np-h"><b>' + ico('sparkle', 16) + LL('Подключение ИИ', 'AI connection') + '</b></div><div class="aipop-b">';
     h += '<label class="af"><span>' + (AI.shared ? LL('Используется общий ключ сектора. Свой ключ (необязательно)', 'Using the shared unit key. Your own key (optional)') : LL('Ваш ключ Gemini API', 'Your Gemini API key')) + '</span><input type="password" id="aikey-in" value="' + (AI.shared ? '' : esc(AI.key)) + '" placeholder="AIza…" autocomplete="off" data-enter="aikey"></label>';
-    h += '<p class="fhint">' + (AI.sharedKey ? LL('Если ввести свой ключ, он будет использоваться вместо общего до закрытия вкладки.', 'Your own key replaces the shared one until the tab closes.') : LL('Ключ хранится только до закрытия вкладки. Получить бесплатно: aistudio.google.com → Get API key.', 'Stored only until the tab closes. Get one free at aistudio.google.com → Get API key.')) + '</p>';
+    h += '<p class="fhint">' + (AI.sharedKey ? LL('Если ввести свой ключ, на этом устройстве будет использоваться он вместо общего.', 'Your own key replaces the shared one on this device.') : LL('Ключ сохраняется на этом устройстве. Получить бесплатно: aistudio.google.com → Get API key.', 'Saved on this device. Get one free at aistudio.google.com → Get API key.')) + '</p>';
     if (CLOUD.on && isAdmin() && AI.key && !AI.shared && AI.st === 'ok' && AI.sharedKey !== AI.key) h += '<button type="button" class="btn small" data-act="aishare" style="margin-bottom:10px">' + ico('users', 14) + LL('Сделать этот ключ общим для всех', 'Make this key the default for everyone') + '</button>';
     h += '<label class="af"><span>' + LL('Модель', 'Model') + '</span><select id="aimodel">' + (AI.avail && AI.avail.length ? AI.avail.map(function (m) { return [m.id, m.name, m.id]; }) : AI_MODELS).map(function (m) { return '<option value="' + m[0] + '"' + (AI.model === m[0] ? ' selected' : '') + '>' + esc(m[1]) + ' · ' + esc(m[2]) + '</option>'; }).join('') + '</select></label>';
     h += '<label class="chk"><input type="checkbox" id="aideid"' + (AI.deid ? ' checked' : '') + '><span>' + LL('Обезличивать данные перед отправкой (ФИО, ИИН, ИБ, адрес)', 'De-identify data before sending (name, ID, case no., address)') + '</span></label>';
@@ -3196,7 +3204,7 @@ function markLabs(rid) {
 /* ======================= v10: MDT protocol ======================= */
 var MP = [
   ['pass', ['Паспортные данные', 'Patient details'], [f('fam', 'Фамилия', 'Surname', 'text'), f('nam', 'Имя', 'Name', 'text'), f('otc', 'Отчество', 'Patronymic', 'text'), f('iin', 'ИИН', 'IIN', 'text'), f('dob', 'Дата рождения', 'Date of birth', 'date'), f('age', 'Возраст', 'Age', 'num', { unit: 'u.years' }), f('sex', 'Пол', 'Sex', 'seg', { options: ['М', 'Ж'] }), f('addr', 'Адрес постоянного местожительства', 'Permanent address', 'text', { wide: true })]],
-  ['dx', ['Диагноз', 'Diagnosis'], [f('main', 'Основной диагноз', 'Main diagnosis', 'long', { rows: 2 }), f('loc', 'Локализация', 'Location', 'text'), f('morph', 'Морфологический диагноз', 'Morphology', 'text', { wide: true }), f('T', 'T', 'T', 'text'), f('N', 'N', 'N', 'text'), f('M', 'M', 'M', 'text'), f('stage', 'Стадия', 'Stage', 'text'), f('mets', 'Метастазы', 'Metastases', 'seg', { options: ['Да', 'Нет'] }), f('metsLoc', 'Локализация метастазов', 'Metastatic sites', 'text', { show: function (d) { return d.mets === 'Да'; } }), f('ecog', 'ECOG', 'ECOG', 'sel', { options: ['0', '1', '2', '3', '4'] }), f('cg', 'Клиническая группа', 'Clinical group', 'sel', { options: ['Ia', 'Ib', 'II', 'III', 'IV'] }), f('icd', 'Код диагноза по МКБ-10', 'ICD-10 code', 'text')]],
+  ['dx', ['Диагноз', 'Diagnosis'], [f('main', 'Основной диагноз', 'Main diagnosis', 'long', { rows: 2 }), f('loc', 'Локализация', 'Location', 'text'), f('morph', 'Морфологический диагноз', 'Morphology', 'text', { wide: true, ph: 'Аденокарцинома или код МКБ-О 8140/3' }), f('T', 'T', 'T', 'text'), f('N', 'N', 'N', 'text'), f('M', 'M', 'M', 'text'), f('stage', 'Стадия', 'Stage', 'text'), f('mets', 'Метастазы', 'Metastases', 'seg', { options: ['Да', 'Нет'] }), f('metsLoc', 'Локализация метастазов', 'Metastatic sites', 'text', { show: function (d) { return d.mets === 'Да'; } }), f('ecog', 'ECOG', 'ECOG', 'sel', { options: ['0', '1', '2', '3', '4'] }), f('cg', 'Клиническая группа', 'Clinical group', 'sel', { options: ['Ia', 'Ib', 'II', 'III', 'IV'] }), f('icd', 'Код диагноза по МКБ-10', 'ICD-10 code', 'text', { ph: 'C20 или название' })]],
   ['ref', ['Диагноз при направлении на МДГ', 'Diagnosis at referral'], [f('refDx', 'Диагноз при направлении на МДГ', 'Diagnosis at referral', 'long', { rows: 2 })]],
   ['anam', ['Анамнез заболевания', 'History of present illness'], [f('anam', 'Анамнез заболевания', 'History', 'long', { rows: 4 })]],
   ['labs', ['Лабораторные исследования', 'Laboratory tests'], [f('labs', 'Лабораторные исследования', 'Laboratory tests', 'long', { rows: 3, ph: 'Hb, лейкоциты, тромбоциты, креатинин, альбумин, РЭА, СА 19-9…' })]],
@@ -3405,7 +3413,7 @@ function renderTop() {
   h += renderAIPill();
   h += '<button type="button" class="aibtn' + (UI.aip ? ' on' : '') + '" data-act="aitoggle" title="' + LL('ИИ-ассистент по открытому экрану', 'AI assistant for this screen') + '">' + ico('sparkle', 16) + '<span>' + LL('Ассистент', 'Assistant') + '</span></button>';
   h += renderBell();
-  h += langSeg();
+  h += themeBtn() + langSeg();
   h += '<div class="dd"><button type="button" class="user" data-act="menu" data-id="top" aria-expanded="' + (S.menu === 'top') + '"><span class="av">' + esc(initials(me())) + '</span><span class="un"><b>' + esc(me()) + '</b><em>' + (SESSION.admin ? LL('Администратор', 'Admin') : roleName(SESSION.role)) + '</em></span>' + ico('down', 14) + '</button>';
   if (S.menu === 'top') {
     h += '<div class="pop right" role="menu"><div class="pop-user"><span class="av">' + esc(initials(me())) + '</span><div><b>' + esc(me()) + '</b><em>' + esc(SESSION.email) + '</em><span class="tag">' + (SESSION.admin ? LL('Администратор', 'Admin') + ' · ' : '') + roleName(SESSION.role) + '</span></div></div>';
@@ -3707,6 +3715,7 @@ document.addEventListener('click', function (ev) {
     case 'aistop': if (AI.ctrl) AI.ctrl.abort(); break;
     case 'aikeysave': { var ki = root.querySelector('#aikey-in'), mo = root.querySelector('#aimodel'), de = root.querySelector('#aideid'); AI.model = mo ? mo.value : AI.model; AI.deid = de ? de.checked : AI.deid; try { localStorage.setItem('crr.aimodel', AI.model); localStorage.setItem('crr.aideid', AI.deid ? '1' : '0'); } catch (e) {} AI.threads = {}; aiSetKey(ki ? ki.value : ''); break; }
     case 'aikeyclear': AI.threads = {}; aiSetKey(''); break;
+    case 'theme': UI.theme = themeCur() === 'dark' ? 'light' : 'dark'; saveUI(); themeApply(); render(); break;
     case 'aishare': aiShareDefault(true); break;
     case 'cmd': S.menu = null; S.cmd = { q: '', i: 0 }; render(); break;
     case 'cmdgo': cmdGo(+g('i')); break;
@@ -3848,8 +3857,96 @@ document.addEventListener('change', function (ev) {
   var ur = tg.getAttribute('data-urole'); if (ur) setUser(ur, { role: tg.value });
 });
 
+/* ======================= ICD-10 / ICD-O autocomplete ======================= */
+var ICDX = { loading: {}, el: null, inp: null, items: [], i: 0 };
+function icdMode(tg) {
+  if (!tg || tg.tagName !== 'INPUT' || tg.type !== 'text') return null;
+  var p = tg.getAttribute('data-bind') || tg.getAttribute('data-ebind') || '';
+  if (/(^|\.)icd$/.test(p)) return /^proto\./.test(p) ? 'icdm' : 'icd';
+  if (/(^|\.)morph$/.test(p)) return 'icdo';
+  return null;
+}
+function icdLoad(kind, cb) {
+  var v = kind === 'icdo' ? 'ICDO' : 'ICD10';
+  if (window[v]) { cb(); return; }
+  if (ICDX.loading[v]) { ICDX.loading[v].push(cb); return; }
+  ICDX.loading[v] = [cb];
+  loadScript(kind === 'icdo' ? 'icdo.js' : 'icd10.js').then(function () { (ICDX.loading[v] || []).forEach(function (f) { f(); }); ICDX.loading[v] = null; });
+}
+function icdNorm(q) {
+  var L2 = { 'А': 'A', 'В': 'B', 'С': 'C', 'Е': 'E', 'К': 'K', 'М': 'M', 'Н': 'H', 'О': 'O', 'Р': 'P', 'Т': 'T', 'Х': 'X', 'а': 'A', 'в': 'B', 'с': 'C', 'е': 'E', 'к': 'K', 'м': 'M', 'н': 'H', 'о': 'O', 'р': 'P', 'т': 'T', 'х': 'X' };
+  return q.replace(/^./, function (c) { return L2[c] || c; }).toUpperCase().replace(/[.\s]/g, '');
+}
+function icdQuery(tg, kind) {
+  var val = tg.value, q = kind === 'icdm' ? val.split(/[,;]/).pop() : val; q = q.trim();
+  if (!q) return [];
+  var list = kind === 'icdo' ? window.ICDO : window.ICD10, out = [];
+  if (!list) return [];
+  var codeLike = kind === 'icdo' ? /^\d/.test(q) : /^[A-Za-zА-Яа-я]\d/.test(q);
+  if (codeLike) {
+    var n = kind === 'icdo' ? q.replace(/\s/g, '') : icdNorm(q);
+    for (var i = 0; i < list.length && out.length < 14; i++) { var c = kind === 'icdo' ? list[i][0] : list[i][0].replace('.', ''); if (c.indexOf(n) === 0) out.push(list[i]); }
+  } else if (q.length >= 3) {
+    var ws = q.toLowerCase().split(/\s+/).filter(Boolean);
+    for (var j = 0; j < list.length && out.length < 300; j++) { var nm = list[j][1].toLowerCase(); if (ws.every(function (w) { return nm.indexOf(w) >= 0; })) out.push(list[j]); }
+    var q0 = ws[0];
+    out.sort(function (a, b) { var r = function (x) { return (x[1].toLowerCase().indexOf(q0) === 0 ? 0 : 2) + (kind === 'icdo' && !/\/3$/.test(x[0]) ? 1 : 0); }; return r(a) - r(b) || a[1].length - b[1].length; });
+    out = out.slice(0, 14);
+  }
+  return out;
+}
+function icdClose() { if (ICDX.el) ICDX.el.remove(); ICDX.el = null; ICDX.inp = null; ICDX.items = []; }
+function icdShow(tg, kind) {
+  var items = icdQuery(tg, kind);
+  if (!items.length) { icdClose(); return; }
+  ICDX.inp = tg; ICDX.kind = kind; ICDX.items = items; ICDX.i = 0;
+  if (!ICDX.el) { ICDX.el = document.createElement('div'); ICDX.el.className = 'icdpop'; ICDX.el.setAttribute('role', 'listbox'); document.body.appendChild(ICDX.el); ICDX.el.addEventListener('mousedown', function (e) { var b = e.target.closest('[data-icdi]'); if (!b) return; e.preventDefault(); icdPick(+b.getAttribute('data-icdi')); }); }
+  icdPaint(); icdPlace();
+}
+function icdPaint() {
+  ICDX.el.innerHTML = ICDX.items.map(function (x, i) { return '<div class="icdo-i' + (i === ICDX.i ? ' on' : '') + '" role="option" data-icdi="' + i + '"><b>' + esc(x[0]) + '</b><span>' + esc(x[1]) + '</span></div>'; }).join('');
+}
+function icdPlace() {
+  if (!ICDX.el || !ICDX.inp) return;
+  var r = ICDX.inp.getBoundingClientRect(), w = Math.max(r.width, Math.min(560, window.innerWidth - 24)), left = Math.min(r.left, window.innerWidth - w - 12);
+  var below = window.innerHeight - r.bottom, up = below < 260 && r.top > below;
+  ICDX.el.style.cssText = 'left:' + Math.max(12, left) + 'px;width:' + w + 'px;' + (up ? 'bottom:' + (window.innerHeight - r.top + 4) + 'px' : 'top:' + (r.bottom + 4) + 'px') + ';max-height:' + Math.max(160, Math.min(320, (up ? r.top : below) - 16)) + 'px';
+}
+function icdPick(i) {
+  var x = ICDX.items[i], tg = ICDX.inp, kind = ICDX.kind; if (!x || !tg) return;
+  var nv;
+  if (kind === 'icdm') { var parts = tg.value.split(/[,;]/); parts[parts.length - 1] = ' ' + x[0]; nv = parts.map(function (s) { return s.trim(); }).filter(Boolean).join(', '); }
+  else if (kind === 'icdo') nv = x[1] + ' (' + x[0] + ')';
+  else nv = x[0];
+  tg.value = nv; icdClose();
+  ICDX.picking = true; tg.dispatchEvent(new Event('input', { bubbles: true })); tg.dispatchEvent(new Event('change', { bubbles: true })); ICDX.picking = false;
+  toast(LL('Выбрано: ', 'Selected: ') + x[0] + ' ' + x[1]);
+}
+document.addEventListener('input', function (ev) {
+  var tg = ev.target, kind = icdMode(tg);
+  if (!kind) return;
+  if (ICDX.picking) return;
+  icdLoad(kind, function () { setTimeout(function () { var a = document.activeElement; if (icdMode(a) === kind) icdShow(a, kind); }, 0); });
+});
+document.addEventListener('focusin', function (ev) { var kind = icdMode(ev.target); if (kind) icdLoad(kind, function () {}); });
+document.addEventListener('focusout', function (ev) {
+  if (ev.target !== ICDX.inp) return;
+  var path = function (x) { return x && x.getAttribute && (x.getAttribute('data-bind') || x.getAttribute('data-ebind')); }, was = path(ICDX.inp);
+  var tries = 0;
+  (function chk() { setTimeout(function () { var a = document.activeElement; if (a && icdMode(a) && path(a) === was) { ICDX.inp = a; icdPlace(); } else if ((!a || a === document.body) && ++tries < 4) chk(); else if (path(ICDX.inp) === was) icdClose(); }, 120); })();
+});
+document.addEventListener('keydown', function (ev) {
+  if (!ICDX.el || ev.target !== ICDX.inp) return;
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { ev.preventDefault(); ICDX.i = (ICDX.i + (ev.key === 'ArrowDown' ? 1 : -1) + ICDX.items.length) % ICDX.items.length; icdPaint(); var o = ICDX.el.querySelector('.on'); if (o) o.scrollIntoView({ block: 'nearest' }); }
+  else if (ev.key === 'Enter' || ev.key === 'Tab') { if (ICDX.items.length) { ev.preventDefault(); ev.stopImmediatePropagation(); icdPick(ICDX.i); } }
+  else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopImmediatePropagation(); icdClose(); }
+}, true);
+window.addEventListener('scroll', icdPlace, true); window.addEventListener('resize', icdPlace);
+
 window.__CRR = { SECTIONS: SECTIONS, MODULES: MODULES, MEDIA: MEDIA, COLS: COLS, DICT: DICT, OPT: OPT };
 if (SESSION && isStudent()) maskForStudent();
+themeApply();
+if (window.matchMedia) try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { if (!UI.theme) { themeApply(); render(); } }); } catch (e) {}
 cloudInit();
 if (AI.key) aiCheck();
 render();
