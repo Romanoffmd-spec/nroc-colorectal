@@ -2632,7 +2632,7 @@ function cloudInit() {
         if (!p) { CLOUD.fb.auth().signOut(); return; }
         if (p.status !== 'active') { S.auth = S.auth || { mode: 'login' }; S.auth.mode = 'wait'; S.auth.busy = false; CLOUD.fb.auth().signOut(); render(); return; }
         setSession({ id: u.uid, email: u.email, name: p.name, role: p.role, admin: !!p.admin }); S.auth = null; if (S.view === 'portal') S.view = 'home';
-        cloudListen(); render();
+        cloudListen(); aiLoadShared(); render();
       });
     });
     render();
@@ -2819,7 +2819,22 @@ try { AI.key = sessionStorage.getItem('crr.aikey') || ''; AI.model = localStorag
 var AI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 var AI_MODELS = [['gemini-2.5-flash', 'Gemini 2.5 Flash', LL('быстрая, по умолчанию', 'fast, default')], ['gemini-2.5-pro', 'Gemini 2.5 Pro', LL('глубже, медленнее', 'deeper, slower')], ['gemini-2.5-flash-lite', 'Gemini 2.5 Flash-Lite', LL('самая быстрая', 'fastest')]];
 function aiReady() { return AI.st === 'ok' && !!AI.key; }
-function aiSetKey(k) { AI.key = String(k || '').trim(); try { if (AI.key) sessionStorage.setItem('crr.aikey', AI.key); else sessionStorage.removeItem('crr.aikey'); } catch (e) {} aiCheck(); }
+function aiSetKey(k) { AI.key = String(k || '').trim(); AI.shared = false; if (!AI.key && AI.sharedKey) { try { sessionStorage.removeItem('crr.aikey'); } catch (e) {} AI.key = AI.sharedKey; AI.shared = true; aiCheck(); return; } try { if (AI.key) sessionStorage.setItem('crr.aikey', AI.key); else sessionStorage.removeItem('crr.aikey'); } catch (e) {} aiCheck(); }
+function aiLoadShared() {
+  if (!CLOUD.on || !CLOUD.db) return;
+  CLOUD.db.collection('config').doc('ai').get().then(function (d) {
+    var k = d.exists ? String(d.data().key || '') : '';
+    AI.sharedKey = k; AI.sharedLoaded = true;
+    if (k && !AI.key) { AI.key = k; AI.shared = true; aiCheck(); }
+    else if (!k && AI.key && AI.st === 'ok') aiShareDefault(false);
+    render();
+  }).catch(function () { AI.sharedLoaded = true; });
+}
+function aiShareDefault(force) {
+  if (!CLOUD.on || !CLOUD.db || !SESSION || !isAdmin() || !AI.key || AI.shared || !AI.sharedLoaded) return;
+  if (!force && AI.sharedKey) return;
+  CLOUD.db.collection('config').doc('ai').set({ key: AI.key, by: me(), at: nowIso() }).then(function () { AI.sharedKey = AI.key; toast(LL('Ключ Gemini стал общим для всех пользователей', 'Gemini key is now shared with all users')); render(); }).catch(function (e) { toast(LL('Не удалось сохранить общий ключ: ', 'Could not save shared key: ') + (e.code || e.message)); });
+}
 function aiVer(n) { var m = /gemini-(\d+(?:\.\d+)?)/.exec(n); return m ? parseFloat(m[1]) : 0; }
 function aiCheck() {
   if (!AI.key) { AI.st = 'off'; AI.err = ''; render(); return; }
@@ -2832,7 +2847,7 @@ function aiCheck() {
         var pick = function (re) { return av.filter(function (m) { return re.test(m.id) && !/preview|exp|lite/.test(m.id); }).sort(function (a, b) { return aiVer(b.id) - aiVer(a.id); })[0]; };
         var best = pick(/flash/) || pick(/pro/) || av[0]; AI.model = best.id;
       }
-      AI.st = 'ok'; render(); aiMaybeGreet();
+      AI.st = 'ok'; render(); aiMaybeGreet(); aiShareDefault(false);
     })
     .catch(function (e) { AI.st = 'err'; AI.err = (e && e.error && e.error.message) || LL('Нет связи с Google AI', 'Cannot reach Google AI'); render(); });
 }
@@ -3045,12 +3060,13 @@ function renderAIPill() {
   var h = '<div class="dd"><button type="button" class="aipill s-' + st + '" data-act="menu" data-id="aikey" aria-expanded="' + open + '" title="' + LL('Ключ API Gemini и статус подключения', 'Gemini API key and status') + '"><span class="tgl"><i></i></span><span>' + lbl + '</span></button>';
   if (open) {
     h += '<div class="pop right aipop"><div class="np-h"><b>' + ico('sparkle', 16) + LL('Подключение ИИ', 'AI connection') + '</b></div><div class="aipop-b">';
-    h += '<label class="af"><span>' + LL('Ваш ключ Gemini API', 'Your Gemini API key') + '</span><input type="password" id="aikey-in" value="' + esc(AI.key) + '" placeholder="AIza…" autocomplete="off" data-enter="aikey"></label>';
-    h += '<p class="fhint">' + LL('Ключ хранится только до закрытия вкладки и нигде не сохраняется. Получить бесплатно: aistudio.google.com → Get API key.', 'Stored only until the tab closes. Get one free at aistudio.google.com → Get API key.') + '</p>';
+    h += '<label class="af"><span>' + (AI.shared ? LL('Используется общий ключ сектора. Свой ключ (необязательно)', 'Using the shared unit key. Your own key (optional)') : LL('Ваш ключ Gemini API', 'Your Gemini API key')) + '</span><input type="password" id="aikey-in" value="' + (AI.shared ? '' : esc(AI.key)) + '" placeholder="AIza…" autocomplete="off" data-enter="aikey"></label>';
+    h += '<p class="fhint">' + (AI.sharedKey ? LL('Если ввести свой ключ, он будет использоваться вместо общего до закрытия вкладки.', 'Your own key replaces the shared one until the tab closes.') : LL('Ключ хранится только до закрытия вкладки. Получить бесплатно: aistudio.google.com → Get API key.', 'Stored only until the tab closes. Get one free at aistudio.google.com → Get API key.')) + '</p>';
+    if (CLOUD.on && isAdmin() && AI.key && !AI.shared && AI.st === 'ok' && AI.sharedKey !== AI.key) h += '<button type="button" class="btn small" data-act="aishare" style="margin-bottom:10px">' + ico('users', 14) + LL('Сделать этот ключ общим для всех', 'Make this key the default for everyone') + '</button>';
     h += '<label class="af"><span>' + LL('Модель', 'Model') + '</span><select id="aimodel">' + (AI.avail && AI.avail.length ? AI.avail.map(function (m) { return [m.id, m.name, m.id]; }) : AI_MODELS).map(function (m) { return '<option value="' + m[0] + '"' + (AI.model === m[0] ? ' selected' : '') + '>' + esc(m[1]) + ' · ' + esc(m[2]) + '</option>'; }).join('') + '</select></label>';
     h += '<label class="chk"><input type="checkbox" id="aideid"' + (AI.deid ? ' checked' : '') + '><span>' + LL('Обезличивать данные перед отправкой (ФИО, ИИН, ИБ, адрес)', 'De-identify data before sending (name, ID, case no., address)') + '</span></label>';
     h += '<div class="aistat s-' + st + '"><span class="dot"></span>' + ({ off: LL('Ключ не введён', 'No key'), check: LL('Проверяю ключ…', 'Checking key…'), ok: LL('Подключено: ключ принят, всё работает', 'Connected: key accepted, all good'), err: esc(AI.err) }[st]) + '</div>';
-    h += '<div class="actions"><button type="button" class="btn primary small" data-act="aikeysave">' + LL('Сохранить и проверить', 'Save and test') + '</button>' + (AI.key ? '<button type="button" class="btn small ghost" data-act="aikeyclear">' + LL('Отключить', 'Disconnect') + '</button>' : '') + '</div></div></div>';
+    h += '<div class="actions"><button type="button" class="btn primary small" data-act="aikeysave">' + LL('Сохранить и проверить', 'Save and test') + '</button>' + (AI.key && !AI.shared ? '<button type="button" class="btn small ghost" data-act="aikeyclear">' + (AI.sharedKey ? LL('Вернуть общий ключ', 'Back to shared key') : LL('Отключить', 'Disconnect')) + '</button>' : '') + '</div></div></div>';
   }
   return h + '</div>';
 }
@@ -3691,6 +3707,7 @@ document.addEventListener('click', function (ev) {
     case 'aistop': if (AI.ctrl) AI.ctrl.abort(); break;
     case 'aikeysave': { var ki = root.querySelector('#aikey-in'), mo = root.querySelector('#aimodel'), de = root.querySelector('#aideid'); AI.model = mo ? mo.value : AI.model; AI.deid = de ? de.checked : AI.deid; try { localStorage.setItem('crr.aimodel', AI.model); localStorage.setItem('crr.aideid', AI.deid ? '1' : '0'); } catch (e) {} AI.threads = {}; aiSetKey(ki ? ki.value : ''); break; }
     case 'aikeyclear': AI.threads = {}; aiSetKey(''); break;
+    case 'aishare': aiShareDefault(true); break;
     case 'cmd': S.menu = null; S.cmd = { q: '', i: 0 }; render(); break;
     case 'cmdgo': cmdGo(+g('i')); break;
     case 'cmdclose': S.cmd = null; render(); break;
