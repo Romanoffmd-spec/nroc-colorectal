@@ -521,12 +521,13 @@ function defaultRegistries() {
   ];
 }
 function freshDB() {
-  if (CLOUD_MODE || !window.NOTION_IMPORT) return demoDB();
+  if (CLOUD_MODE || !window.NOTION_IMPORT) return emptyDB();
   var I = window.NOTION_IMPORT || { patients: [], planner: [], mdt: [], mm: [], redcap: [] };
   var cols = { planner: [], mdt: [], mm: [], redcap: [], goals: [], pubs: [] };
   ['planner', 'mdt', 'mm', 'redcap'].forEach(function (k) { (I[k] || []).forEach(function (r, i) { var x = clone(r); x.id = k + '_' + (i + 1); if (k === 'redcap' && !x.done) x.done = 'Ожидает'; cols[k].push(x); }); });
   return { v: 3, seq: (I.patients || []).length + 1, registries: defaultRegistries(), patients: clone(I.patients || []), cols: cols, importedAt: isoOf(new Date()) };
 }
+function emptyDB() { return { v: 3, seq: 1, registries: defaultRegistries(), patients: [], cols: { planner: [], mdt: [], mm: [], redcap: [], goals: [], pubs: [] }, importedAt: isoOf(new Date()) }; }
 function plannerAuto(db) {
   var td = isoOf(new Date()), n = 0;
   (db.cols.planner || []).forEach(function (r) {
@@ -2686,7 +2687,8 @@ function cloudListen() {
     if (snap.metadata.hasPendingWrites) return;
     var map = {}; snap.forEach(function (d) { map[d.id] = d.data().v; });
     if (!Object.keys(map).length) {
-      if (isAdmin()) { DB = migrate(demoDB()); CLOUD.cache = {}; save(); toast(LL('Облако пустое: загружены тестовые данные', 'Cloud was empty: test data loaded')); }
+      if (DB.demo) { DB = migrate(emptyDB()); try { localStorage.setItem(KEY_CLOUD, JSON.stringify(DB)); } catch (e) {} render(); }
+      if (isAdmin()) toast(LL('Общая база пуста: загрузите резервную копию из локальной версии (Администрирование → Загрузить данные в облако)', 'Shared database is empty: upload a backup from the local version (Administration → Upload data to cloud)'));
       return;
     }
     CLOUD.cache = map;
@@ -2715,7 +2717,7 @@ function renderUsers() {
     h += '<tr><td class="strong"><span class="av sm">' + esc(initials(u.name)) + '</span> ' + esc(u.name) + (u.admin ? ' <span class="tag">admin</span>' : '') + '</td><td>' + esc(u.email) + '</td><td><select class="sel-sm" data-urole="' + u.id + '"' + (u.admin ? ' disabled' : '') + '>' + Object.keys(ROLES).map(function (r) { return '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + roleName(r) + '</option>'; }).join('') + '</select></td><td>' + st + '</td><td class="ra">' + (u.admin ? '' : (u.status !== 'active' ? '<button type="button" class="btn small primary" data-act="uok" data-id="' + u.id + '">' + LL('Подтвердить', 'Approve') + '</button>' : '') + (u.status !== 'rejected' ? '<button type="button" class="btn small ghost" data-act="uno" data-id="' + u.id + '">' + LL('Отключить', 'Disable') + '</button>' : '')) + '</td></tr>';
   });
   h += '</tbody></table></div>';
-  h += '<div class="page-sec"><div class="panel"><div class="ph"><h2>' + LL('Режим хранения', 'Storage mode') + '</h2></div><p class="muted">' + (CLOUD.on ? LL('Облачный прототип Firebase: проект ', 'Firebase cloud prototype: project ') + '<b>' + esc(CLOUD.cfg.projectId) + '</b>. ' + LL('Только тестовые данные.', 'Test data only.') : LL('Локальный режим: данные и учётные записи хранятся в этом браузере.', 'Local mode: data and accounts live in this browser.')) + '</p><div class="actions" style="margin-top:12px"><button type="button" class="btn" data-act="cloudsetup">' + ico('cloud', 16) + LL('Настроить облако', 'Cloud setup') + '</button>' + (CLOUD.on ? '<button type="button" class="btn ghost" data-act="demoload">' + LL('Перезагрузить тестовые данные', 'Reload test data') + '</button>' : '') + '</div></div></div>';
+  h += '<div class="page-sec"><div class="panel"><div class="ph"><h2>' + LL('Режим хранения', 'Storage mode') + '</h2></div><p class="muted">' + (CLOUD.on ? LL('Общая облачная база Firebase: проект ', 'Shared Firebase database: project ') + '<b>' + esc(CLOUD.cfg.projectId) + '</b>. ' + LL('Все подтверждённые пользователи видят одни и те же данные, изменения синхронизируются сразу.', 'All approved users see the same data; changes sync instantly.') : LL('Локальный режим: данные и учётные записи хранятся в этом браузере.', 'Local mode: data and accounts live in this browser.')) + '</p><div class="actions" style="margin-top:12px"><button type="button" class="btn" data-act="cloudsetup">' + ico('cloud', 16) + LL('Настроить облако', 'Cloud setup') + '</button>' + (CLOUD.on ? '<button type="button" class="btn" data-act="restore">' + ico('upload', 16) + LL('Загрузить данные в облако (файл резервной копии)', 'Upload data to cloud (backup file)') + '</button>' : '<button type="button" class="btn" data-act="backup">' + ico('download', 16) + LL('Скачать резервную копию для облака', 'Download backup for cloud') + '</button>') + '</div></div></div>';
   return h;
 }
 
@@ -2752,7 +2754,7 @@ function fbRules() {
 function renderCloudSetup() {
   var c = S.cs;
   var h = '<div class="dim" data-act="csclose"></div><section class="modal xmodal wide" role="dialog" aria-modal="true"><div class="dhead"><div><div class="dh-kicker">Firebase</div><div class="dh-title">' + LL('Облачный режим (прототип)', 'Cloud mode (prototype)') + '</div></div><button type="button" class="iconbtn" data-act="csclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
-  h += '<div class="warnbox"><b>' + ico('alert', 15) + LL('Только тестовые данные', 'Test data only') + '</b><ul><li>' + LL('Серверы Firebase находятся за пределами Казахстана. Реальные данные пациентов туда не загружаются: облако стартует с тестового набора, ваши локальные данные остаются в браузере отдельно.', 'Firebase servers are outside Kazakhstan. Real patient data is never uploaded: the cloud starts with a test set, your local data stays separate.') + '</li></ul></div>';
+  h += '<div class="warnbox"><b>' + ico('alert', 15) + LL('Реальные данные пациентов', 'Real patient data') + '</b><ul><li>' + LL('Облако становится общей базой сектора: доступ только у подтверждённых администратором сотрудников, студенты видят обезличенные данные.', 'The cloud becomes the shared unit database: approved staff only, students see de-identified data.') + '</li><li>' + LL('Серверы Firebase находятся за пределами Казахстана (выберите регион europe-west). Закон РК о персональных данных требует хранить персональные данные в РК: согласуйте использование с руководством центра.', 'Firebase servers are outside Kazakhstan (choose europe-west). Kazakhstan law requires personal data to be stored in-country: clear this with the centre management.') + '</li><li>' + LL('После подключения администратор загружает данные: в локальной версии Меню → Резервная копия, затем здесь Администрирование → Загрузить данные в облако.', 'After connecting, the admin uploads data: local version Menu → Backup, then here Administration → Upload data to cloud.') + '</li></ul></div>';
   h += '<ol class="steps"><li>' + LL('Откройте <b>console.firebase.google.com</b>, создайте проект (Google Analytics можно выключить).', 'Open <b>console.firebase.google.com</b> and create a project.') + '</li><li>' + LL('Build → Authentication → Get started → включите <b>Email/Password</b>.', 'Build → Authentication → enable <b>Email/Password</b>.') + '</li><li>' + LL('Build → Firestore Database → Create database (регион europe-west), затем вкладка Rules: вставьте правила ниже и нажмите Publish.', 'Build → Firestore → Create database, then Rules: paste the rules below and Publish.') + '</li><li>' + LL('Project settings → Your apps → Web (&lt;/&gt;) → зарегистрируйте приложение и скопируйте объект <b>firebaseConfig</b> сюда.', 'Project settings → Your apps → Web → copy the <b>firebaseConfig</b> object here.') + '</li><li>' + LL('Для сайта по ссылке: Authentication → Settings → Authorized domains → добавьте ваш домен GitHub Pages.', 'For the shared link: Authentication → Settings → Authorized domains → add your GitHub Pages domain.') + '</li></ol>';
   h += '<div class="fld wide"><label>firebaseConfig</label><textarea rows="7" class="mono-ta" data-sb="cs.cfg" placeholder="{ apiKey: &quot;…&quot;, authDomain: &quot;…&quot;, projectId: &quot;…&quot;, appId: &quot;…&quot; }">' + esc(c.cfg || '') + '</textarea></div>';
   h += '<div class="fld wide"><label>' + LL('Почта администратора (можно несколько через запятую)', 'Admin email(s), comma separated') + '</label><input type="text" data-sb="cs.admins" data-rr="1" value="' + esc(c.admins || '') + '"></div>';
@@ -3340,7 +3342,7 @@ function renderSide() {
   h += navBtn('q', 'clipboard', LL('Анкеты', 'Questionnaires'), undefined, qd || null);
   ['pubs', 'redcap', 'goals'].forEach(function (k) { h += navBtn('col:' + k, COLS[k].icon, L(COLS[k].title), DB.cols[k].length); });
   if (isAdmin()) { h += '<div class="side-h">' + LL('Администрирование', 'Admin') + '</div>' + navBtn('users', 'shield', LL('Пользователи', 'Users')); }
-  h += '<div class="side-foot"><span class="dot-live' + (CLOUD.on ? ' cloud' : '') + '"></span>' + (CLOUD.on ? LL('Облако · тестовые данные', 'Cloud · test data') : LL('Локально в этом браузере', 'Local, this browser')) + '</div></div></nav>';
+  h += '<div class="side-foot"><span class="dot-live' + (CLOUD.on ? ' cloud' : '') + '"></span>' + (CLOUD.on ? LL('Облако · общая база', 'Cloud · shared database') : LL('Локально в этом браузере', 'Local, this browser')) + '</div></div></nav>';
   return h;
 }
 function renderTabbar() {
