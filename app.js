@@ -522,7 +522,9 @@ function defaultRegistries() {
 }
 function freshDB() {
   if (CLOUD_MODE || !window.NOTION_IMPORT) return emptyDB();
-  var I = window.NOTION_IMPORT || { patients: [], planner: [], mdt: [], mm: [], redcap: [] };
+  return dbFromImport(window.NOTION_IMPORT);
+}
+function dbFromImport(I) {
   var cols = { planner: [], mdt: [], mm: [], redcap: [], goals: [], pubs: [] };
   ['planner', 'mdt', 'mm', 'redcap'].forEach(function (k) { (I[k] || []).forEach(function (r, i) { var x = clone(r); x.id = k + '_' + (i + 1); if (k === 'redcap' && !x.done) x.done = 'Ожидает'; cols[k].push(x); }); });
   return { v: 3, seq: (I.patients || []).length + 1, registries: defaultRegistries(), patients: clone(I.patients || []), cols: cols, importedAt: isoOf(new Date()) };
@@ -2688,10 +2690,10 @@ function cloudListen() {
     var map = {}; snap.forEach(function (d) { map[d.id] = d.data().v; });
     if (!Object.keys(map).length) {
       if (DB.demo) { DB = migrate(emptyDB()); try { localStorage.setItem(KEY_CLOUD, JSON.stringify(DB)); } catch (e) {} render(); }
-      if (isAdmin()) toast(LL('Общая база пуста: загрузите резервную копию из локальной версии (Администрирование → Загрузить данные в облако)', 'Shared database is empty: upload a backup from the local version (Administration → Upload data to cloud)'));
+      CLOUD.empty = true; render();
       return;
     }
-    CLOUD.cache = map;
+    CLOUD.cache = map; CLOUD.empty = false;
     var busy = S.drawer || S.rec || S.edit || S.enr || S.fill;
     DB = migrate(dbFromDocs(map));
     try { localStorage.setItem(KEY_CLOUD, JSON.stringify(DB)); } catch (e) {}
@@ -3351,6 +3353,7 @@ function renderTabbar() {
 }
 function renderMain() {
   var v = S.view;
+  if (CLOUD.on && CLOUD.empty && SESSION) return '<div class="page"><div class="panel" style="max-width:640px;margin:40px auto;text-align:center;padding:32px"><div class="pt-icon">' + ico('upload', 26) + '</div><h2>' + LL('Общая база пока пустая', 'The shared database is empty') + '</h2>' + (isAdmin() ? '<p class="muted">' + LL('Нажмите кнопку и выберите файл <b>data.js</b> в папке <b>Документы → colorectal-registry</b>. Все пациенты, планировщик, МДГ, M&M и RedCap загрузятся в облако и станут видны всем подтверждённым сотрудникам.', 'Click the button and pick <b>data.js</b> in <b>Documents → colorectal-registry</b>.') + '</p><button type="button" class="btn primary" data-act="restore">' + ico('upload', 16) + LL('Загрузить данные', 'Upload data') + '</button>' : '<p class="muted">' + LL('Администратор ещё не загрузил данные.', 'The administrator has not uploaded data yet.') + '</p>') + '</div></div>';
   if (v === 'home') return renderHome();
   if (v === 'users') return renderUsers();
   if (v === 'fu') return renderFu();
@@ -3689,7 +3692,7 @@ document.addEventListener('drop', function (ev) {
 document.getElementById('importFile').addEventListener('change', function (ev) {
   var fl = ev.target.files[0]; if (!fl) return; var rd = new FileReader();
   rd.onload = function () {
-    try { var x = JSON.parse(rd.result); if (!x || x.v !== 3) throw 0; if (!confirm(t('confirm.restore', { n: plural(x.patients.length, 'pl.patient') }))) return; DB = migrate(x); save(); setView('home'); toast(t('toast.restored')); }
+    try { var txt = String(rd.result), x; if (/^\s*window\.NOTION_IMPORT\s*=/.test(txt)) { x = dbFromImport(JSON.parse(txt.replace(/^\s*window\.NOTION_IMPORT\s*=\s*/, '').replace(/;\s*$/, ''))); } else x = JSON.parse(txt); if (!x || x.v !== 3) throw 0; CLOUD.empty = false; if (!confirm(t('confirm.restore', { n: plural(x.patients.length, 'pl.patient') }))) return; DB = migrate(x); save(); setView('home'); toast(t('toast.restored')); }
     catch (e) { toast(t('toast.badBackup')); }
     ev.target.value = '';
   };
