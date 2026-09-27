@@ -902,8 +902,10 @@ function thSort(scope, k, label) {
 }
 
 function renderFu() {
-  var items = fuDueAll();
-  var h = '<div class="head"><div><h1>' + t('nav.followup') + '</h1><p class="sub">' + t('fu.sub') + '</p></div></div><div class="tablewrap">';
+  var items = fuDueAll(), late = items.filter(function (x) { return x.f.st === 'overdue'; }).length;
+  var h = '<div class="head"><div><h1>' + t('nav.followup') + '</h1><p class="sub">' + t('fu.sub') + '</p></div></div>';
+  h += grpHead(LL('Просрочено и ближайшие 14 дней', 'Overdue and due within 14 days'), items.length, 'attn', late ? '<span class="tag due">' + LL('просрочено: ', 'overdue: ') + late + '</span>' : '');
+  h += '<div class="tablewrap">';
   if (!items.length) h += '<div class="empty">' + t('fu.empty') + '</div>';
   else {
     h += '<table class="grid"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + t('col.surgery') + '</th><th>' + t('fu.check') + '</th><th>' + t('fu.due') + '</th><th>' + t('col.status') + '</th><th></th></tr></thead><tbody>';
@@ -914,7 +916,14 @@ function renderFu() {
     });
     h += '</tbody></table>';
   }
-  return h + '</div>';
+  h += '</div>';
+  var dueIds = {}; items.forEach(function (x) { dueIds[x.p.id] = 1; });
+  var fine = DB.patients.filter(function (p) { return p.d.date && !dueIds[p.id]; }).sort(function (a, b) { return String(b.d.date).localeCompare(String(a.d.date)); });
+  h += grpHead(LL('В порядке: всё выполнено или срок ещё не подошёл', 'On track: done or not yet due'), fine.length, 'okg');
+  h += '<div class="tablewrap">' + (fine.length ? '<table class="grid"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + t('col.surgery') + '</th><th>' + LL('Контроли', 'Follow-ups') + '</th></tr></thead><tbody>' + fine.map(function (p) {
+    return '<tr data-act="openp" data-id="' + p.id + '" tabindex="0"><td class="mono">' + p.id + '</td><td class="strong">' + esc(p.d.fio || '') + '</td><td>' + fmtDate(p.d.date) + '</td><td class="fuchips">' + fuList(p).map(function (f) { return '<span class="tag' + (f.st === 'done' ? ' okt' : '') + '">' + f.label + ': ' + (f.st === 'done' ? '✓' : LL('через ', 'in ') + f.days + LL(' дн', ' d')) + '</span>'; }).join('') + '</td></tr>';
+  }).join('') + '</tbody></table>' : '<div class="grp-empty">' + LL('Пока нет', 'None yet') + '</div>') + '</div>';
+  return h;
 }
 
 /* ======================= Field rendering ======================= */
@@ -1324,7 +1333,27 @@ function renderCol(k) {
   if (q) list = list.filter(function (r) { return c.fields.some(function (x) { var val = r[x.id]; return val && String(Array.isArray(val) ? val.join(' ') : val).toLowerCase().indexOf(q) >= 0; }); });
   if (v === 'cal') h += renderCal(k, list);
   else if (v === 'board') h += renderBoard(k, list);
+  else if (k === 'mdt' || k === 'mm') h += renderSplit(k, list);
   else h += renderTable(k, list);
+  return h;
+}
+function needsAttn(k, r) {
+  var td = isoOf(new Date());
+  if (k === 'mdt') { var w = !r.status || r.status === 'Ожидает обсуждения'; return w ? (r.date && r.date < td ? 'late' : 'wait') : null; }
+  if (k === 'mm') { var p = r.status !== 'Разобран'; return p ? (r.date && r.date < td ? 'late' : 'wait') : null; }
+  return null;
+}
+function grpHead(title, n, cls, extra) { return '<div class="grp-h ' + (cls || '') + '"><b>' + title + '</b><span class="cnt">' + n + '</span>' + (extra || '') + '</div>'; }
+function renderSplit(k, list) {
+  var att = list.filter(function (r) { return needsAttn(k, r); }), ok = list.filter(function (r) { return !needsAttn(k, r); });
+  var late = att.filter(function (r) { return needsAttn(k, r) === 'late'; }).length;
+  att.sort(function (a, b) { var la = needsAttn(k, a) === 'late' ? 0 : 1, lb = needsAttn(k, b) === 'late' ? 0 : 1; return la - lb || String(a.date || '9').localeCompare(String(b.date || '9')); });
+  var S0 = S.sort[k]; S.sort[k] = S0 || { k: 'date', d: 1 };
+  var h = grpHead(k === 'mdt' ? LL('Ожидают обсуждения', 'Awaiting discussion') : LL('Запланированные и неразобранные', 'Planned and pending'), att.length, 'attn', late ? '<span class="tag due">' + LL('просрочено: ', 'overdue: ') + late + '</span>' : '');
+  h += att.length ? renderTable(k, att, true) : '<div class="grp-empty">' + LL('Ничего не ожидает', 'Nothing pending') + '</div>';
+  S.sort[k] = S0;
+  h += grpHead(k === 'mdt' ? LL('Обсуждены, лечение идёт или завершено', 'Discussed, treatment ongoing or done') : LL('Разобраны', 'Reviewed'), ok.length, 'okg');
+  h += renderTable(k, ok);
   return h;
 }
 function cellVal(x, val) {
@@ -1335,9 +1364,9 @@ function cellVal(x, val) {
   if (x.type === 'sel' || x.type === 'seg') return esc(ov(val));
   var s = String(val); return esc(s.length > 90 ? s.slice(0, 90) + '…' : s);
 }
-function renderTable(k, list) {
+function renderTable(k, list, keepOrder) {
   var c = COLS[k], s = S.sort[k] || { k: c.dateField || c.titleField, d: -1 };
-  list.sort(function (a, b) { var av = a[s.k], bv = b[s.k]; if (!has(av)) return 1; if (!has(bv)) return -1; return String(av).localeCompare(String(bv), locale(), { numeric: true }) * s.d; });
+  if (!keepOrder) list.sort(function (a, b) { var av = a[s.k], bv = b[s.k]; if (!has(av)) return 1; if (!has(bv)) return -1; return String(av).localeCompare(String(bv), locale(), { numeric: true }) * s.d; });
   var h = '<div class="tablewrap">';
   if (!list.length) return h + '<div class="empty">' + t('col.empty') + '</div></div>';
   h += '<table class="grid"><thead><tr>' + c.list.map(function (id) { return thSort(k, id, L(c.F[id].label)); }).join('') + '</tr></thead><tbody>';
