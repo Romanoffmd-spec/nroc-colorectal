@@ -2256,8 +2256,12 @@ function renderQPage() {
   if (tab === 'res') {
     var rows = []; DB.patients.forEach(function (p) { (p.q || []).forEach(function (e) { if (e.date) rows.push({ p: p, e: e }); }); });
     rows.sort(function (a, b) { return b.e.date.localeCompare(a.e.date); });
-    h += qStatsHTML(rows);
+    h += qStatsHTML();
+    var rgrp = {}, rord = []; rows.forEach(function (x) { if (!rgrp[x.e.tid]) { rgrp[x.e.tid] = []; rord.push(x.e.tid); } rgrp[x.e.tid].push(x); });
+    if (!rows.length) h += '<div class="empty">' + LL('Пока нет заполненных анкет в карточках', 'No completed questionnaires in records yet') + '</div>';
+    rord.forEach(function (tid) { var qq = qTpl(tid), rows = rgrp[tid]; h += grpHead(esc(qq ? qName(qq) : '?'), rows.length, 'okg');
     h += '<div class="tablewrap">' + (rows.length ? '<table class="grid"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + LL('Анкета', 'Questionnaire') + '</th><th>' + LL('Срок', 'Time point') + '</th><th>' + LL('Дата', 'Date') + '</th><th>' + LL('Баллы', 'Score') + '</th><th>' + LL('Вывод', 'Result') + '</th></tr></thead><tbody>' + rows.map(function (x) { var q = qTpl(x.e.tid), b = qBand(q || {}, x.e.score); return '<tr data-act="openp" data-id="' + x.p.id + '" tabindex="0"><td class="mono">' + x.p.id + '</td><td class="strong">' + esc(pName(x.p)) + '</td><td>' + esc(qShort(q)) + '</td><td>' + esc(x.e.label || '') + '</td><td>' + fmtDate(x.e.date) + '</td><td class="num">' + (x.e.score !== null && x.e.score !== undefined ? x.e.score : '') + '</td><td>' + (b ? '<span class="st st-' + (b.c === 'ok' ? 'done' : b.c === 'due' ? 'cancel' : 'prog') + '">' + esc(L(b.t)) + '</span>' : '') + '</td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">' + LL('Пока нет заполненных анкет', 'No completed questionnaires yet') + '</div>') + '</div>';
+    });
     return h;
   }
   h += '<div class="tablewrap">' + (due.length ? '<table class="grid"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + LL('Анкета', 'Questionnaire') + '</th><th>' + LL('Срок', 'Time point') + '</th><th>' + LL('Заполнить до', 'Due') + '</th><th></th></tr></thead><tbody>' + due.map(function (x) { return '<tr data-act="openp" data-id="' + x.p.id + '" tabindex="0"><td class="mono">' + x.p.id + '</td><td class="strong">' + esc(pName(x.p)) + '</td><td>' + esc(qShort(qTpl(x.e.tid))) + '</td><td>' + esc(x.e.label || '') + '</td><td>' + (x.n < 0 ? '<span class="tag due">' + fmtDate(x.e.due) + ' · ' + daysLabel(x.n) + '</span>' : '<span class="tag">' + fmtDate(x.e.due) + ' · ' + daysLabel(x.n) + '</span>') + '</td><td><button type="button" class="btn small primary" data-act="qfill" data-pid="' + x.p.id + '" data-id="' + x.e.id + '">' + ico('tablet', 15) + LL('Заполнить', 'Fill in') + '</button></td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">' + LL('На ближайшие 30 дней анкет нет. Назначить анкету можно в карточке пациента, раздел «После операции».', 'Nothing due in the next 30 days. Schedule questionnaires in the patient card, After surgery section.') + '</div>') + '</div>';
@@ -3943,6 +3947,8 @@ document.addEventListener('click', function (ev) {
     case 'qlshare': navigator.share({ title: S.qlink.name, url: S.qlink.url }).catch(function () {}); break;
     case 'qllink': { var sel = document.getElementById('qlp_' + g('id')); qlLinkManual(g('id'), sel ? sel.value : ''); break; }
     case 'qldel': qlDel(g('id')); break;
+    case 'qropen': S.qrOpen = S.qrOpen === g('id') ? null : g('id'); render(); break;
+    case 'qsopen': S.qsOpen = S.qsOpen || {}; S.qsOpen[g('id')] = !S.qsOpen[g('id')]; render(); break;
     case 'approk': apprAct('ok', g('id')); break;
     case 'apprno': apprAct('no', g('id')); break;
     case 'apprdel': apprAct('del', g('id')); break;
@@ -4263,24 +4269,45 @@ function qlDel(id) {
   if (!confirm(LL('Удалить эту анкету из входящих?', 'Delete this response?'))) return;
   CLOUD.db.collection('qresp').doc(id).delete().catch(function () {}); QL.resp = QL.resp.filter(function (x) { return x.id !== id; }); render();
 }
+function qAnsText(q, it, a) { if (!has(a)) return LL('нет ответа', 'no answer'); if (it.type === 'single') return L((it.opts[+a] || {}).t) + (q.score ? ' (' + ((it.opts[+a] || {}).s || 0) + ')' : ''); if (it.type === 'multi') return a.map(function (i) { return L((it.opts[+i] || {}).t); }).join(', '); return String(a); }
 function renderQInbox() {
   if (!CLOUD.on) return '<div class="empty">' + LL('Онлайн-анкеты работают в общей облачной базе на сайте.', 'Online questionnaires work in the shared cloud database on the website.') + '</div>';
-  if (!QL.resp.length) return '<div class="empty">' + LL('Все анкеты от пациентов разобраны: входящих без привязки нет.', 'All patient responses are matched.') + '</div>';
+  if (!QL.resp.length) return '<div class="empty">' + LL('Входящих без привязки нет: все анкеты от пациентов прикреплены к карточкам.', 'No unmatched responses.') + '</div>';
   var opts = DB.patients.slice().sort(function (a, b) { return pName(a).localeCompare(pName(b)); }).map(function (p) { return '<option value="' + p.id + '">' + esc(pName(p)) + ' · ' + p.id + '</option>'; }).join('');
-  return '<p class="muted pad">' + LL('Эти анкеты не удалось автоматически сопоставить с карточкой (нет совпадения по ФИО и дате рождения или совпадений несколько). Выберите пациента или создайте карточку.', 'These could not be matched automatically. Pick a patient or create a record.') + '</p><div class="tablewrap"><table class="grid"><thead><tr><th>' + t('col.fio') + '</th><th>' + LL('Дата рождения', 'DOB') + '</th><th>' + LL('Телефон', 'Phone') + '</th><th>' + LL('Анкета', 'Questionnaire') + '</th><th>' + LL('Баллы', 'Score') + '</th><th>' + LL('Получена', 'Received') + '</th><th></th></tr></thead><tbody>' + QL.resp.map(function (r) {
-    var q = qTpl(r.tid), sc = q ? qScore(q, r.ans || {}) : null;
-    return '<tr><td class="strong">' + esc(r.fio || '') + '</td><td>' + fmtDate(r.dob) + '</td><td>' + esc(r.phone || '') + '</td><td>' + esc(qShort(q)) + '</td><td class="num">' + (sc === null ? '' : sc) + '</td><td>' + fmtDate(String(r.atIso).slice(0, 10)) + '</td><td class="qlact"><select class="sel-sm" id="qlp_' + r.id + '"><option value="">' + LL('Выбрать пациента…', 'Choose patient…') + '</option><option value="__new">' + LL('+ Создать новую карточку', '+ Create new record') + '</option>' + opts + '</select><button type="button" class="btn small primary" data-act="qllink" data-id="' + r.id + '">' + LL('Прикрепить', 'Attach') + '</button><button type="button" class="iconbtn sm" data-act="qldel" data-id="' + r.id + '" aria-label="' + LL('Удалить', 'Delete') + '">' + ico('x', 15) + '</button></td></tr>';
+  var h = '<div class="qinfo pad"><b>' + LL('Что делать с входящими', 'What to do with the inbox') + '</b><span>' + LL('Сюда попадают анкеты, которые не удалось сопоставить с карточкой по ФИО и дате рождения. Баллы и вывод уже посчитаны. Прикрепите анкету к пациенту или создайте новую карточку: после этого она появится в карточке и во вкладке «Результаты». Тестовые ответы можно удалить крестиком. Статистика ниже во вкладке «Результаты» учитывает и входящие.', 'Responses that could not be matched by name and date of birth. Scores are already computed. Attach to a patient or create a record; then it shows in the record and in Results. Delete test responses with ×.') + '</span></div>';
+  var grp = {}, order = []; QL.resp.forEach(function (r) { if (!grp[r.tid]) { grp[r.tid] = []; order.push(r.tid); } grp[r.tid].push(r); });
+  order.forEach(function (tid) {
+  var qq = qTpl(tid);
+  h += grpHead(esc(qq ? qName(qq) : LL('Анкета удалена', 'Deleted questionnaire')), grp[tid].length, 'attn');
+  h += '<div class="tablewrap"><table class="grid"><thead><tr><th>' + t('col.fio') + '</th><th>' + LL('Дата рождения', 'DOB') + '</th><th>' + LL('Телефон', 'Phone') + '</th><th>' + LL('Анкета', 'Questionnaire') + '</th><th>' + LL('Баллы', 'Score') + '</th><th>' + LL('Вывод', 'Result') + '</th><th>' + LL('Получена', 'Received') + '</th><th></th></tr></thead><tbody>' + grp[tid].map(function (r) {
+    var q = qTpl(r.tid), sc = q ? qScore(q, r.ans || {}) : null, bd = q ? qBand(q, sc) : null, open = S.qrOpen === r.id;
+    var row = '<tr><td class="strong">' + esc(r.fio || '') + '</td><td>' + fmtDate(r.dob) + '</td><td>' + esc(r.phone || '') + '</td><td>' + esc(qShort(q)) + '</td><td class="num">' + (sc === null ? '' : sc + (q && q.max ? ' / ' + q.max : '')) + '</td><td>' + (bd ? '<span class="st st-' + (bd.c === 'ok' ? 'done' : bd.c === 'due' ? 'cancel' : 'prog') + '">' + esc(L(bd.t)) + '</span>' : '') + '</td><td>' + fmtDate(String(r.atIso).slice(0, 10)) + '</td><td class="qlact"><button type="button" class="btn small ghost" data-act="qropen" data-id="' + r.id + '">' + (open ? LL('Скрыть', 'Hide') : LL('Ответы', 'Answers')) + '</button><select class="sel-sm" id="qlp_' + r.id + '"><option value="">' + LL('Выбрать пациента…', 'Choose patient…') + '</option><option value="__new">' + LL('+ Создать новую карточку', '+ Create new record') + '</option>' + opts + '</select><button type="button" class="btn small primary" data-act="qllink" data-id="' + r.id + '">' + LL('Прикрепить', 'Attach') + '</button><button type="button" class="iconbtn sm" data-act="qldel" data-id="' + r.id + '" aria-label="' + LL('Удалить', 'Delete') + '">' + ico('x', 15) + '</button></td></tr>';
+    if (open && q) row += '<tr class="qr-ans"><td colspan="8"><ol class="qans">' + qVisible(q, r.ans || {}).map(function (it) { return '<li><span>' + esc(L(it.text)) + '</span><b>' + esc(qAnsText(q, it, (r.ans || {})[it.id])) + '</b></li>'; }).join('') + '</ol></td></tr>';
+    return row;
   }).join('') + '</tbody></table></div>';
+  });
+  return h;
 }
-function qStatsHTML(rows) {
-  var by = {}; rows.forEach(function (x) { (by[x.e.tid] = by[x.e.tid] || []).push(x); });
+function qAllEntries() {
+  var out = [];
+  DB.patients.forEach(function (p) { (p.q || []).forEach(function (e) { if (e.date) out.push({ tid: e.tid, ans: e.ans || {}, score: e.score, pid: p.id, date: e.date }); }); });
+  (QL.resp || []).forEach(function (r) { var q = qTpl(r.tid); out.push({ tid: r.tid, ans: r.ans || {}, score: q ? qScore(q, r.ans || {}) : null, pid: 'inbox:' + r.id, date: String(r.atIso || '').slice(0, 10), inbox: true }); });
+  return out;
+}
+function qStatsHTML() {
+  var all = qAllEntries(), by = {}; all.forEach(function (x) { (by[x.tid] = by[x.tid] || []).push(x); });
   var ks = Object.keys(by); if (!ks.length) return '';
   return '<div class="qstats pad">' + ks.map(function (tid) {
-    var q = qTpl(tid), xs = by[tid], sc = xs.map(function (x) { return x.e.score; }).filter(function (v) { return v !== null && v !== undefined; }).map(Number);
-    var mean = sc.length ? Math.round(sc.reduce(function (a, b) { return a + b; }, 0) / sc.length * 10) / 10 : null, med = median(sc);
+    var q = qTpl(tid), xs = by[tid], sc = xs.map(function (x) { return x.score; }).filter(function (v) { return v !== null && v !== undefined; }).map(Number);
+    var mean = sc.length ? Math.round(sc.reduce(function (a, b) { return a + b; }, 0) / sc.length * 10) / 10 : null, med = median(sc.slice()), mn = sc.length ? Math.min.apply(null, sc) : null, mx = sc.length ? Math.max.apply(null, sc) : null;
+    var inbox = xs.filter(function (x) { return x.inbox; }).length, pts = {}; xs.forEach(function (x) { if (!x.inbox) pts[x.pid] = 1; });
     var bands = (q && q.bands || []).map(function (b) { var n = sc.filter(function (v) { return v >= b.min && v <= b.max; }).length; return '<span class="qsb qsb-' + b.c + '"><i>' + n + '</i>' + esc(L(b.t)) + (sc.length ? ' · ' + Math.round(n / sc.length * 100) + '%' : '') + '</span>'; }).join('');
-    var pts = {}; xs.forEach(function (x) { pts[x.p.id] = 1; });
-    return '<div class="card qst"><b>' + esc(qShort(q)) + '</b><div class="qst-n"><span><i>' + xs.length + '</i>' + LL('анкет', 'forms') + '</span><span><i>' + Object.keys(pts).length + '</i>' + LL('пациентов', 'patients') + '</span>' + (mean !== null ? '<span><i>' + mean + '</i>' + LL('средний балл', 'mean') + '</span><span><i>' + med + '</i>' + LL('медиана', 'median') + '</span>' : '') + '</div>' + (bands ? '<div class="qst-b">' + bands + '</div>' : '') + '</div>';
+    var open = (S.qsOpen || {})[tid], qh = '';
+    if (open && q) qh = '<div class="qdist">' + q.items.filter(function (it) { return it.type === 'single' || it.type === 'multi'; }).map(function (it) {
+      var answered = xs.filter(function (x) { return has(x.ans[it.id]); }), n = answered.length;
+      return '<div class="qd-q"><b>' + esc(L(it.text)) + '</b><span class="muted">' + LL('ответили: ', 'answered: ') + n + '</span>' + it.opts.map(function (o, j) { var c = answered.filter(function (x) { var a = x.ans[it.id]; return Array.isArray(a) ? a.indexOf(j) >= 0 : +a === j; }).length, pc = n ? Math.round(c / n * 100) : 0; return '<div class="qd-o"><span class="qd-l">' + esc(L(o.t)) + '</span><span class="qd-bar"><i style="width:' + pc + '%"></i></span><span class="qd-n">' + c + ' · ' + pc + '%</span></div>'; }).join('') + '</div>';
+    }).join('') + '</div>';
+    return '<div class="card qst' + (open ? ' open' : '') + '"><div class="qst-h"><b>' + esc(qShort(q)) + '</b><button type="button" class="linkbtn" data-act="qsopen" data-id="' + tid + '">' + (open ? LL('Скрыть разбор по вопросам', 'Hide per-question') : LL('Разбор по вопросам', 'Per-question breakdown')) + '</button></div><div class="qst-n"><span><i>' + xs.length + '</i>' + LL('анкет', 'forms') + '</span><span><i>' + Object.keys(pts).length + '</i>' + LL('пациентов', 'patients') + '</span>' + (inbox ? '<span><i>' + inbox + '</i>' + LL('во входящих', 'in inbox') + '</span>' : '') + (mean !== null ? '<span><i>' + mean + '</i>' + LL('средний балл', 'mean') + '</span><span><i>' + med + '</i>' + LL('медиана', 'median') + '</span><span><i>' + mn + '..' + mx + '</i>' + LL('разброс', 'range') + '</span>' : '') + '</div>' + (bands ? '<div class="qst-b">' + bands + '</div>' : '') + qh + '</div>';
   }).join('') + '</div>';
 }
 
