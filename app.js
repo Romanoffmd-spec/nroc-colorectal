@@ -3122,7 +3122,7 @@ function aiStream(o) {
     })
     .catch(function (e) {
       var em = (e && e.error && e.error.message) || (e && e.message) || '';
-      if (/high demand|overloaded|unavailable|try again later|RESOURCE_EXHAUSTED|rate limit|429|503/i.test(em) && (o.busyTry || 0) < 3) {
+      if (/high demand|overloaded|unavailable|try again later|RESOURCE_EXHAUSTED|rate limit|quota|429|503/i.test(em) && (o.busyTry || 0) < 3) {
         o.busyTry = (o.busyTry || 0) + 1;
         if (o.busyTry >= 2 && AI.avail && AI.avail.length) { var alt = AI.avail.filter(function (m) { return /flash/.test(m.id) && !/preview|exp/.test(m.id) && m.id !== AI.model && !(o.tried || []).some(function (x) { return x === m.id; }); }).sort(function (a, b) { return aiVer(b.id) - aiVer(a.id); })[0]; if (alt) { o.tried = (o.tried || []).concat([AI.model]); o.model = alt.id; } }
         setTimeout(function () { aiStream(o); }, 1500 * o.busyTry); return;
@@ -3132,7 +3132,7 @@ function aiStream(o) {
         if (!cand && AI.avail && AI.avail.length) { var fl = AI.avail.filter(function (m) { return /flash/.test(m.id) && !/lite|preview|exp/.test(m.id) && m.id !== AI.model; }).sort(function (a, b) { return aiVer(b.id) - aiVer(a.id); })[0]; if (fl) cand = fl.id; }
         if (cand) { AI.model = cand; try { localStorage.setItem('crr.aimodel', cand); localStorage.removeItem('crr.aimodel.m'); } catch (x) {} o.retried = true; aiStream(o); return; }
       }
-      if (e && e.name === 'AbortError') { o.done(text + (text ? '\n\n' : '') + LL('_(остановлено)_', '_(stopped)_'), src); return; } o.fail(/high demand|overloaded|unavailable|try again later|RESOURCE_EXHAUSTED|rate limit|429|503/i.test(em) ? LL('Серверы Gemini сейчас перегружены. Нажмите «Обновить» через минуту.', 'Gemini is overloaded right now. Press refresh in a minute.') : /Failed to fetch|NetworkError/i.test(em) ? LL('Нет связи с Gemini. Проверьте интернет.', 'Cannot reach Gemini. Check your connection.') : (em || LL('Ошибка запроса к Gemini', 'Gemini request failed'))); });
+      if (e && e.name === 'AbortError') { o.done(text + (text ? '\n\n' : '') + LL('_(остановлено)_', '_(stopped)_'), src); return; } o.fail(/quota|free_tier/i.test(em) ? LL('Дневной лимит бесплатных запросов Gemini исчерпан. Попробуйте позже или укажите свой ключ API.', 'Free Gemini quota is used up for today. Try later or add your own API key.') : /high demand|overloaded|unavailable|try again later|RESOURCE_EXHAUSTED|rate limit|quota|429|503/i.test(em) ? LL('Серверы Gemini сейчас перегружены. Нажмите «Обновить» через минуту.', 'Gemini is overloaded right now. Press refresh in a minute.') : /Failed to fetch|NetworkError/i.test(em) ? LL('Нет связи с Gemini. Проверьте интернет.', 'Cannot reach Gemini. Check your connection.') : (em || LL('Ошибка запроса к Gemini', 'Gemini request failed'))); });
 }
 
 /* minimal markdown */

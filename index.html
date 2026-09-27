@@ -1266,14 +1266,37 @@ html[data-theme="dark"] ::-webkit-scrollbar{width:10px;height:10px}html[data-the
 :where(html[data-theme="dark"]) .h9 .pk.talk{background:#141e1e;color:#94f0ec}
 
 /*DARK-END*/
+/* mobile: page must not pan sideways */
+html,body{overflow-x:hidden;overscroll-behavior-x:none}
+@supports (overflow:clip){html,body{overflow-x:clip}}
+.app,.main,.content{max-width:100vw}
+.content{overflow-x:hidden;overscroll-behavior:contain}
+.content *{overflow-wrap:anywhere}
+.content table *,.content .seg *,.content .tabs *,.content button{overflow-wrap:normal}
+@media (max-width:900px){
+  .main{overflow-x:hidden}
+  .top{overflow:hidden}
+  .top-r{gap:2px;min-width:0}
+  .top-t{flex:1 1 0;min-width:0}
+  .top .cmdk{flex:0 0 34px;width:34px;margin-left:0}
+  .top .user{padding-left:2px;padding-right:2px}
+  .tabbar{grid-template-columns:repeat(6,minmax(0,1fr));width:100%;box-sizing:border-box}
+  .tabbar button{min-width:0;overflow:hidden}
+  .tabbar button>span,.tabbar button{white-space:nowrap;text-overflow:ellipsis}
+  input,select,textarea{font-size:16px!important}
+}
+/* long patient names/notes in chips must not widen the page */
+.h9 .bchip{min-width:0;max-width:100%;overflow:hidden}
+.h9 .bchip b{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.h9 .sl,.h9 .sl-b,.h9 .bchips,.h9 .panel,.h9 .dash>*{min-width:0;max-width:100%}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <input type="file" id="importFile" accept=".json,.js,application/json,text/javascript" hidden>
-<script src="firebase-config.js?v=959cc29c"></script>
-<script src="i18n.js?v=959cc29c"></script>
-<script src="ai-corpus.js?v=959cc29c"></script>
-<script src="app.js?v=959cc29c"></script>
+<script src="firebase-config.js?v=m0927b"></script>
+<script src="i18n.js?v=m0927b"></script>
+<script src="ai-corpus.js?v=m0927b"></script>
+<script src="app.js?v=m0927b"></script>
 </body>
 </html>
