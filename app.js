@@ -3671,7 +3671,7 @@ function renderSide() {
   return h;
 }
 function renderTabbar() {
-  var items = [['home', 'home', LL('Главная', 'Home')], ['col:planner', 'cal', LL('План', 'Planner')], ['reg:all', 'users', LL('Пациенты', 'Patients')], ['studies', 'flask', LL('Наука', 'Research')]];
+  var items = [['home', 'home', LL('Главная', 'Home')], ['col:planner', 'cal', LL('План', 'Planner')], ['reg:all', 'users', 'Rectal'], ['studies', 'flask', LL('Наука', 'Research')]];
   return '<nav class="tabbar">' + items.map(function (x) { return '<button type="button" class="' + (S.view === x[0] ? 'on' : '') + '" data-act="view" data-v="' + x[0] + '">' + ico(x[1], 20) + '<span>' + x[2] + '</span></button>'; }).join('') + '<button type="button" data-act="aitoggle" class="' + (UI.aip ? 'on' : '') + '">' + ico('sparkle', 20) + '<span>' + LL('ИИ', 'AI') + '</span></button><button type="button" data-act="side">' + ico('menu', 20) + '<span>' + LL('Меню', 'Menu') + '</span></button></nav>';
 }
 function renderMain() {
