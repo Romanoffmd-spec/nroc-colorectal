@@ -1262,6 +1262,32 @@ function buildProtocol(p) {
 }
 
 /* ======================= Patient card ======================= */
+function ptagRegs() { return DB.registries.filter(function (r) { return r.kind !== 'study' && (r.mode === 'manual' || (r.rules || []).length && r.rules.every(function (x) { return (x.vals && x.vals.length) || (x.not && x.not.length); })); }); }
+function ptagPicker(dr) {
+  var regs = ptagRegs(), tops = regs.filter(function (r) { return !r.parent || !regOf(r.parent); });
+  function chip(r) { var on = draftIn(dr, r); return '<button type="button" class="kchip' + (on ? ' on' : '') + '" data-act="ptag" data-id="' + r.id + '" aria-pressed="' + on + '">' + (on ? ico('check', 13) : '') + esc(regName(r)) + '</button>'; }
+  function branch(r) { var ch = regs.filter(function (x) { return x.parent === r.id; }); return chip(r) + ch.map(branch).join(''); }
+  var h = '<section class="card ptags" id="sec-ptags"><h3>' + ico('tag', 16) + LL('Теги: в какие разделы попадёт карточка', 'Tags: which sections this record belongs to') + '</h3><div class="kgroups">';
+  h += tops.map(function (r) { var ch = regs.filter(function (x) { return x.parent === r.id; }); return '<div class="kgrp"><span>' + esc(regName(r)) + '</span><div class="kchips">' + (ch.length ? chip(r) + ch.map(branch).join('') : chip(r)) + '</div></div>'; }).join('');
+  return h + '</div></section>';
+}
+function ptagToggle(id) {
+  var dr = S.drawer, r = regOf(id); if (!dr || !r) return;
+  var d = dr.p.d, on = draftIn(dr, r);
+  function apply(reg) {
+    if (reg.mode === 'manual') { dr.members[reg.id] = true; return; }
+    (reg.rules || []).forEach(function (x) {
+      var fd = FIELD[x.f]; if (!fd) return;
+      if (x.vals && x.vals.length) { if (fd.type === 'multi') { var a = Array.isArray(d[x.f]) ? d[x.f].slice() : []; if (!a.some(function (z) { return x.vals.indexOf(z) >= 0; })) a.push(x.vals[0]); d[x.f] = a; } else if (x.vals.indexOf(d[x.f]) < 0) d[x.f] = x.vals[0]; }
+      else if (x.not && x.not.indexOf(d[x.f]) >= 0) { var ok = (fd.options || []).filter(function (o) { return x.not.indexOf(o) < 0; })[0]; if (ok) d[x.f] = ok; }
+    });
+  }
+  if (on) {
+    if (r.mode === 'manual') dr.members[r.id] = false;
+    else (r.rules || []).forEach(function (x) { if (!x.vals) return; if (Array.isArray(d[x.f])) d[x.f] = d[x.f].filter(function (z) { return x.vals.indexOf(z) < 0; }); else if (x.vals.indexOf(d[x.f]) >= 0) delete d[x.f]; });
+  } else { ancestors(r).forEach(apply); apply(r); }
+  render();
+}
 function draftIn(dr, reg) { if (reg.parent) { var par = regOf(reg.parent); if (par && !draftIn(dr, par)) return false; } return reg.mode === 'manual' ? !!dr.members[reg.id] : inReg({ id: dr.p.id, d: dr.p.d }, Object.assign({}, reg, { parent: null })); }
 function renderPatient() {
   var dr = S.drawer, p = dr.p, d = p.d;
@@ -1283,7 +1309,7 @@ function renderPatient() {
   h += '<div class="pbody"><nav class="pnav" aria-label="' + t('a11y.cardSections') + '">' + nav.map(function (g) {
     var ph = PHASES.filter(function (x) { return x[0] === g[0]; })[0];
     return (ph ? '<div class="pn-h ph-' + g[0] + '"><span class="pn-n">' + (PHASES.indexOf(ph) + 1) + '</span>' + t(ph[1]) + '</div>' : g[0] === 'more' ? '<div class="pn-h">' + t('ph.more') + '</div>' : '') + g[1].map(function (s) { return '<button type="button" data-act="jump" data-id="' + s.id + '">' + esc(s.title) + '</button>'; }).join('');
-  }).join('') + '</nav><div class="dbody">' + (!dr.isNew ? aiInline('pat-' + p.id, aiPatCtx(p), 'Сводка случая в 3-4 строках: диагноз, стадия, тактика, текущий этап. Затем 1-3 пункта, что не заполнено или требует внимания.', LL('ИИ: сводка случая', 'AI: case summary'), true) : '');
+  }).join('') + '</nav><div class="dbody">' + ptagPicker(dr) + (!dr.isNew ? aiInline('pat-' + p.id, aiPatCtx(p), 'Сводка случая в 3-4 строках: диагноз, стадия, тактика, текущий этап. Затем 1-3 пункта, что не заполнено или требует внимания.', LL('ИИ: сводка случая', 'AI: case summary'), true) : '');
   if (isStudent()) h += '<div class="lockbox">' + ico('lock', 15) + LL('Режим студента: данные обезличены, изменения не сохраняются.', 'Student mode: anonymised, changes are not saved.') + '</div>';
   if (dr.errs) h += '<div class="errbox"><b>' + ico('alert', 16) + LL('Карточку нельзя сохранить', 'Cannot save the record') + '</b><ul>' + dr.errs.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></div>';
   var enr = Object.keys(p.enroll || {}).map(function (sid) { var r = regOf(sid); return r ? { r: r, e: p.enroll[sid] } : null; }).filter(Boolean);
@@ -3939,6 +3965,7 @@ document.addEventListener('click', function (ev) {
     case 'aistop': if (AI.ctrl) AI.ctrl.abort(); break;
     case 'aikeysave': { var ki = root.querySelector('#aikey-in'), mo = root.querySelector('#aimodel'), de = root.querySelector('#aideid'); if (mo && mo.value !== AI.model) try { localStorage.setItem(aiModelName(AI.prov) + '.m', '1'); } catch (e) {} AI.model = mo ? mo.value : AI.model; AI.deid = de ? de.checked : AI.deid; try { localStorage.setItem(aiModelName(AI.prov), AI.model); localStorage.setItem('crr.aideid', AI.deid ? '1' : '0'); } catch (e) {} AI.threads = {}; aiSetKey(ki ? ki.value : ''); break; }
     case 'aikeyclear': AI.threads = {}; aiSetKey(''); break;
+    case 'ptag': ptagToggle(g('id')); break;
     case 'aiprov': aiSetProv(g('v')); break;
     case 'theme': UI.theme = themeCur() === 'dark' ? 'light' : 'dark'; saveUI(); themeApply(); render(); break;
     case 'qlnew': qlCreate(g('id'), g('pid'), g('eid')); break;
