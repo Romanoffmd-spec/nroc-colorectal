@@ -1098,6 +1098,27 @@ button.lockbtn:hover{background:var(--accent-soft);color:var(--navy)}
 .grp-empty{margin:0 28px;padding:14px 16px;border:1px dashed var(--line);border-radius:var(--r);color:var(--muted);font-size:13px}
 .fuchips{display:flex;gap:6px;flex-wrap:wrap}.tag.okt{background:var(--ok-soft);color:var(--ok)}
 @media (max-width:760px){.grp-h{padding:14px 12px 6px}.grp-empty{margin:0 12px}}
+.filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 28px 16px}
+.flabel{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin-right:2px;font-weight:500;flex:none;white-space:nowrap}
+.fsel{display:inline-flex;position:relative;flex:none;max-width:100%}
+.fsel select{width:auto;min-width:0;max-width:100%;appearance:auto;height:34px;border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:0 28px 0 14px;font-size:12.5px;color:var(--ink2);cursor:pointer;text-overflow:ellipsis}
+.fsel.on select{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+.bell.has svg{color:var(--navy)}
+@media (max-width:760px){.filters{padding-left:14px;padding-right:14px}.flabel{width:100%}.fsel,.fsel select{width:100%}}
+.top-t{flex:1 1 auto;min-width:40px}
+.top-r>*{flex:none}.aipill,.aibtn,.cmdk{white-space:nowrap}
+.cmdk{flex:0 1 240px;min-width:110px}
+.h9 .qi-l{overflow-wrap:anywhere;min-width:0}
+@media (max-width:1320px){.aibtn span{display:none}.aibtn{padding:0 8px}.cmdk kbd{display:none}}
+@media (max-width:1120px){.aipill>span:last-child{display:none}.aipill{padding:0 6px}.user .un{display:none}}
+.futab td{vertical-align:top}
+.ful{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;min-width:170px}
+.ful li{display:flex;flex-direction:column;font-size:12.5px;line-height:1.35;padding-left:9px;border-left:3px solid var(--line)}
+.ful li b{font-weight:600;color:var(--ink)}.ful li span{color:var(--muted)}
+.ful.late li{border-color:var(--due)}.ful.late li span{color:var(--due)}
+.ful.next li{border-color:var(--warn)}.ful.done li{border-color:var(--ok)}
+.ful .linkbtn{align-self:flex-start;font-size:12px;padding-top:2px}
+.muted.small{font-size:12px}
 /*DARK-START*/
 .pt-lang{display:flex;gap:8px;align-items:center}
 .themebtn svg{transition:transform .3s ease}.themebtn:hover svg{transform:rotate(-20deg)}
@@ -1225,9 +1246,9 @@ html[data-theme="dark"] ::-webkit-scrollbar{width:10px;height:10px}html[data-the
 <body>
 <div id="root"></div>
 <input type="file" id="importFile" accept=".json,.js,application/json,text/javascript" hidden>
-<script src="firebase-config.js?v=0065807b"></script>
-<script src="i18n.js?v=0065807b"></script>
-<script src="ai-corpus.js?v=0065807b"></script>
-<script src="app.js?v=0065807b"></script>
+<script src="firebase-config.js?v=93b80cbf"></script>
+<script src="i18n.js?v=93b80cbf"></script>
+<script src="ai-corpus.js?v=93b80cbf"></script>
+<script src="app.js?v=93b80cbf"></script>
 </body>
 </html>

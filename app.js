@@ -901,30 +901,45 @@ function thSort(scope, k, label) {
   return '<th class="s" aria-sort="' + (on ? (s.d > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" class="th" data-act="sort" data-scope="' + scope + '" data-k="' + k + '">' + esc(label) + (on ? (s.d > 0 ? ' ↑' : ' ↓') : '') + '</button></th>';
 }
 
+function fuPatInfo(p) {
+  var out = { late: [], done: [], next: [] };
+  fuList(p).forEach(function (f) {
+    var nm = LL('Контроль ', 'Follow-up ') + f.label;
+    if (f.st === 'done') out.done.push({ t: nm, s: typeof p.fu[f.key] === 'string' ? fmtDate(p.fu[f.key]) : '' });
+    else if (f.st === 'overdue') out.late.push({ t: nm, s: LL('срок ', 'due ') + fmtDate(f.due) + ', ' + LL('просрочено на ', 'overdue by ') + (-f.days) + LL(' дн', ' d'), fu: f.key });
+    else out.next.push({ t: nm, s: fmtDate(f.due) + (f.days === 0 ? LL(', сегодня', ', today') : ', ' + LL('через ', 'in ') + f.days + LL(' дн', ' d')), fu: f.key, soon: f.st === 'soon' });
+  });
+  (p.q || []).forEach(function (e) {
+    var nm = LL('Анкета ', 'Questionnaire ') + qShort(qTpl(e.tid)) + (e.label ? ' (' + e.label + ')' : '');
+    if (e.date) out.done.push({ t: nm, s: fmtDate(e.date) + (e.score !== null && e.score !== undefined ? ', ' + e.score + LL(' б.', ' pts') + (e.band ? ', ' + e.band : '') : '') });
+    else { var n = daysTo(e.due); if (n === null) out.next.push({ t: nm, s: LL('без срока', 'no date') }); else if (n < 0) out.late.push({ t: nm, s: LL('срок ', 'due ') + fmtDate(e.due) + ', ' + LL('просрочено на ', 'overdue by ') + (-n) + LL(' дн', ' d') }); else out.next.push({ t: nm, s: fmtDate(e.due) + ', ' + LL('через ', 'in ') + n + LL(' дн', ' d'), soon: n <= 14 }); }
+  });
+  return out;
+}
+function fuCell(list, cls, pid) {
+  if (!list.length) return '<span class="muted">—</span>';
+  return '<ul class="ful ' + cls + '">' + list.map(function (x) { return '<li><b>' + esc(x.t) + '</b><span>' + esc(x.s) + '</span>' + (x.fu && pid && can('edit') ? '<button type="button" class="linkbtn" data-act="fudone" data-id="' + pid + '" data-k="' + x.fu + '">' + LL('выполнен', 'mark done') + '</button>' : '') + '</li>'; }).join('') + '</ul>';
+}
+function fuTable(rows) {
+  return '<div class="tablewrap"><table class="grid futab"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + LL('Операция', 'Surgery') + '</th><th>' + LL('Просрочено', 'Overdue') + '</th><th>' + LL('Ожидается', 'Upcoming') + '</th><th>' + LL('Выполнено', 'Done') + '</th></tr></thead><tbody>' + rows.map(function (x) {
+    var p = x.p, d = p.d;
+    return '<tr data-act="openp" data-id="' + p.id + '" tabindex="0"><td class="mono">' + p.id + '</td><td class="strong">' + esc(d.fio || '') + '</td><td><div>' + fmtDate(d.date) + '</div><div class="muted small">' + esc(ov(d.proc || d.endo || '')) + '</div></td><td>' + fuCell(x.i.late, 'late', p.id) + '</td><td>' + fuCell(x.i.next, 'next', p.id) + '</td><td>' + fuCell(x.i.done, 'done') + '</td></tr>';
+  }).join('') + '</tbody></table></div>';
+}
 function renderFu() {
-  var items = fuDueAll(), late = items.filter(function (x) { return x.f.st === 'overdue'; }).length;
-  var h = '<div class="head"><div><h1>' + t('nav.followup') + '</h1><p class="sub">' + t('fu.sub') + '</p></div></div>';
-  h += grpHead(LL('Просрочено и ближайшие 14 дней', 'Overdue and due within 14 days'), items.length, 'attn', late ? '<span class="tag due">' + LL('просрочено: ', 'overdue: ') + late + '</span>' : '');
-  h += '<div class="tablewrap">';
-  if (!items.length) h += '<div class="empty">' + t('fu.empty') + '</div>';
-  else {
-    h += '<table class="grid"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + t('col.surgery') + '</th><th>' + t('fu.check') + '</th><th>' + t('fu.due') + '</th><th>' + t('col.status') + '</th><th></th></tr></thead><tbody>';
-    items.forEach(function (x) {
-      var st = x.f.st === 'overdue' ? '<span class="tag due">' + t('fu.overdueBy', { n: -x.f.days }) + '</span>' : '<span class="tag">' + (x.f.days === 0 ? t('fu.today') : t('fu.inDays', { n: x.f.days })) + '</span>';
-      h += '<tr data-act="openp" data-id="' + x.p.id + '" tabindex="0"><td class="mono">' + x.p.id + '</td><td class="strong">' + esc(x.p.d.fio || '') + '</td><td>' + fmtDate(x.p.d.date) + '</td><td>' + x.f.label + '</td><td>' + fmtDate(x.f.due) + '</td><td>' + st + '</td>';
-      h += '<td><button type="button" class="btn small" data-act="fudone" data-id="' + x.p.id + '" data-k="' + x.f.key + '">' + t('fu.markDone') + '</button></td></tr>';
-    });
-    h += '</tbody></table>';
-  }
-  h += '</div>';
-  var dueIds = {}; items.forEach(function (x) { dueIds[x.p.id] = 1; });
-  var fine = DB.patients.filter(function (p) { return p.d.date && !dueIds[p.id]; }).sort(function (a, b) { return String(b.d.date).localeCompare(String(a.d.date)); });
+  var rows = DB.patients.filter(function (p) { return p.d.date || (p.q || []).length; }).map(function (p) { return { p: p, i: fuPatInfo(p) }; });
+  var att = rows.filter(function (x) { return x.i.late.length || x.i.next.some(function (n) { return n.soon; }); }), fine = rows.filter(function (x) { return att.indexOf(x) < 0; });
+  att.sort(function (a, b) { return b.i.late.length - a.i.late.length || String(a.p.d.date).localeCompare(String(b.p.d.date)); });
+  fine.sort(function (a, b) { return String(b.p.d.date || '').localeCompare(String(a.p.d.date || '')); });
+  var late = att.filter(function (x) { return x.i.late.length; }).length;
+  var h = '<div class="head"><div><h1>' + t('nav.followup') + '</h1><p class="sub">' + LL('Контроли через 30 дней, 90 дней и 1 год после операции и назначенные анкеты', 'Follow-ups at 30 days, 90 days and 1 year after surgery, plus scheduled questionnaires') + '</p></div></div>';
+  h += grpHead(LL('Просрочено или подходит срок (14 дней)', 'Overdue or due within 14 days'), att.length, 'attn', late ? '<span class="tag due">' + LL('с просрочкой: ', 'with overdue: ') + late + '</span>' : '');
+  h += att.length ? fuTable(att) : '<div class="grp-empty">' + LL('Просроченных и срочных контролей нет', 'Nothing overdue or due soon') + '</div>';
   h += grpHead(LL('В порядке: всё выполнено или срок ещё не подошёл', 'On track: done or not yet due'), fine.length, 'okg');
-  h += '<div class="tablewrap">' + (fine.length ? '<table class="grid"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + t('col.surgery') + '</th><th>' + LL('Контроли', 'Follow-ups') + '</th></tr></thead><tbody>' + fine.map(function (p) {
-    return '<tr data-act="openp" data-id="' + p.id + '" tabindex="0"><td class="mono">' + p.id + '</td><td class="strong">' + esc(p.d.fio || '') + '</td><td>' + fmtDate(p.d.date) + '</td><td class="fuchips">' + fuList(p).map(function (f) { return '<span class="tag' + (f.st === 'done' ? ' okt' : '') + '">' + f.label + ': ' + (f.st === 'done' ? '✓' : LL('через ', 'in ') + f.days + LL(' дн', ' d')) + '</span>'; }).join('') + '</td></tr>';
-  }).join('') + '</tbody></table>' : '<div class="grp-empty">' + LL('Пока нет', 'None yet') + '</div>') + '</div>';
+  h += fine.length ? fuTable(fine) : '<div class="grp-empty">' + LL('Пока нет', 'None yet') + '</div>';
   return h;
 }
+
 
 /* ======================= Field rendering ======================= */
 function fieldHTML(x, val, path, d, attrs) {
@@ -1509,7 +1524,7 @@ function target(path) {
 }
 function bind(path, val) {
   var head = path.split('.')[0], rest = path.slice(head.length + 1);
-  if (head === 'fu') { if (val) S.drawer.p.fu[rest] = true; else delete S.drawer.p.fu[rest]; return; }
+  if (head === 'fu') { if (val) S.drawer.p.fu[rest] = isoOf(new Date()); else delete S.drawer.p.fu[rest]; return; }
   if (head === 'm') { S.drawer.members[rest] = !!val; return; }
   var tg = target(path); if (tg) setPath(tg[0], tg[1], val);
 }
@@ -3760,7 +3775,7 @@ document.addEventListener('click', function (ev) {
         S.drawer = null; save(); toast(t('toast.deleted')); render();
       }
       break;
-    case 'fudone': { ev.stopPropagation(); var p = DB.patients.filter(function (x) { return x.id === g('id'); })[0]; if (p) { p.fu[g('k')] = true; save(); toast(t('toast.fuDone')); render(); } break; }
+    case 'fudone': { ev.stopPropagation(); var p = DB.patients.filter(function (x) { return x.id === g('id'); })[0]; if (p) { p.fu[g('k')] = isoOf(new Date()); save(); toast(t('toast.fuDone')); render(); } break; }
     case 'sort': { var sc = g('scope'), sk = g('k'), s = S.sort[sc]; S.sort[sc] = { k: sk, d: s && s.k === sk ? -s.d : 1 }; render(); break; }
     case 'csv': S.menu = null; S.xport = { mode: 'labels', anon: false, book: true, sel: 'view' }; render(); break;
     case 'cview': UI.colView[g('k')] = g('v'); saveUI(); S.inline = null; render(); break;
