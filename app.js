@@ -1261,7 +1261,7 @@ function renderPatient() {
   h += '<div class="pbody"><nav class="pnav" aria-label="' + t('a11y.cardSections') + '">' + nav.map(function (g) {
     var ph = PHASES.filter(function (x) { return x[0] === g[0]; })[0];
     return (ph ? '<div class="pn-h ph-' + g[0] + '"><span class="pn-n">' + (PHASES.indexOf(ph) + 1) + '</span>' + t(ph[1]) + '</div>' : g[0] === 'more' ? '<div class="pn-h">' + t('ph.more') + '</div>' : '') + g[1].map(function (s) { return '<button type="button" data-act="jump" data-id="' + s.id + '">' + esc(s.title) + '</button>'; }).join('');
-  }).join('') + '</nav><div class="dbody">' + (!dr.isNew ? aiInline('pat-' + p.id, aiPatCtx(p), 'Сводка случая в 3-4 строках: диагноз, стадия, тактика, текущий этап. Затем 1-3 пункта, что не заполнено или требует внимания.', LL('ИИ: сводка случая', 'AI: case summary'), true) : '');
+  }).join('') + '</nav><div class="dbody">' + (!dr.isNew ? aiInline('pat-' + p.id, aiPatCtx(p), 'Сводка случая в 3-4 строках: диагноз, стадия, тактика, текущий этап. Затем 1-3 пункта, что не заполнено или требует внимания.', LL('ИИ: сводка случая', 'AI: case summary'), 'manual') : '');
   if (isStudent()) h += '<div class="lockbox">' + ico('lock', 15) + LL('Режим студента: данные обезличены, изменения не сохраняются.', 'Student mode: anonymised, changes are not saved.') + '</div>';
   if (dr.errs) h += '<div class="errbox"><b>' + ico('alert', 16) + LL('Карточку нельзя сохранить', 'Cannot save the record') + '</b><ul>' + dr.errs.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></div>';
   var enr = Object.keys(p.enroll || {}).map(function (sid) { var r = regOf(sid); return r ? { r: r, e: p.enroll[sid] } : null; }).filter(Boolean);
@@ -1325,9 +1325,9 @@ function renderCol(k) {
   if (k === 'pubs') h += '<button type="button" class="btn" data-act="orcid">' + ico('user', 16) + LL('Из ORCID', 'From ORCID') + '</button>';
   h += '<button type="button" class="btn" data-act="cxopen" data-k="' + k + '">' + ico('download', 16) + (k === 'pubs' ? LL('Отчёт за период', 'Report for period') : 'Excel') + '</button>';
   h += '<button type="button" class="btn primary" data-act="newrec" data-k="' + k + '">' + ico('plus', 16) + t('b.add') + '</button></div></div>';
-  if (k === 'mm') h += aiInline('col-mm', aiViewCtx('col:mm'), 'Общее саммари M&M сектора в 4-6 пунктах: сколько разборов, типы осложнений, повторяющиеся факторы, что стоит внедрить.', LL('ИИ: саммари M&M', 'AI: M&M summary'));
-  if (k === 'mdt') h += aiInline('col-mdt', aiViewCtx('col:mdt'), 'Подготовка к ближайшей МДГ: по каждому ожидающему случаю одна строка, чего не хватает для решения (стадирование, морфология, МРТ, КТ, РЭА). В конце приоритет обсуждения.', LL('ИИ: к заседанию МДГ', 'AI: MDT prep'));
-  if (k === 'planner') h += aiInline('col-planner', { title: 'Планировщик', data: briefText() }, 'Коротко по отделению: кто после операции и на какие сутки, у кого окно контрольных анализов, кто на операцию сегодня и завтра, на что обратить внимание. 4-6 пунктов.', LL('ИИ: отделение сегодня', 'AI: ward today'));
+  if (k === 'mm') h += aiInline('col-mm', aiViewCtx('col:mm'), 'Общее саммари M&M сектора в 4-6 пунктах: сколько разборов, типы осложнений, повторяющиеся факторы, что стоит внедрить.', LL('ИИ: саммари M&M', 'AI: M&M summary'), 'daily');
+  if (k === 'mdt') h += aiInline('col-mdt', aiViewCtx('col:mdt'), 'Подготовка к ближайшей МДГ: по каждому ожидающему случаю одна строка, чего не хватает для решения (стадирование, морфология, МРТ, КТ, РЭА). В конце приоритет обсуждения.', LL('ИИ: к заседанию МДГ', 'AI: MDT prep'), 'daily');
+  if (k === 'planner') h += aiInline('col-planner', { title: 'Планировщик', data: briefText() }, 'Коротко по отделению: кто после операции и на какие сутки, у кого окно контрольных анализов, кто на операцию сегодня и завтра, на что обратить внимание. 4-6 пунктов.', LL('ИИ: отделение сегодня', 'AI: ward today'), 'daily');
   var list = DB.cols[k].slice();
   var q = S.q.trim().toLowerCase();
   if (q) list = list.filter(function (r) { return c.fields.some(function (x) { var val = r[x.id]; return val && String(Array.isArray(val) ? val.join(' ') : val).toLowerCase().indexOf(q) >= 0; }); });
@@ -1437,7 +1437,7 @@ function renderRecord() {
   var o = S.rec, c = COLS[o.k], r = o.r;
   var h = '<div class="dim" data-act="closerec"></div><section class="drawer full rec" role="dialog" aria-modal="true" aria-label="' + esc(L(c.title)) + '">';
   h += '<div class="dhead"><div class="dh-main"><div class="dh-kicker">' + esc(L(c.title)) + '</div><div class="dh-title">' + esc(o.isNew ? t('rec.new') : recTitle(c, r)) + '</div></div><div class="dh-r">' + (r.notion ? '<a class="btn small" href="' + esc(r.notion) + '" target="_blank" rel="noopener">' + ico('ext', 15) + 'Notion</a>' : '') + '<button type="button" class="btn small ai' + (UI.aip ? ' on' : '') + '" data-act="aitoggle">' + ico('sparkle', 14) + LL('Ассистент', 'Assistant') + '</button><button type="button" class="iconbtn" aria-label="' + t('a11y.close') + '" data-act="closerec">' + ico('x', 20) + '</button></div></div>';
-  h += '<div class="dbody">' + (!o.isNew && ['mdt', 'mm', 'planner', 'pubs'].indexOf(o.k) >= 0 ? aiInline('rec-' + o.k + '-' + r.id, aiCtx(), { mdt: 'Суть случая в 2-3 строках и чего не хватает для решения МДГ.', mm: 'Кратко: что произошло, тяжесть по Clavien-Dindo, ключевые факторы, предотвратимость, 1-2 вывода.', planner: 'Кратко: что важно по этой госпитализации сегодня (сутки, контрольные анализы, что проверить).', pubs: 'Кратко: статус публикации и чего не хватает в карточке.' }[o.k], LL('ИИ: кратко', 'AI: in brief'), true) : '') + '<section class="card"><div class="fgrid">' + c.fields.map(function (x) { return fieldHTML(x, r[x.id], 'r.' + x.id, r); }).join('') + '</div></section>';
+  h += '<div class="dbody">' + (!o.isNew && ['mdt', 'mm', 'planner', 'pubs'].indexOf(o.k) >= 0 ? aiInline('rec-' + o.k + '-' + r.id, aiCtx(), { mdt: 'Суть случая в 2-3 строках и чего не хватает для решения МДГ.', mm: 'Кратко: что произошло, тяжесть по Clavien-Dindo, ключевые факторы, предотвратимость, 1-2 вывода.', planner: 'Кратко: что важно по этой госпитализации сегодня (сутки, контрольные анализы, что проверить).', pubs: 'Кратко: статус публикации и чего не хватает в карточке.' }[o.k], LL('ИИ: кратко', 'AI: in brief'), 'manual') : '') + '<section class="card"><div class="fgrid">' + c.fields.map(function (x) { return fieldHTML(x, r[x.id], 'r.' + x.id, r); }).join('') + '</div></section>';
   if (o.k === 'mdt') h += mpCard(r);
   if (o.k === 'pubs') h += pubTools(r);
   if (LINKED.indexOf(o.k) >= 0) {
@@ -2953,6 +2953,7 @@ function aiCheck() {
         var pick = function (re) { return av.filter(function (m) { return re.test(m.id) && !/preview|exp|lite/.test(m.id); }).sort(function (a, b) { return aiVer(b.id) - aiVer(a.id); })[0]; };
         var best = pick(/flash/) || pick(/pro/) || av[0]; AI.model = best.id;
       }
+      var lites = av.filter(function (m) { return /flash-lite/.test(m.id) && !/exp/.test(m.id); }).sort(function (a, b) { return (/preview/.test(a.id) ? 1 : 0) - (/preview/.test(b.id) ? 1 : 0) || aiVer(b.id) - aiVer(a.id); }); AI.lite = lites[0] ? lites[0].id : null;
       AI.st = 'ok'; render(); aiMaybeGreet(); aiShareDefault(false);
     })
     .catch(function (e) { AI.st = 'err'; AI.err = (e && e.error && e.error.message) || LL('Нет связи с Google AI', 'Cannot reach Google AI'); render(); });
@@ -2989,10 +2990,15 @@ function aiStream(o) {
     })
     .catch(function (e) {
       var em = (e && e.error && e.error.message) || (e && e.message) || '';
-      if (/high demand|overloaded|unavailable|try again later|RESOURCE_EXHAUSTED|rate limit|429|503/i.test(em) && (o.busyTry || 0) < 3) {
+      if (/RESOURCE_EXHAUSTED|quota|rate.?limit|429/i.test(em)) {
+        var qa = aiAltModel(o, true);
+        if (qa && !o.quotaAlt) { o.quotaAlt = true; o.model = qa; aiStream(o); return; }
+        o.fail(LL('Дневной лимит бесплатного ключа Gemini исчерпан для этой модели. Лимит обновится около 12:00 по Астане. Можно ввести свой ключ в окне Gemini.', 'The free Gemini key has used up its daily quota for this model. It resets around 07:00 UTC. You can enter your own key.')); return;
+      }
+      if (/high demand|overloaded|unavailable|try again later|503/i.test(em) && (o.busyTry || 0) < 2) {
         o.busyTry = (o.busyTry || 0) + 1;
-        if (o.busyTry >= 2 && AI.avail && AI.avail.length) { var alt = AI.avail.filter(function (m) { return /flash/.test(m.id) && !/preview|exp/.test(m.id) && m.id !== AI.model && !(o.tried || []).some(function (x) { return x === m.id; }); }).sort(function (a, b) { return aiVer(b.id) - aiVer(a.id); })[0]; if (alt) { o.tried = (o.tried || []).concat([AI.model]); o.model = alt.id; } }
-        setTimeout(function () { aiStream(o); }, 1500 * o.busyTry); return;
+        if (o.busyTry === 2) { var oa = aiAltModel(o, false); if (oa) o.model = oa; }
+        setTimeout(function () { aiStream(o); }, 2000 * o.busyTry); return;
       }
       if (!o.retried && /no longer available|not found|is not supported|deprecated/i.test(em)) {
         var sug = /models\/(gemini-[\w.\-]+)/g, mm, cand = null; while ((mm = sug.exec(em))) { if (mm[1] !== AI.model) cand = mm[1]; }
@@ -3128,22 +3134,47 @@ function aiViewCtx(v) {
 }
 function hashStr(x) { var h = 5381; for (var i = 0; i < x.length; i++) h = ((h << 5) + h + x.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
 AI.inl = {};
-function aiInline(name, ctx, prompt, title, stable) {
+AI.inlGo = {};
+function aiAltModel(o, preferLite) {
+  if (!AI.avail || !AI.avail.length) return null;
+  var cur = o.model || AI.model, tried = (o.tried = (o.tried || []).concat([cur]));
+  var c = AI.avail.filter(function (m) { return /flash/.test(m.id) && !/exp/.test(m.id) && tried.indexOf(m.id) < 0; });
+  c.sort(function (a, b) { var la = /lite/.test(a.id) ? 1 : 0, lb = /lite/.test(b.id) ? 1 : 0, pa = /preview/.test(a.id) ? 1 : 0, pb = /preview/.test(b.id) ? 1 : 0; return (preferLite ? lb - la : la - lb) || pa - pb || aiVer(b.id) - aiVer(a.id); });
+  return c[0] ? c[0].id : null;
+}
+function aiInlineRun(st, name, ctx, prompt, cacheId, force) {
+  var go = function () {
+    aiStream({ bg: true, temp: 0.3, search: false, model: AI.lite || undefined,
+      system: AI_SYS + '\nСегодня: ' + fmtDate(isoOf(new Date())) + '. Отвечай очень кратко, без вступлений и без повторения исходных данных.\n\n=== КОНТЕКСТ (' + ctx.title + ') ===\n' + ctx.data,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      chunk: function (t) { st.text = t; var el = document.getElementById('ail-' + name); if (el) el.innerHTML = md(t); },
+      done: function (t) { st.text = t || ''; st.st = 'ok'; st.at = nowIso();
+        if (cacheId && st.text) { try { localStorage.setItem('crr.ail.' + cacheId, JSON.stringify({ text: st.text, at: st.at })); } catch (e) {} if (CLOUD.on && CLOUD.db && can('edit')) CLOUD.db.collection('aicache').doc(cacheId).set({ text: st.text, at: st.at, by: me() }).catch(function () {}); }
+        render(); },
+      fail: function (e) { st.text = e; st.st = 'err'; if (/API key|PERMISSION|403|401/i.test(e)) { AI.st = 'err'; AI.err = e; } render(); } });
+  };
+  if (!cacheId || force) { setTimeout(go, 0); return; }
+  var loc = null; try { loc = JSON.parse(localStorage.getItem('crr.ail.' + cacheId) || 'null'); } catch (e) {}
+  if (loc && loc.text) { st.text = loc.text; st.at = loc.at; st.st = 'ok'; return; }
+  if (CLOUD.on && CLOUD.db) CLOUD.db.collection('aicache').doc(cacheId).get().then(function (d) {
+    if (d.exists && d.data().text) { st.text = d.data().text; st.at = d.data().at; st.st = 'ok'; try { localStorage.setItem('crr.ail.' + cacheId, JSON.stringify({ text: st.text, at: st.at })); } catch (e) {} render(); }
+    else go();
+  }).catch(go);
+  else setTimeout(go, 0);
+}
+function aiInline(name, ctx, prompt, title, mode) {
   if (!aiReady() || !SESSION || !ctx || !ctx.data) return '';
-  var key = name + ':' + hashStr((stable ? '' : ctx.data) + '|' + prompt + '|' + AI.deid + LANG), st = AI.inl[key];
+  var daily = mode === 'daily', manual = mode === 'manual' || mode === true;
+  var key = daily ? name + '_' + isoOf(new Date()) + '_' + LANG + (AI.deid ? 'd' : 'n') : name + ':' + hashStr(prompt + '|' + AI.deid + LANG), st = AI.inl[key];
   if (!st) {
-    Object.keys(AI.inl).forEach(function (k) { if (k.indexOf(name + ':') === 0) delete AI.inl[k]; });
+    if (manual && !AI.inlGo[key]) return '<div class="bai bai-idle"><button type="button" class="bai-go" data-act="ailgo" data-k="' + key + '">' + ico('sparkle', 14) + esc(title) + '</button></div>';
+    Object.keys(AI.inl).forEach(function (k) { if (k.indexOf(name + (daily ? '_' : ':')) === 0) delete AI.inl[k]; });
     st = AI.inl[key] = { st: 'run', text: '' };
-    setTimeout(function () {
-      aiStream({ bg: true, temp: 0.3, search: false,
-        system: AI_SYS + '\nСегодня: ' + fmtDate(isoOf(new Date())) + '. Отвечай очень кратко, без вступлений и без повторения исходных данных.\n\n=== КОНТЕКСТ (' + ctx.title + ') ===\n' + ctx.data,
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        chunk: function (t) { st.text = t; var el = document.getElementById('ail-' + name); if (el) el.innerHTML = md(t); },
-        done: function (t) { st.text = t || ''; st.st = 'ok'; render(); },
-        fail: function (e) { st.text = e; st.st = 'err'; if (/API key|PERMISSION|403|401/i.test(e)) { AI.st = 'err'; AI.err = e; } render(); } });
-    }, 0);
+    aiInlineRun(st, name, ctx, prompt, daily ? key : null, !!AI.inlGo[key + '!']);
+    delete AI.inlGo[key + '!'];
   }
-  return '<div class="bai' + (st.st === 'err' ? ' err' : '') + '"><div class="bai-h">' + ico('sparkle', 13) + '<span>' + esc(title) + '</span>' + (st.st === 'run' ? '<em>' + LL('анализирую…', 'thinking…') + '</em>' : '<button type="button" class="linkbtn" data-act="ailre" data-k="' + key + '" title="' + LL('Обновить', 'Refresh') + '">' + ico('refresh', 13) + '</button>') + '</div><div id="ail-' + name + '" class="bai-t">' + (st.text ? (st.st === 'err' ? esc(st.text) : md(st.text)) : '') + '</div></div>';
+  var when = st.at && st.st === 'ok' ? '<em>' + LL('обновлено ', 'updated ') + new Date(st.at).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) + '</em>' : '';
+  return '<div class="bai' + (st.st === 'err' ? ' err' : '') + '"><div class="bai-h">' + ico('sparkle', 13) + '<span>' + esc(title) + '</span>' + (st.st === 'run' ? '<em>' + LL('анализирую…', 'thinking…') + '</em>' : when + '<button type="button" class="linkbtn" data-act="ailre" data-k="' + key + '" title="' + LL('Обновить', 'Refresh') + '">' + ico('refresh', 13) + '</button>') + '</div><div id="ail-' + name + '" class="bai-t">' + (st.text ? (st.st === 'err' ? esc(st.text) : md(st.text)) : '') + '</div></div>';
 }
 function aiThread(key) { return AI.threads[key] || (AI.threads[key] = { msgs: [], greeted: false }); }
 function aiRun(ctx, hiddenPrompt, visibleText, sendText) {
@@ -3405,7 +3436,7 @@ function renderHome() {
   var labsBody = b.labs.length ? b.labs.map(function (x) { return '<div class="bi bi-' + x.st + '"><span class="pod">' + x.pod + '<i>' + LL('сут', 'POD') + '</i></span><div class="bi-t"><b>' + esc(x.name || x.who) + '</b><span>' + esc(x.op) + ' · ' + x.route + ' · ' + LL('окно ', 'window ') + x.win[0] + '-' + x.win[1] + LL(' сут', ' d') + (x.noRoute ? ' · <button type="button" class="linkbtn" data-act="openrec" data-k="planner" data-id="' + x.rid + '">' + LL('указать путь', 'set route') + '</button>' : '') + '</span></div><span class="bi-s">' + x.stTxt + '</span>' + (can('edit') ? '<button type="button" class="btn small" data-act="labsdone" data-id="' + x.rid + '">' + ico('check', 14) + LL('Взяты', 'Taken') + '</button>' : '') + '</div>'; }).join('') : '<p class="bnone">' + LL('Сегодня контрольные анализы никому не положены.', 'No control labs due today.') + '</p>';
   h += '<section class="panel brief wide"><div class="ph"><h2>' + LL('Брифинг на сегодня', 'Today\'s briefing') + '</h2><button type="button" class="btn small ai" data-act="aiopen">' + ico('sparkle', 14) + LL('Разбор ИИ', 'AI review') + '</button></div>';
   h += '<div class="bsum">' + briefSumLines(b.sum).map(function (l) { return '<div class="sl"><span class="sl-ic">' + ico(l[0], 15) + '</span><div class="sl-b"><div class="sl-t">' + l[1] + '</div>' + (l[2] && l[2].length ? '<div class="bchips">' + l[2].map(function (x) { return '<button type="button" class="bchip" data-act="openrec" data-k="' + x.k + '" data-id="' + x.id + '"><b>' + esc(x.name) + '</b>' + (x.x ? '<span>' + esc(x.x) + '</span>' : '') + '</button>'; }).join('') + '</div>' : '') + '</div></div>'; }).join('') + '</div>';
-  h += aiInline('home', aiViewCtx('home'), 'Главное на сегодня для врачей сектора: 3-5 коротких пунктов по срочности (кому что сделать, кого проверить, риски). Только то, что требует действия.', LL('ИИ: главное на сегодня', 'AI: what matters today'));
+  h += aiInline('home', aiViewCtx('home'), 'Главное на сегодня для врачей сектора: 3-5 коротких пунктов по срочности (кому что сделать, кого проверить, риски). Только то, что требует действия.', LL('ИИ: главное на сегодня', 'AI: what matters today'), 'daily');
   h += '<div class="bgrid"><div>';
   h += sec(LL('Контрольные анализы после операции', 'Post-op control labs'), 'flask', labsBody, b.labs.length) + '</div><div>';
   h += sec(LL('Операции сегодня и завтра', 'Surgery today and tomorrow'), 'knife', b.ops.length ? b.ops.map(function (x) { return '<button type="button" class="bi link" data-act="openrec" data-k="planner" data-id="' + x.rid + '"><span class="pod op">' + ico('knife', 15) + '</span><div class="bi-t"><b>' + esc(x.name || x.who) + '</b><span>' + esc(x.when) + (x.what ? ' · ' + esc(x.what) : '') + '</span></div></button>'; }).join('') : '<p class="bnone">' + LL('Не запланировано', 'Nothing scheduled') + '</p>', b.ops.length);
@@ -3826,7 +3857,8 @@ document.addEventListener('click', function (ev) {
     case 'aicopy': { var am = aiThread(aiCtx().key).msgs[+g('i')]; if (am) { navigator.clipboard && navigator.clipboard.writeText(am.text); toast(LL('Скопировано', 'Copied')); } break; }
     case 'aichip': { var cx0 = aiCtx(), ch0 = (cx0.chips || [])[+g('i')]; if (ch0 && !AI.busy) aiRun(cx0, null, ch0[0], ch0[1]); break; }
     case 'aisend': aiSendInput(); break;
-    case 'ailre': delete AI.inl[g('k')]; render(); break;
+    case 'ailre': delete AI.inl[g('k')]; AI.inlGo[g('k')] = true; AI.inlGo[g('k') + '!'] = true; try { localStorage.removeItem('crr.ail.' + g('k')); } catch (e) {} render(); break;
+    case 'ailgo': AI.inlGo[g('k')] = true; render(); break;
     case 'aistop': if (AI.ctrl) AI.ctrl.abort(); break;
     case 'aikeysave': { var ki = root.querySelector('#aikey-in'), mo = root.querySelector('#aimodel'), de = root.querySelector('#aideid'); if (mo && mo.value !== AI.model) try { localStorage.setItem('crr.aimodel.m', '1'); } catch (e) {} AI.model = mo ? mo.value : AI.model; AI.deid = de ? de.checked : AI.deid; try { localStorage.setItem('crr.aimodel', AI.model); localStorage.setItem('crr.aideid', AI.deid ? '1' : '0'); } catch (e) {} AI.threads = {}; aiSetKey(ki ? ki.value : ''); break; }
     case 'aikeyclear': AI.threads = {}; aiSetKey(''); break;
