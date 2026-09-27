@@ -154,6 +154,8 @@ var SECTIONS = [
     f('ib', '№ истории болезни (ИБ)', 'Case record no. (ИБ)', 'text', { ph: '2026/12345', lock: true, check: ibCheck }),
     f('sex', 'Пол', 'Sex', 'seg', { options: ['М', 'Ж'] }),
     f('age', 'Возраст', 'Age', 'num', { unit: 'u.years' }),
+    f('dob', 'Дата рождения', 'Date of birth', 'date'),
+    f('phone', 'Телефон', 'Phone', 'text', { ph: '+7 7__ ___ __ __' }),
     f('bmi', 'ИМТ', 'BMI', 'num'),
     f('asa', 'ASA', 'ASA', 'sel', { options: ['I', 'II', 'III', 'IV'] }),
     f('ecog', 'ECOG', 'ECOG', 'sel', { options: ['0', '1', '2', '3', '4'] }),
@@ -624,6 +626,7 @@ function migrate(db) {
     db.patients.forEach(function (p) { Object.keys(p.d).forEach(function (k) { var v = p.d[k]; if (Array.isArray(v)) p.d[k] = v.map(function (x) { return LR[x] || x; }); else if (LR[v]) p.d[k] = LR[v]; }); });
     db.mig.p8 = 1;
   }
+  if (!db.pending) db.pending = [];
   if (!db.cols.pubs) db.cols.pubs = [];
   plannerAuto(db);
   return db;
@@ -703,6 +706,43 @@ function tagsOf(match) {
   return match.filter(function (r) { return !match.some(function (o) { return o.parent === r.id; }); });
 }
 function regOf(id) { return DB.registries.filter(function (r) { return r.id === id; })[0]; }
+function canApprove(r) { return !!SESSION && r.appr && r.appr.st === 'pending' && (SESSION.role === 'doctor' || isAdmin()) && (!CLOUD.on || r.appr.uid !== SESSION.id); }
+function apprMine() { return (DB.pending || []).filter(canApprove); }
+function renderAppr() {
+  var list = (DB.pending || []).slice().sort(function (a, b) { return String(b.appr.at).localeCompare(String(a.appr.at)); });
+  var h = pageHead(LL('Наука', 'Research'), LL('На одобрении', 'Awaiting approval'), LL('Новые исследования и регистры появляются для всех только после одобрения врачом, который их не создавал.', 'New studies and registries go live after approval by a doctor other than the author.'));
+  if (!list.length) return h + '<div class="empty">' + LL('Нет заявок на одобрение', 'Nothing awaiting approval') + '</div>';
+  h += '<div class="apl">' + list.map(function (r) {
+    var pr = r.kind === 'study' ? stProto(r) : null, a = r.appr, mine = SESSION && a.uid === SESSION.id;
+    var st = a.st === 'rejected' ? '<span class="st st-cancel">' + LL('Отклонено', 'Rejected') + '</span>' : '<span class="st st-prog">' + LL('Ждёт одобрения', 'Pending') + '</span>';
+    var det = pr ? [[LL('Номер', 'No.'), pr.no], [LL('Тип', 'Type'), ov(pr.type)], [LL('Дизайн', 'Design'), pr.syn && ov(pr.syn.design)], [LL('Цель', 'Aim'), pr.syn && pr.syn.aim], [LL('Коды МКБ-10', 'ICD-10'), pr.icd], [LL('Целевой набор', 'Target'), pr.target], [LL('Дедлайн', 'Deadline'), fmtDate(pr.deadline)]] : [[LL('Правило отбора', 'Rule'), ruleText(r)], [LL('Свои поля', 'Custom fields'), (r.custom || []).map(function (c) { return c.label; }).join(', ')]];
+    var x = '<section class="card apc"><div class="apc-h"><span class="sc-ic">' + ico(r.kind === 'study' ? 'flask' : 'folder', 18) + '</span><div><b>' + esc(regName(r)) + '</b><span class="muted">' + (r.kind === 'study' ? LL('Исследование', 'Study') : LL('Регистр', 'Registry')) + ' · ' + esc(a.by || '') + ' · ' + fmtDate(String(a.at).slice(0, 10)) + '</span></div>' + st + '</div>';
+    x += '<dl class="dls">' + det.filter(function (d) { return has(d[1]); }).map(function (d) { return '<dt>' + d[0] + '</dt><dd>' + esc(String(d[1])) + '</dd>'; }).join('') + '</dl>';
+    if (a.st === 'rejected') x += '<p class="aerr">' + ico('alert', 14) + esc((a.noBy || '') + ': ' + (a.reason || LL('без комментария', 'no comment'))) + '</p>';
+    x += '<div class="actions">';
+    if (canApprove(r)) x += '<button type="button" class="btn primary" data-act="approk" data-id="' + r.id + '">' + ico('check', 15) + LL('Одобрить', 'Approve') + '</button><button type="button" class="btn" data-act="apprno" data-id="' + r.id + '">' + LL('Отклонить', 'Reject') + '</button>';
+    else if (a.st === 'pending') x += '<span class="muted">' + (mine ? LL('Ждёт одобрения другого врача', 'Waiting for another doctor') : LL('Одобрить может врач', 'A doctor can approve')) + '</span>';
+    if (mine || isAdmin()) x += '<button type="button" class="btn ghost danger" data-act="apprdel" data-id="' + r.id + '">' + LL('Удалить заявку', 'Delete request') + '</button>';
+    return x + '</div></section>';
+  }).join('') + '</div>';
+  return h;
+}
+function apprAct(kind, id) {
+  var r = (DB.pending || []).filter(function (x) { return x.id === id; })[0]; if (!r) return;
+  if (kind === 'ok') {
+    if (!canApprove(r)) return;
+    r.appr.st = 'approved'; r.appr.okBy = me(); r.appr.okAt = nowIso();
+    DB.pending = DB.pending.filter(function (x) { return x.id !== id; }); DB.registries.push(r);
+    save(); toast((r.kind === 'study' ? LL('Исследование одобрено: ', 'Study approved: ') : LL('Регистр одобрен: ', 'Registry approved: ')) + regName(r)); render();
+  } else if (kind === 'no') {
+    if (!canApprove(r)) return;
+    var why = prompt(LL('Причина отклонения (увидит автор):', 'Reason for rejection (the author will see it):'), ''); if (why === null) return;
+    r.appr.st = 'rejected'; r.appr.reason = why.trim(); r.appr.noBy = me(); r.appr.noAt = nowIso(); save(); render();
+  } else if (kind === 'del') {
+    if (!confirm(LL('Удалить заявку?', 'Delete this request?'))) return;
+    DB.pending = DB.pending.filter(function (x) { return x.id !== id; }); save(); render();
+  }
+}
 function regName(r) { return r.nameKey ? t(r.nameKey) : r.name; }
 function ruleText(reg) {
   if (reg.kind === 'study' && reg.desc) return reg.desc;
@@ -1495,7 +1535,13 @@ function saveEditor() {
   e.custom = e.custom.filter(function (c) { return c.label.trim(); });
   var isNew = e.isNew; delete e.isNew; delete e._step; delete e._tpl;
   if (e.kind === 'study') { if (!e.proto.no) e.proto.no = nextStudyNo(); var live = regOf(e.id); if (live && live.proto) { e.proto.log = live.proto.log; e.proto.blocks = live.proto.blocks; e.proto.seq = live.proto.seq; e.proto.blockNo = live.proto.blockNo; } }
-  if (isNew) DB.registries.push(e); else DB.registries = DB.registries.map(function (r) { return r.id === e.id ? e : r; });
+  if (isNew) {
+    e.appr = { st: 'pending', by: me(), uid: SESSION ? SESSION.id : '', at: nowIso() };
+    DB.pending = (DB.pending || []).concat([e]); S.edit = null; S.view = 'appr'; UI.view = 'appr'; saveUI();
+    if (save()) toast(LL('Отправлено на одобрение врачам. После одобрения ', 'Sent to doctors for approval. After approval the ') + (e.kind === 'study' ? LL('исследование появится в разделе «Наука».', 'study will appear in Research.') : LL('регистр появится в списке.', 'registry will appear in the list.')));
+    render(); return;
+  }
+  DB.registries = DB.registries.map(function (r) { return r.id === e.id ? e : r; });
   S.edit = null; S.view = 'reg:' + e.id; UI.view = S.view; if (e.kind === 'study' && isNew) UI.stab = 'pts'; saveUI();
   if (save()) toast(e.kind === 'study' ? (isNew ? LL('Исследование создано: ', 'Study created: ') + e.proto.no : LL('Протокол сохранён', 'Protocol saved')) : isNew ? t('toast.regCreated') : t('toast.regSaved')); render();
 }
@@ -2020,7 +2066,7 @@ function qCard(p, isNew) {
   else h += '<div class="qlist">' + list.map(function (e) {
     var q = qTpl(e.tid), open = S.qview === e.id;
     var r = '<div class="qrow"><div class="qn"><b>' + esc(qShort(q)) + '</b>' + (e.label ? '<span>' + esc(e.label) + '</span>' : '') + '</div><div class="qs">' + qStatusTag(e) + '</div><div class="qa">';
-    r += e.date ? '<button type="button" class="btn small ghost" data-act="qview" data-id="' + e.id + '">' + (open ? LL('Скрыть ответы', 'Hide answers') : LL('Ответы', 'Answers')) + '</button>' : '<button type="button" class="btn small primary" data-act="qfill" data-pid="' + p.id + '" data-id="' + e.id + '">' + ico('tablet', 15) + LL('Заполнить', 'Fill in') + '</button>';
+    r += e.date ? '<button type="button" class="btn small ghost" data-act="qview" data-id="' + e.id + '">' + (open ? LL('Скрыть ответы', 'Hide answers') : LL('Ответы', 'Answers')) + '</button>' : '<button type="button" class="btn small primary" data-act="qfill" data-pid="' + p.id + '" data-id="' + e.id + '">' + ico('tablet', 15) + LL('Заполнить', 'Fill in') + '</button>' + (CLOUD.on ? '<button type="button" class="btn small" data-act="qlnew" data-id="' + e.tid + '" data-pid="' + p.id + '" data-eid="' + e.id + '">' + ico('ext', 14) + LL('Ссылка пациенту', 'Link for patient') + '</button>' : '');
     r += '<button type="button" class="iconbtn sm" aria-label="' + LL('Удалить', 'Delete') + '" data-act="qdel" data-pid="' + p.id + '" data-id="' + e.id + '">' + ico('x', 15) + '</button></div></div>';
     if (open && q) r += '<ol class="qans">' + qVisible(q, e.ans || {}).map(function (it) { var a = (e.ans || {})[it.id]; var txt = !has(a) ? '' : it.type === 'single' ? L(it.opts[+a].t) + (q.score ? ' (' + (it.opts[+a].s || 0) + ')' : '') : it.type === 'multi' ? a.map(function (i) { return L(it.opts[+i].t); }).join(', ') : String(a); return '<li><span>' + esc(L(it.text)) + '</span><b>' + esc(txt || LL('нет ответа', 'no answer')) + '</b></li>'; }).join('') + '</ol>';
     return r;
@@ -2133,14 +2179,16 @@ function qbSave() {
 function renderQPage() {
   var due = qDueAll(30), tab = UI.qtab || 'due';
   var h = '<div class="head"><div><div class="kicker">' + LL('Наука', 'Research') + '</div><h1>' + LL('Анкеты пациентов', 'Patient questionnaires') + '</h1></div><div class="actions"><button type="button" class="btn primary" data-act="qbnew">' + ico('plus', 16) + LL('Новая анкета', 'New questionnaire') + '</button></div></div>';
-  h += '<div class="tabs pad">' + [['due', LL('К заполнению', 'Due'), due.length], ['tpl', LL('Шаблоны анкет', 'Templates'), qTpls().length], ['res', LL('Результаты', 'Results'), null]].map(function (x) { return '<button type="button" class="tab' + (tab === x[0] ? ' on' : '') + '" data-act="qtab" data-v="' + x[0] + '">' + x[1] + (x[2] !== null ? '<span class="cnt">' + x[2] + '</span>' : '') + '</button>'; }).join('') + '</div>';
+  h += '<div class="tabs pad">' + [['due', LL('К заполнению', 'Due'), due.length], ['tpl', LL('Шаблоны анкет', 'Templates'), qTpls().length], ['res', LL('Результаты', 'Results'), null]].concat(CLOUD.on ? [['inbox', LL('Входящие', 'Inbox'), QL.resp.length || null]] : []).map(function (x) { return '<button type="button" class="tab' + (tab === x[0] ? ' on' : '') + '" data-act="qtab" data-v="' + x[0] + '">' + x[1] + (x[2] !== null ? '<span class="cnt">' + x[2] + '</span>' : '') + '</button>'; }).join('') + '</div>';
   if (tab === 'tpl') {
-    h += '<div class="scards pad">' + qTpls().map(function (q) { return '<div class="scard qt"><span class="sc-ic">' + ico('clipboard', 20) + '</span><b>' + esc(qName(q)) + '</b><span class="muted">' + esc(L(q.desc || ['', ''])) + '</span><div class="sc-meta"><span>' + plural(q.items.length, 'pl.question') + '</span>' + (q.max ? '<span>0..' + q.max + LL(' баллов', ' points') + '</span>' : '') + (q.builtin ? '<span class="tag">' + LL('встроенная', 'built-in') + '</span>' : '') + '</div><div class="sc-act">' + (q.builtin ? '<button type="button" class="btn small" data-act="qbcopy" data-id="' + q.id + '">' + LL('Сделать копию', 'Duplicate') + '</button>' : '<button type="button" class="btn small" data-act="qbedit" data-id="' + q.id + '">' + LL('Изменить', 'Edit') + '</button>') + '</div></div>'; }).join('') + '<button type="button" class="scard new" data-act="qbnew"><span class="sc-ic">' + ico('plus', 20) + '</span><b>' + LL('Новая анкета', 'New questionnaire') + '</b></button></div>';
+    h += '<div class="scards pad">' + qTpls().map(function (q) { return '<div class="scard qt"><span class="sc-ic">' + ico('clipboard', 20) + '</span><b>' + esc(qName(q)) + '</b><span class="muted">' + esc(L(q.desc || ['', ''])) + '</span><div class="sc-meta"><span>' + plural(q.items.length, 'pl.question') + '</span>' + (q.max ? '<span>0..' + q.max + LL(' баллов', ' points') + '</span>' : '') + (q.builtin ? '<span class="tag">' + LL('встроенная', 'built-in') + '</span>' : '') + '</div><div class="sc-act">' + (q.builtin ? '<button type="button" class="btn small" data-act="qbcopy" data-id="' + q.id + '">' + LL('Сделать копию', 'Duplicate') + '</button>' : '<button type="button" class="btn small" data-act="qbedit" data-id="' + q.id + '">' + LL('Изменить', 'Edit') + '</button>') + (can('edit') ? '<button type="button" class="btn small primary" data-act="qlnew" data-id="' + q.id + '">' + ico('ext', 14) + LL('Сформировать ссылку', 'Create link') + '</button>' : '') + '</div></div>'; }).join('') + '<button type="button" class="scard new" data-act="qbnew"><span class="sc-ic">' + ico('plus', 20) + '</span><b>' + LL('Новая анкета', 'New questionnaire') + '</b></button></div>';
     return h;
   }
+  if (tab === 'inbox') return h + renderQInbox();
   if (tab === 'res') {
     var rows = []; DB.patients.forEach(function (p) { (p.q || []).forEach(function (e) { if (e.date) rows.push({ p: p, e: e }); }); });
     rows.sort(function (a, b) { return b.e.date.localeCompare(a.e.date); });
+    h += qStatsHTML(rows);
     h += '<div class="tablewrap">' + (rows.length ? '<table class="grid"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + LL('Анкета', 'Questionnaire') + '</th><th>' + LL('Срок', 'Time point') + '</th><th>' + LL('Дата', 'Date') + '</th><th>' + LL('Баллы', 'Score') + '</th><th>' + LL('Вывод', 'Result') + '</th></tr></thead><tbody>' + rows.map(function (x) { var q = qTpl(x.e.tid), b = qBand(q || {}, x.e.score); return '<tr data-act="openp" data-id="' + x.p.id + '" tabindex="0"><td class="mono">' + x.p.id + '</td><td class="strong">' + esc(pName(x.p)) + '</td><td>' + esc(qShort(q)) + '</td><td>' + esc(x.e.label || '') + '</td><td>' + fmtDate(x.e.date) + '</td><td class="num">' + (x.e.score !== null && x.e.score !== undefined ? x.e.score : '') + '</td><td>' + (b ? '<span class="st st-' + (b.c === 'ok' ? 'done' : b.c === 'due' ? 'cancel' : 'prog') + '">' + esc(L(b.t)) + '</span>' : '') + '</td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">' + LL('Пока нет заполненных анкет', 'No completed questionnaires yet') + '</div>') + '</div>';
     return h;
   }
@@ -2519,6 +2567,7 @@ function importOrcid() {
 /* ======================= Notifications ======================= */
 function notifs() {
   var out = [], td = isoOf(new Date()), tm = isoOf(addDays(td, 1));
+  apprMine().forEach(function (r) { out.push({ id: 'ap:' + r.id, ic: 'check', lvl: 'soon', t: (r.kind === 'study' ? LL('Одобрить исследование: ', 'Approve study: ') : LL('Одобрить регистр: ', 'Approve registry: ')) + regName(r), s: LL('создал(а) ', 'by ') + (r.appr.by || ''), go: ['v', 'appr'] }); });
   fuDueAll().forEach(function (x) { if (x.f.st === 'overdue') out.push({ id: 'fu:' + x.p.id + ':' + x.f.key, ic: 'clock', lvl: 'due', t: LL('Просрочен контроль: ', 'Follow-up overdue: ') + x.f.label, s: pName(x.p) + ' · ' + daysLabel(x.f.days), go: ['p', x.p.id] }); });
   qDueAll(3).forEach(function (x) { out.push({ id: 'q:' + x.p.id + ':' + x.e.id, ic: 'clipboard', lvl: x.n < 0 ? 'due' : 'soon', t: LL('Анкета ', 'Questionnaire ') + qShort(qTpl(x.e.tid)) + (x.n < 0 ? LL(' просрочена', ' overdue') : LL(' к заполнению', ' due')), s: pName(x.p) + ' · ' + daysLabel(x.n), go: ['p', x.p.id] }); });
   (DB.cols.redcap || []).forEach(function (r) { if (r.done !== 'Заполнено' && r.contact && r.contact <= td) out.push({ id: 'rc:' + r.id, ic: 'flask', lvl: r.contact < td ? 'due' : 'soon', t: LL('RedCap: связаться с пациентом', 'RedCap: contact the patient'), s: (r.fio || '') + ' · ' + fmtDate(r.contact), go: ['r', 'redcap', r.id] }); });
@@ -2546,7 +2595,8 @@ function renderBell() {
 function goNotif(i) {
   var n = notifs()[+i]; if (!n) return;
   UI.seen = UI.seen || {}; UI.seen[n.id] = 1; saveUI(); S.menu = null;
-  if (n.go[0] === 'p') openPatient(n.go[1]);
+  if (n.go[0] === 'v') setView(n.go[1]);
+  else if (n.go[0] === 'p') openPatient(n.go[1]);
   else if (n.go[0] === 'r') openRec(n.go[1], n.go[2]);
   else if (n.go[0] === 's') { UI.stab = n.go[2]; setView('reg:' + n.go[1]); }
 }
@@ -2637,7 +2687,7 @@ function cloudInit() {
         if (!p) { CLOUD.fb.auth().signOut(); return; }
         if (p.status !== 'active') { S.auth = S.auth || { mode: 'login' }; S.auth.mode = 'wait'; S.auth.busy = false; CLOUD.fb.auth().signOut(); render(); return; }
         setSession({ id: u.uid, email: u.email, name: p.name, role: p.role, admin: !!p.admin }); S.auth = null; if (S.view === 'portal') S.view = 'home';
-        cloudListen(); aiLoadShared(); render();
+        cloudListen(); aiLoadShared(); qlListen(); render();
       });
     });
     render();
@@ -2660,6 +2710,7 @@ function cloudDocs() {
   DB.patients.forEach(function (p) { m['p_' + p.id] = p; });
   Object.keys(DB.cols).forEach(function (k) { DB.cols[k].forEach(function (r) { m['c_' + k + '__' + r.id] = r; }); });
   DB.registries.forEach(function (r) { m['g_' + r.id] = r; });
+  (DB.pending || []).forEach(function (r) { m['x_' + r.id] = r; });
   m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, studySeq: DB.studySeq, importedAt: DB.importedAt };
   var out = {}; Object.keys(m).forEach(function (k) { out[k.replace(/\//g, '_')] = JSON.stringify(m[k]); }); return out;
 }
@@ -2680,12 +2731,13 @@ function cloudPush() {
   }, 400);
 }
 function dbFromDocs(map) {
-  var db = { v: 3, seq: 1, registries: [], patients: [], cols: { planner: [], mdt: [], mm: [], redcap: [], goals: [], pubs: [] }, mig: {} };
+  var db = { v: 3, seq: 1, registries: [], pending: [], patients: [], cols: { planner: [], mdt: [], mm: [], redcap: [], goals: [], pubs: [] }, mig: {} };
   Object.keys(map).forEach(function (k) {
     var v; try { v = JSON.parse(map[k]); } catch (e) { return; }
     if (k === 'meta') { Object.keys(v).forEach(function (x) { db[x] = v[x]; }); return; }
     if (k.indexOf('p_') === 0) db.patients.push(v);
     else if (k.indexOf('g_') === 0) db.registries.push(v);
+    else if (k.indexOf('x_') === 0) db.pending.push(v);
     else if (k.indexOf('c_') === 0) { var ck = k.slice(2).split('__')[0]; (db.cols[ck] = db.cols[ck] || []).push(v); }
   });
   db.patients.sort(function (a, b) { return a.id.localeCompare(b.id); });
@@ -2822,10 +2874,10 @@ function demoDB() {
 }
 
 /* ======================= v10: AI assistant (Gemini) ======================= */
-var AI = { key: '', model: 'gemini-2.5-flash', st: 'off', err: '', deid: true, threads: {}, busy: false };
+var AI = { key: '', model: 'gemini-flash-latest', st: 'off', err: '', deid: true, threads: {}, busy: false };
 try { AI.key = localStorage.getItem('crr.aikey') || ''; AI.model = localStorage.getItem('crr.aimodel') || AI.model; AI.deid = localStorage.getItem('crr.aideid') !== '0'; } catch (e) {}
 var AI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-var AI_MODELS = [['gemini-2.5-flash', 'Gemini 2.5 Flash', LL('быстрая, по умолчанию', 'fast, default')], ['gemini-2.5-pro', 'Gemini 2.5 Pro', LL('глубже, медленнее', 'deeper, slower')], ['gemini-2.5-flash-lite', 'Gemini 2.5 Flash-Lite', LL('самая быстрая', 'fastest')]];
+var AI_MODELS = [['gemini-flash-latest', 'Gemini Flash', LL('быстрая, по умолчанию', 'fast, default')], ['gemini-pro-latest', 'Gemini Pro', LL('глубже, медленнее', 'deeper, slower')]];
 function aiReady() { return AI.st === 'ok' && !!AI.key; }
 function aiSetKey(k) { AI.key = String(k || '').trim(); AI.shared = false; if (!AI.key && AI.sharedKey) { try { localStorage.removeItem('crr.aikey'); } catch (e) {} AI.key = AI.sharedKey; AI.shared = true; aiCheck(); return; } try { if (AI.key) localStorage.setItem('crr.aikey', AI.key); else localStorage.removeItem('crr.aikey'); } catch (e) {} aiCheck(); }
 function aiLoadShared() {
@@ -2851,7 +2903,8 @@ function aiCheck() {
     .then(function (j) {
       var av = (j.models || []).filter(function (m) { return /gemini/.test(m.name) && (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0 && !/embedding|tts|image|audio|live|vision/.test(m.name); }).map(function (m) { return { id: m.name.replace(/^models\//, ''), name: m.displayName || m.name }; });
       AI.avail = av;
-      if (av.length && !av.some(function (m) { return m.id === AI.model; })) {
+      var manual = false; try { manual = localStorage.getItem('crr.aimodel.m') === '1'; } catch (e) {}
+      if (av.length && (!manual || !av.some(function (m) { return m.id === AI.model; }))) {
         var pick = function (re) { return av.filter(function (m) { return re.test(m.id) && !/preview|exp|lite/.test(m.id); }).sort(function (a, b) { return aiVer(b.id) - aiVer(a.id); })[0]; };
         var best = pick(/flash/) || pick(/pro/) || av[0]; AI.model = best.id;
       }
@@ -2889,7 +2942,14 @@ function aiStream(o) {
       }
       return pump();
     })
-    .catch(function (e) { if (e && e.name === 'AbortError') { o.done(text + (text ? '\n\n' : '') + LL('_(остановлено)_', '_(stopped)_'), src); return; } o.fail((e && e.error && e.error.message) || (e && e.message) || LL('Ошибка запроса к Gemini', 'Gemini request failed')); });
+    .catch(function (e) {
+      var em = (e && e.error && e.error.message) || (e && e.message) || '';
+      if (!o.retried && /no longer available|not found|is not supported|deprecated/i.test(em)) {
+        var sug = /models\/(gemini-[\w.\-]+)/g, mm, cand = null; while ((mm = sug.exec(em))) { if (mm[1] !== AI.model) cand = mm[1]; }
+        if (!cand && AI.avail && AI.avail.length) { var fl = AI.avail.filter(function (m) { return /flash/.test(m.id) && !/lite|preview|exp/.test(m.id) && m.id !== AI.model; }).sort(function (a, b) { return aiVer(b.id) - aiVer(a.id); })[0]; if (fl) cand = fl.id; }
+        if (cand) { AI.model = cand; try { localStorage.setItem('crr.aimodel', cand); localStorage.removeItem('crr.aimodel.m'); } catch (x) {} o.retried = true; aiStream(o); return; }
+      }
+      if (e && e.name === 'AbortError') { o.done(text + (text ? '\n\n' : '') + LL('_(остановлено)_', '_(stopped)_'), src); return; } o.fail((e && e.error && e.error.message) || (e && e.message) || LL('Ошибка запроса к Gemini', 'Gemini request failed')); });
 }
 
 /* minimal markdown */
@@ -2923,6 +2983,7 @@ function md(src) {
 
 /* context builders: what the assistant sees on each screen */
 var AI_SYS = 'Ты клинический и научный ИИ-ассистент колоректального сектора Национального научного онкологического центра (ННОЦ, NROC), Астана, Казахстан. Пользователи: врачи-хирурги, резиденты, студенты.\n' +
+  'Используй строгую русскую медицинскую терминологию (латеральная лимфодиссекция, латеральные тазовые лимфоузлы, тотальная мезоректумэктомия, несостоятельность анастомоза), без разговорных и калькированных терминов.\n' +
   'Правила:\n- Ты ничего не меняешь в данных платформы: только читаешь, анализируешь, считаешь, советуешь и готовишь черновики, которые врач переносит сам.\n' +
   '- Опирайся на данные из блока КОНТЕКСТ. Числа бери только оттуда или вычисляй из них, явно показывая расчёт. Если данных нет, так и скажи и перечисли, чего не хватает.\n' +
   '- Клинические рекомендации: NCCN, ESMO, ASCRS, ESCP, JSCCR, клинические протоколы МЗ РК, AJCC/UICC 8. Указывай источник и год. Ссылки давай с PMID или DOI, только реально существующие; если не уверен в ссылке, не выдумывай, а предложи поисковый запрос для PubMed.\n' +
@@ -3358,6 +3419,7 @@ function viewTitle() {
   if (v === 'fu') return t('nav.followup');
   if (v === 'studies') return t('nav.studies');
   if (v === 'q') return LL('Анкеты', 'Questionnaires');
+  if (v === 'appr') return LL('На одобрении', 'Awaiting approval');
   if (v.indexOf('col:') === 0 && COLS[v.slice(4)]) return L(COLS[v.slice(4)].title);
   if (v.indexOf('reg:') === 0) { var r = regOf(v.slice(4)); return r ? regName(r) : t('nav.allPatients'); }
   return '';
@@ -3385,6 +3447,7 @@ function render() {
   if (sideOn) h += '<div class="side-dim" data-act="side"></div>';
   if (S.drawer) h += renderPatient();
   if (S.rec) h += renderRecord();
+  if (S.qlink) h += renderQLink();
   if (S.edit) h += renderEditor();
   if (S.pick) h += renderPick();
   if (S.xport) h += renderExport();
@@ -3440,6 +3503,7 @@ function renderSide() {
   var so = !(UI.open && UI.open.studies === false);
   h += '<div class="tn" style="--d:0"><button type="button" class="tog' + (so ? ' open' : '') + '" data-act="tog" data-id="studies" aria-expanded="' + !!so + '" aria-label="' + t(so ? 'a11y.collapse' : 'a11y.expand') + '">' + ico('right', 13) + '</button><button type="button" class="nav' + (S.view === 'studies' ? ' on' : '') + '" data-act="view" data-v="studies">' + ico('flask', 16) + '<span class="nl">' + t('nav.studies') + '</span><span class="cnt">' + studies().length + '</span></button></div>';
   if (so) kids(null, true).forEach(function (r) { h += treeNode(r, 1); });
+  if ((DB.pending || []).length) h += navBtn('appr', 'check', LL('На одобрении', 'Awaiting approval'), undefined, apprMine().length || null);
   if (can('edit')) h += '<button type="button" class="nav add" data-act="newstudy">' + ico('plus', 16) + '<span class="nl">' + t('nav.newStudy') + '</span></button>';
   var qd = qDueAll(0).length;
   h += navBtn('q', 'clipboard', LL('Анкеты', 'Questionnaires'), undefined, qd || null);
@@ -3457,6 +3521,7 @@ function renderMain() {
   if (CLOUD.on && CLOUD.empty && SESSION) return '<div class="page"><div class="panel" style="max-width:640px;margin:40px auto;text-align:center;padding:32px"><div class="pt-icon">' + ico('upload', 26) + '</div><h2>' + LL('Общая база пока пустая', 'The shared database is empty') + '</h2>' + (isAdmin() ? '<p class="muted">' + LL('Нажмите кнопку и выберите файл <b>data.js</b> в папке <b>Документы → colorectal-registry</b>. Все пациенты, планировщик, МДГ, M&M и RedCap загрузятся в облако и станут видны всем подтверждённым сотрудникам.', 'Click the button and pick <b>data.js</b> in <b>Documents → colorectal-registry</b>.') + '</p><button type="button" class="btn primary" data-act="restore">' + ico('upload', 16) + LL('Загрузить данные', 'Upload data') + '</button>' : '<p class="muted">' + LL('Администратор ещё не загрузил данные.', 'The administrator has not uploaded data yet.') + '</p>') + '</div></div>';
   if (v === 'home') return renderHome();
   if (v === 'users') return renderUsers();
+  if (v === 'appr') return renderAppr();
   if (v === 'fu') return renderFu();
   if (v === 'studies') return renderStudies();
   if (v === 'q') return renderQPage();
@@ -3514,7 +3579,7 @@ document.addEventListener('click', function (ev) {
   var a = tg.getAttribute('data-act');
   if (a === 'search' || (tg.tagName === 'INPUT' && a !== 'segset')) return;
   var g = function (x) { return tg.getAttribute('data-' + x); };
-  var NEED = { savep: 'edit', saverec: 'edit', delp: 'delete', delrec: 'delete', esave: 'edit', edelete: 'delete', enrgo: 'edit', enroll: 'edit', rand: 'rand', unlockf: 'unlock', impgo: 'edit', imp: 'edit', newp: 'edit', newrec: 'edit', newreg: 'edit', newstudy: 'edit', qbsave: 'edit', qbnew: 'edit', fillsave: 'edit', cmtadd: 'edit', labsdone: 'edit', reset: 'admin', restore: 'admin', tplsave: 'edit', qsched: 'edit', qnow: 'edit', toreg: 'edit', addlinked: 'edit' };
+  var NEED = { qlnew: 'edit', qllink: 'edit', qldel: 'edit', savep: 'edit', saverec: 'edit', delp: 'delete', delrec: 'delete', esave: 'edit', edelete: 'delete', enrgo: 'edit', enroll: 'edit', rand: 'rand', unlockf: 'unlock', impgo: 'edit', imp: 'edit', newp: 'edit', newrec: 'edit', newreg: 'edit', newstudy: 'edit', qbsave: 'edit', qbnew: 'edit', fillsave: 'edit', cmtadd: 'edit', labsdone: 'edit', reset: 'admin', restore: 'admin', tplsave: 'edit', qsched: 'edit', qnow: 'edit', toreg: 'edit', addlinked: 'edit' };
   if (NEED[a] && !can(NEED[a])) { toast(LL('Недостаточно прав для роли «', 'Not allowed for role "') + (SESSION ? roleName(SESSION.role) : '') + LL('»', '"')); return; }
   switch (a) {
     case 'side': if (window.innerWidth < 900) S.sideMob = !S.sideMob; else { UI.side = !UI.side; saveUI(); } render(); break;
@@ -3713,9 +3778,18 @@ document.addEventListener('click', function (ev) {
     case 'aisend': aiSendInput(); break;
     case 'ailre': delete AI.inl[g('k')]; render(); break;
     case 'aistop': if (AI.ctrl) AI.ctrl.abort(); break;
-    case 'aikeysave': { var ki = root.querySelector('#aikey-in'), mo = root.querySelector('#aimodel'), de = root.querySelector('#aideid'); AI.model = mo ? mo.value : AI.model; AI.deid = de ? de.checked : AI.deid; try { localStorage.setItem('crr.aimodel', AI.model); localStorage.setItem('crr.aideid', AI.deid ? '1' : '0'); } catch (e) {} AI.threads = {}; aiSetKey(ki ? ki.value : ''); break; }
+    case 'aikeysave': { var ki = root.querySelector('#aikey-in'), mo = root.querySelector('#aimodel'), de = root.querySelector('#aideid'); if (mo && mo.value !== AI.model) try { localStorage.setItem('crr.aimodel.m', '1'); } catch (e) {} AI.model = mo ? mo.value : AI.model; AI.deid = de ? de.checked : AI.deid; try { localStorage.setItem('crr.aimodel', AI.model); localStorage.setItem('crr.aideid', AI.deid ? '1' : '0'); } catch (e) {} AI.threads = {}; aiSetKey(ki ? ki.value : ''); break; }
     case 'aikeyclear': AI.threads = {}; aiSetKey(''); break;
     case 'theme': UI.theme = themeCur() === 'dark' ? 'light' : 'dark'; saveUI(); themeApply(); render(); break;
+    case 'qlnew': qlCreate(g('id'), g('pid'), g('eid')); break;
+    case 'qlclose': S.qlink = null; render(); break;
+    case 'qlcopy': { var qu = S.qlink.url; if (navigator.clipboard) navigator.clipboard.writeText(qu).then(function () { toast(LL('Ссылка скопирована', 'Link copied')); }); else { var qi = document.getElementById('qlurl'); qi.select(); document.execCommand('copy'); toast(LL('Ссылка скопирована', 'Link copied')); } break; }
+    case 'qlshare': navigator.share({ title: S.qlink.name, url: S.qlink.url }).catch(function () {}); break;
+    case 'qllink': { var sel = document.getElementById('qlp_' + g('id')); qlLinkManual(g('id'), sel ? sel.value : ''); break; }
+    case 'qldel': qlDel(g('id')); break;
+    case 'approk': apprAct('ok', g('id')); break;
+    case 'apprno': apprAct('no', g('id')); break;
+    case 'apprdel': apprAct('del', g('id')); break;
     case 'aishare': aiShareDefault(true); break;
     case 'cmd': S.menu = null; S.cmd = { q: '', i: 0 }; render(); break;
     case 'cmdgo': cmdGo(+g('i')); break;
@@ -3824,7 +3898,7 @@ document.addEventListener('keydown', function (ev) {
   if (tg.getAttribute && tg.getAttribute('data-gs') && ev.key === 'Enter') { ev.preventDefault(); var q = tg.value.trim(); var hit = q && DB.patients.filter(function (p) { return p.id.toLowerCase() === q.toLowerCase() || String(p.d.ib || '') === q; }); if (hit && hit.length === 1) { openPatient(hit[0].id); return; } S.view = 'reg:all'; UI.view = S.view; saveUI(); S.q = q; render(); var s = root.querySelector('.search'); if (s) s.focus(); return; }
   if (ev.key === 'Escape') {
     if (S.fill) { ev.stopImmediatePropagation(); if (S.fill.done || confirm(LL('Выйти без сохранения ответов?', 'Leave without saving answers?'))) { S.fill = null; render(); } return; }
-    var ks = ['randShow', 'enr', 'qb', 'qs', 'cx', 'imp', 'xport'];
+    var ks = ['randShow', 'enr', 'qb', 'qs', 'cx', 'imp', 'xport', 'qlink'];
     for (var i = 0; i < ks.length; i++) if (S[ks[i]]) { ev.stopImmediatePropagation(); S[ks[i]] = null; render(); return; }
     if (S.menu) { ev.stopImmediatePropagation(); S.menu = null; render(); return; }
   }
@@ -3942,6 +4016,117 @@ document.addEventListener('keydown', function (ev) {
   else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopImmediatePropagation(); icdClose(); }
 }, true);
 window.addEventListener('scroll', icdPlace, true); window.addEventListener('resize', icdPlace);
+
+/* ======================= Questionnaire links (public one-page form) ======================= */
+var QL = { resp: [], unsub: null, busy: {} };
+function qlUrl(tok) { return location.origin + location.pathname.replace(/[^\/]*$/, '') + 'q.html#' + tok; }
+function qlToken() { var a = new Uint8Array(16), c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789', o = ''; crypto.getRandomValues(a); for (var i = 0; i < a.length; i++) o += c[a[i] % c.length]; return o; }
+function qlSnapshot(q) {
+  return { name: q.name, short: q.short || '', sub: q.sub || ['', ''], desc: q.desc || ['', ''], items: q.items.map(function (it) { return { id: it.id, type: it.type, text: it.text, opts: (it.opts || []).map(function (o) { return { t: o.t }; }), cond: it.cond && it.cond.q ? { q: it.cond.q, a: it.cond.a } : null }; }) };
+}
+function qlCreate(tid, pid, eid) {
+  if (!CLOUD.on || !CLOUD.db) { toast(LL('Ссылки для пациентов работают в общей облачной базе (на сайте)', 'Patient links work in the shared cloud database (on the website)')); return; }
+  var q = qTpl(tid); if (!q) return;
+  var tok = qlToken(), doc = { tid: tid, tpl: qlSnapshot(q), pid: pid || '', eid: eid || '', active: true, created: nowIso(), by: me() };
+  CLOUD.db.collection('qlinks').doc(tok).set(doc).then(function () {
+    S.qlink = { url: qlUrl(tok), tok: tok, name: qName(q), pid: pid || '', who: pid && findPat(pid) ? pName(findPat(pid)) : '' }; render();
+  }).catch(function (e) { toast(LL('Не удалось создать ссылку: ', 'Could not create link: ') + (e.code || e.message)); });
+}
+function renderQLink() {
+  var o = S.qlink;
+  var h = '<div class="dim" data-act="qlclose"></div><section class="modal" role="dialog" aria-modal="true"><div class="dhead"><div><div class="dh-kicker">' + LL('Ссылка на анкету', 'Questionnaire link') + '</div><div class="dh-title">' + esc(o.name) + '</div></div><button type="button" class="iconbtn" data-act="qlclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
+  h += '<p class="muted">' + (o.pid ? LL('Ссылка для пациента ', 'Link for patient ') + '<b>' + esc(o.who) + '</b>. ' + LL('Ответы сразу прикрепятся к его карточке.', 'Answers attach to their record automatically.') : LL('Пациент открывает ссылку без регистрации, вводит ФИО и дату рождения и проходит анкету. Ответы приходят в раздел «Анкеты», баллы считаются автоматически, анкета прикрепляется к карточке пациента по ФИО и дате рождения.', 'The patient opens the link without an account, enters name and date of birth and completes the form. Answers arrive in Questionnaires, scored and attached to the patient record by name and date of birth.')) + '</p>';
+  h += '<div class="qlbox"><input type="text" readonly value="' + esc(o.url) + '" id="qlurl"><button type="button" class="btn primary" data-act="qlcopy">' + ico('copy', 15) + LL('Копировать', 'Copy') + '</button></div>';
+  h += '<div class="qlrow"><div id="qlqr" class="qlqr"></div><div class="qlside"><a class="btn" href="' + esc(o.url) + '" target="_blank" rel="noopener">' + ico('ext', 15) + LL('Открыть', 'Open') + '</a>' + (navigator.share ? '<button type="button" class="btn" data-act="qlshare">' + ico('send', 15) + LL('Отправить', 'Share') + '</button>' : '') + '<p class="fhint">' + LL('QR-код можно показать пациенту с экрана или распечатать.', 'Show the QR code on screen or print it.') + '</p></div></div>';
+  h += '</div></section>';
+  setTimeout(qlDrawQR, 0);
+  return h;
+}
+function qlDrawQR() {
+  var el = document.getElementById('qlqr'); if (!el || !S.qlink) return;
+  var draw = function () { try { var qr = window.qrcode(0, 'M'); qr.addData(S.qlink.url); qr.make(); el.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 2, scalable: true }); } catch (e) {} };
+  if (window.qrcode) draw(); else loadScript('https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js').then(draw).catch(function () {});
+}
+function qlNormName(s) { return nameTokens(s).join(' '); }
+function qlAge(dob) { if (!dob) return null; var d = new Date(dob + 'T00:00:00'), n = new Date(), a = n.getFullYear() - d.getFullYear(); if (n.getMonth() < d.getMonth() || (n.getMonth() === d.getMonth() && n.getDate() < d.getDate())) a--; return a; }
+function qlMatch(r) {
+  if (r.pid && findPat(r.pid)) return findPat(r.pid);
+  var nt = nameTokens(r.fio); if (!nt.length) return null;
+  var byDob = DB.patients.filter(function (p) { return p.d.dob && r.dob && p.d.dob === r.dob; });
+  var ok = function (p) { var pt = nameTokens(p.d.fio); if (!pt.length || pt[0] !== nt[0]) return false; return nt.length < 2 || pt.length < 2 || pt[1] === nt[1] || pt[1][0] === nt[1][0]; };
+  var c = byDob.filter(ok); if (c.length === 1) return c[0];
+  c = DB.patients.filter(ok);
+  if (c.length > 1 && r.dob) { var age = qlAge(r.dob); c = c.filter(function (p) { var a = num(p.d.age); return a === null || Math.abs(a - age) <= 1; }); }
+  if (c.length > 1) { var ex = c.filter(function (p) { return qlNormName(p.d.fio) === qlNormName(r.fio); }); if (ex.length === 1) c = ex; }
+  return c.length === 1 ? c[0] : null;
+}
+function qlAttach(r, p) {
+  var q = qTpl(r.tid); if (!q || !p) return false;
+  var ans = r.ans || {}, sc = qScore(q, ans), bd = qBand(q, sc), eid = 'qr_' + r.id, date = String(r.atIso || nowIso()).slice(0, 10);
+  withPat(p.id, function (x) {
+    x.q = x.q || [];
+    if (x.q.some(function (e) { return e.id === eid || e.rid === r.id; })) return;
+    var e = r.eid ? x.q.filter(function (y) { return y.id === r.eid && !y.date; })[0] : null;
+    if (!e) { e = { id: eid, tid: r.tid, label: LL('онлайн', 'online') }; x.q.push(e); }
+    e.rid = r.id; e.ans = clone(ans); e.date = date; e.score = sc; e.band = bd ? L(bd.t) : null; e.by = LL('Пациент по ссылке', 'Patient via link'); e.src = 'link';
+    if (r.dob && !x.d.dob) x.d.dob = r.dob; if (r.phone && !x.d.phone) x.d.phone = r.phone;
+  });
+  p = findPat(p.id); if (p) p.log = (p.log || []).concat([{ ts: nowIso(), by: LL('Пациент по ссылке', 'Patient via link'), act: 'q', note: qShort(q) + (sc !== null ? ', ' + sc + LL(' баллов', ' points') : ''), ch: [] }]);
+  return true;
+}
+function qlListen() {
+  if (QL.unsub || !CLOUD.db || !SESSION || isStudent()) return;
+  QL.unsub = CLOUD.db.collection('qresp').where('status', 'in', ['new', 'unmatched']).onSnapshot(function (snap) {
+    var list = [], changed = false;
+    snap.forEach(function (d) { var r = d.data(); r.id = d.id; r.atIso = r.at && r.at.toDate ? r.at.toDate().toISOString() : ''; list.push(r); });
+    list.forEach(function (r) {
+      if (r.status !== 'new' || QL.busy[r.id] || !can('edit')) return;
+      QL.busy[r.id] = 1;
+      var p = qlMatch(r);
+      if (p && qlAttach(r, p)) { changed = true; CLOUD.db.collection('qresp').doc(r.id).update({ status: 'done', pid: p.id, doneAt: nowIso() }).catch(function () {}); }
+      else CLOUD.db.collection('qresp').doc(r.id).update({ status: 'unmatched' }).catch(function () {});
+    });
+    QL.resp = list.filter(function (r) { return r.status === 'unmatched' || (r.status === 'new' && !QL.busy[r.id]); });
+    if (changed) { save(); toast(LL('Получены новые анкеты от пациентов', 'New questionnaires received from patients')); }
+    render();
+  }, function () {});
+}
+function qlLinkManual(id, pid) {
+  var r = QL.resp.filter(function (x) { return x.id === id; })[0]; if (!r) return;
+  var p;
+  if (pid === '__new') {
+    p = { id: 'CR-' + String(DB.seq).padStart(4, '0'), d: { fio: r.fio, dob: r.dob || '', phone: r.phone || '' }, fu: {}, custom: {}, log: [{ ts: nowIso(), by: me(), act: 'create', note: LL('из онлайн-анкеты', 'from online questionnaire'), ch: [] }] };
+    if (r.dob) p.d.age = String(qlAge(r.dob)); DB.seq++; DB.patients.push(p);
+  } else p = findPat(pid);
+  if (!p) { toast(LL('Выберите пациента', 'Choose a patient')); return; }
+  qlAttach(r, p); save();
+  CLOUD.db.collection('qresp').doc(id).update({ status: 'done', pid: p.id, doneAt: nowIso(), doneBy: me() }).catch(function () {});
+  QL.resp = QL.resp.filter(function (x) { return x.id !== id; }); toast(LL('Анкета прикреплена: ', 'Attached to: ') + pName(p)); render();
+}
+function qlDel(id) {
+  if (!confirm(LL('Удалить эту анкету из входящих?', 'Delete this response?'))) return;
+  CLOUD.db.collection('qresp').doc(id).delete().catch(function () {}); QL.resp = QL.resp.filter(function (x) { return x.id !== id; }); render();
+}
+function renderQInbox() {
+  if (!CLOUD.on) return '<div class="empty">' + LL('Онлайн-анкеты работают в общей облачной базе на сайте.', 'Online questionnaires work in the shared cloud database on the website.') + '</div>';
+  if (!QL.resp.length) return '<div class="empty">' + LL('Все анкеты от пациентов разобраны: входящих без привязки нет.', 'All patient responses are matched.') + '</div>';
+  var opts = DB.patients.slice().sort(function (a, b) { return pName(a).localeCompare(pName(b)); }).map(function (p) { return '<option value="' + p.id + '">' + esc(pName(p)) + ' · ' + p.id + '</option>'; }).join('');
+  return '<p class="muted pad">' + LL('Эти анкеты не удалось автоматически сопоставить с карточкой (нет совпадения по ФИО и дате рождения или совпадений несколько). Выберите пациента или создайте карточку.', 'These could not be matched automatically. Pick a patient or create a record.') + '</p><div class="tablewrap"><table class="grid"><thead><tr><th>' + t('col.fio') + '</th><th>' + LL('Дата рождения', 'DOB') + '</th><th>' + LL('Телефон', 'Phone') + '</th><th>' + LL('Анкета', 'Questionnaire') + '</th><th>' + LL('Баллы', 'Score') + '</th><th>' + LL('Получена', 'Received') + '</th><th></th></tr></thead><tbody>' + QL.resp.map(function (r) {
+    var q = qTpl(r.tid), sc = q ? qScore(q, r.ans || {}) : null;
+    return '<tr><td class="strong">' + esc(r.fio || '') + '</td><td>' + fmtDate(r.dob) + '</td><td>' + esc(r.phone || '') + '</td><td>' + esc(qShort(q)) + '</td><td class="num">' + (sc === null ? '' : sc) + '</td><td>' + fmtDate(String(r.atIso).slice(0, 10)) + '</td><td class="qlact"><select class="sel-sm" id="qlp_' + r.id + '"><option value="">' + LL('Выбрать пациента…', 'Choose patient…') + '</option><option value="__new">' + LL('+ Создать новую карточку', '+ Create new record') + '</option>' + opts + '</select><button type="button" class="btn small primary" data-act="qllink" data-id="' + r.id + '">' + LL('Прикрепить', 'Attach') + '</button><button type="button" class="iconbtn sm" data-act="qldel" data-id="' + r.id + '" aria-label="' + LL('Удалить', 'Delete') + '">' + ico('x', 15) + '</button></td></tr>';
+  }).join('') + '</tbody></table></div>';
+}
+function qStatsHTML(rows) {
+  var by = {}; rows.forEach(function (x) { (by[x.e.tid] = by[x.e.tid] || []).push(x); });
+  var ks = Object.keys(by); if (!ks.length) return '';
+  return '<div class="qstats pad">' + ks.map(function (tid) {
+    var q = qTpl(tid), xs = by[tid], sc = xs.map(function (x) { return x.e.score; }).filter(function (v) { return v !== null && v !== undefined; }).map(Number);
+    var mean = sc.length ? Math.round(sc.reduce(function (a, b) { return a + b; }, 0) / sc.length * 10) / 10 : null, med = median(sc);
+    var bands = (q && q.bands || []).map(function (b) { var n = sc.filter(function (v) { return v >= b.min && v <= b.max; }).length; return '<span class="qsb qsb-' + b.c + '"><i>' + n + '</i>' + esc(L(b.t)) + (sc.length ? ' · ' + Math.round(n / sc.length * 100) + '%' : '') + '</span>'; }).join('');
+    var pts = {}; xs.forEach(function (x) { pts[x.p.id] = 1; });
+    return '<div class="card qst"><b>' + esc(qShort(q)) + '</b><div class="qst-n"><span><i>' + xs.length + '</i>' + LL('анкет', 'forms') + '</span><span><i>' + Object.keys(pts).length + '</i>' + LL('пациентов', 'patients') + '</span>' + (mean !== null ? '<span><i>' + mean + '</i>' + LL('средний балл', 'mean') + '</span><span><i>' + med + '</i>' + LL('медиана', 'median') + '</span>' : '') + '</div>' + (bands ? '<div class="qst-b">' + bands + '</div>' : '') + '</div>';
+  }).join('') + '</div>';
+}
 
 window.__CRR = { SECTIONS: SECTIONS, MODULES: MODULES, MEDIA: MEDIA, COLS: COLS, DICT: DICT, OPT: OPT };
 if (SESSION && isStudent()) maskForStudent();

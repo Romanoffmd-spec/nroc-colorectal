@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Анкета пациента · ННОЦ</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="media/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F6F7F9;--card:#FFFFFF;--ink:#0F1629;--ink2:#384157;--muted:#667085;--line:#E4E7EC;--ctrl:#D0D5DD;--accent:#1F2F84;--accent-ink:#1A2670;--accent-soft:#EEF0FA;--ok:#067647;--ok-soft:#ECFDF3;--due:#B42318;--due-soft:#FEF3F2;--r:12px}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#0A0A0C;--ink:#F4F5F7;--ink2:#C7CBD4;--muted:#8B91A1;--line:#1C1D22;--ctrl:#2A2C33;--accent:#4A5BE0;--accent-ink:#AEB8FF;--accent-soft:#0F1330;--ok:#3DD68C;--ok-soft:#07200F;--due:#FF6B5E;--due-soft:#240B09}.logo{filter:brightness(0) invert(1)}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:680px;margin:0 auto;padding:20px 16px calc(40px + env(safe-area-inset-bottom))}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{height:30px;width:auto}
+.brand span{font-size:12px;color:var(--muted);line-height:1.3}
+.lang{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:none}
+.lang button{border:0;background:none;color:var(--muted);font:inherit;font-size:13px;font-weight:600;padding:5px 11px;cursor:pointer}
+.lang button.on{background:var(--accent-soft);color:var(--accent-ink)}
+h1{font-size:24px;line-height:1.25;margin:0 0 6px;letter-spacing:-.01em}
+.sub{color:var(--ink2);margin:0 0 4px}
+.desc{color:var(--muted);font-size:14px;margin:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-top:14px}
+.card h2{font-size:15px;margin:0 0 12px;color:var(--ink2);font-weight:600}
+label.f{display:block;margin-bottom:12px}
+label.f span{display:block;font-size:13px;color:var(--ink2);margin-bottom:5px;font-weight:500}
+label.f em{font-style:normal;color:var(--muted);font-weight:400}
+input[type=text],input[type=date],input[type=tel],input[type=number],textarea{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--ctrl);border-radius:10px;padding:11px 12px;outline:none;min-height:46px}
+input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.q{padding:16px 0;border-top:1px solid var(--line)}
+.q:first-of-type{border-top:0;padding-top:4px}
+.qt{font-weight:600;margin-bottom:10px;display:flex;gap:10px}
+.qn{flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);font-size:12px;display:grid;place-items:center;margin-top:1px}
+.opts{display:grid;gap:8px}
+.opt{display:flex;align-items:center;gap:12px;border:1px solid var(--ctrl);border-radius:10px;padding:12px 14px;cursor:pointer;background:var(--card);font-size:15px;text-align:left;width:100%;color:var(--ink);font-family:inherit;min-height:48px}
+.opt i{flex:none;width:20px;height:20px;border:2px solid var(--ctrl);border-radius:50%;display:grid;place-items:center}
+.opt.multi i{border-radius:6px}
+.opt.on{border-color:var(--accent);background:var(--accent-soft)}
+.opt.on i{border-color:var(--accent);background:var(--accent)}
+.opt.on i::after{content:'';width:8px;height:8px;border-radius:50%;background:#fff}
+.opt.multi.on i::after{width:10px;height:6px;border-radius:0;background:none;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg) translate(1px,-1px)}
+.consent{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--ink2);cursor:pointer}
+.consent input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--accent);flex:none}
+.bar{position:sticky;bottom:0;margin-top:16px;padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent)}
+.prog{height:4px;border-radius:4px;background:var(--line);overflow:hidden;margin-bottom:10px}.prog span{display:block;height:100%;background:var(--accent);transition:width .25s}
+.send{width:100%;border:0;border-radius:12px;background:var(--accent);color:#fff;font:inherit;font-weight:600;font-size:16px;padding:15px;cursor:pointer;min-height:52px}
+.send:disabled{opacity:.45;cursor:not-allowed}
+.hint{font-size:13px;color:var(--muted);text-align:center;margin-top:8px}
+.err{background:var(--due-soft);color:var(--due);border-radius:10px;padding:12px 14px;margin-top:12px;font-size:14px}
+.done{text-align:center;padding:48px 16px}
+.done .ic{width:64px;height:64px;border-radius:50%;background:var(--ok-soft);color:var(--ok);display:grid;place-items:center;margin:0 auto 16px}
+.center{text-align:center;color:var(--muted);padding:60px 16px}
+.spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s 1s linear infinite;margin:0 auto 12px}@keyframes s{to{transform:rotate(360deg)}}
+.priv{font-size:12px;color:var(--muted);margin-top:18px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="center"><div class="spin"></div>Загрузка анкеты…</div></div>
+<script src="firebase-config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+(function () {
+  var app = document.getElementById('app'), tok = (location.hash || '').replace(/^#/, '').trim();
+  var LANG = 'ru';
+  var S = { link: null, ans: {}, fio: '', dob: '', phone: '', ok: false, sending: false, err: '' };
+  function L(x) { return Array.isArray(x) ? (LANG === 'en' ? (x[1] || x[0]) : x[0]) : (x || ''); }
+  function T(ru, en) { return LANG === 'en' ? en : ru; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function has(v) { return v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && !v.length); }
+  function vis() { return S.link.tpl.items.filter(function (it) { if (!it.cond || !it.cond.q) return true; var a = S.ans[it.cond.q]; if (!has(a)) return false; return Array.isArray(a) ? a.indexOf(+it.cond.a) >= 0 : +a === +it.cond.a; }); }
+  function msg(t) { app.innerHTML = '<div class="center">' + t + '</div>'; }
+  if (!tok) { msg(T('Ссылка неполная. Попросите врача прислать её ещё раз.', 'The link is incomplete. Ask your doctor to send it again.')); return; }
+  if (!window.FIREBASE_CONFIG) { msg(T('Сервис временно недоступен.', 'Service unavailable.')); return; }
+  firebase.initializeApp(window.FIREBASE_CONFIG);
+  var db = firebase.firestore();
+  db.collection('qlinks').doc(tok).get().then(function (d) {
+    if (!d.exists || !d.data().active) { msg(T('Ссылка недействительна или отключена. Обратитесь к лечащему врачу.', 'This link is invalid or disabled. Please contact your doctor.')); return; }
+    S.link = d.data(); render();
+  }).catch(function () { msg(T('Ссылка недействительна или отключена. Обратитесь к лечащему врачу.', 'This link is invalid or disabled. Please contact your doctor.')); });
+
+  function valid() {
+    if (!S.link.pid && (!S.fio.trim() || S.fio.trim().split(/\s+/).length < 2 || !S.dob)) return false;
+    if (!S.ok) return false;
+    return vis().every(function (it) { return has(S.ans[it.id]); });
+  }
+  function progress() { var v = vis(), n = v.filter(function (it) { return has(S.ans[it.id]); }).length; return v.length ? Math.round(n / v.length * 100) : 0; }
+  function render() {
+    if (S.sent) {
+      app.innerHTML = top() + '<div class="card done"><div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><h1>' + T('Спасибо!', 'Thank you!') + '</h1><p class="sub">' + T('Ваши ответы переданы лечащему врачу. Страницу можно закрыть.', 'Your answers were sent to your doctor. You can close this page.') + '</p></div>';
+      return;
+    }
+    var tp = S.link.tpl, h = top();
+    h += '<h1>' + esc(L(tp.name)) + '</h1>' + (L(tp.sub) ? '<p class="sub">' + esc(L(tp.sub)) + '</p>' : '');
+    if (!S.link.pid) {
+      h += '<div class="card"><h2>' + T('О вас', 'About you') + '</h2>';
+      h += '<label class="f"><span>' + T('Фамилия, имя, отчество', 'Full name') + '</span><input type="text" id="fio" autocomplete="name" value="' + esc(S.fio) + '" placeholder="' + T('Иванов Иван Иванович', 'John Smith') + '"></label>';
+      h += '<label class="f"><span>' + T('Дата рождения', 'Date of birth') + '</span><input type="date" id="dob" value="' + esc(S.dob) + '" max="' + new Date().toISOString().slice(0, 10) + '"></label>';
+      h += '<label class="f" style="margin:0"><span>' + T('Телефон', 'Phone') + ' <em>' + T('(необязательно)', '(optional)') + '</em></span><input type="tel" id="phone" autocomplete="tel" value="' + esc(S.phone) + '" placeholder="+7 7__ ___ __ __"></label></div>';
+    }
+    h += '<div class="card">';
+    vis().forEach(function (it, i) {
+      h += '<div class="q"><div class="qt"><span class="qn">' + (i + 1) + '</span><span>' + esc(L(it.text)) + '</span></div>';
+      if (it.type === 'single' || it.type === 'multi') {
+        h += '<div class="opts">' + it.opts.map(function (o, j) { var a = S.ans[it.id], on = it.type === 'multi' ? (a || []).indexOf(j) >= 0 : a === j; return '<button type="button" class="opt' + (it.type === 'multi' ? ' multi' : '') + (on ? ' on' : '') + '" data-q="' + it.id + '" data-i="' + j + '"><i></i><span>' + esc(L(o.t)) + '</span></button>'; }).join('') + '</div>';
+      } else if (it.type === 'num') h += '<input type="number" inputmode="decimal" data-num="' + it.id + '" value="' + esc(S.ans[it.id] == null ? '' : S.ans[it.id]) + '">';
+      else h += '<textarea rows="3" data-txt="' + it.id + '">' + esc(S.ans[it.id] || '') + '</textarea>';
+      h += '</div>';
+    });
+    h += '</div>';
+    h += '<div class="card"><label class="consent"><input type="checkbox" id="ok"' + (S.ok ? ' checked' : '') + '><span>' + T('Я согласен(на), чтобы мои ответы использовались лечащими врачами Национального научного онкологического центра для наблюдения и научных исследований в обезличенном виде.', 'I agree that my answers may be used by my doctors at the National Research Oncology Center for follow-up and, de-identified, for research.') + '</span></label></div>';
+    if (S.err) h += '<div class="err">' + esc(S.err) + '</div>';
+    h += '<div class="bar"><div class="prog"><span style="width:' + progress() + '%"></span></div><button type="button" class="send" id="send"' + (valid() && !S.sending ? '' : ' disabled') + '>' + (S.sending ? T('Отправляю…', 'Sending…') : T('Отправить ответы', 'Send answers')) + '</button>' + (valid() ? '' : '<div class="hint">' + T('Заполните все поля и ответьте на все вопросы', 'Fill in all fields and answer every question') + '</div>') + '</div>';
+    h += '<p class="priv">' + T('Ответы видят только ваши лечащие врачи.', 'Only your doctors can see your answers.') + '</p>';
+    var y = window.scrollY; app.innerHTML = h; window.scrollTo(0, y);
+  }
+  function top() { return '<div class="top"><div class="brand"><img class="logo" src="media/nroc-logo.png" alt="NROC"><span>' + T('Национальный научный онкологический центр', 'National Research Oncology Center') + '<br>' + T('Колоректальный сектор', 'Colorectal unit') + '</span></div><div class="lang"><button type="button" data-lang="ru" class="' + (LANG === 'ru' ? 'on' : '') + '">RU</button><button type="button" data-lang="en" class="' + (LANG === 'en' ? 'on' : '') + '">EN</button></div></div>'; }
+  function refreshBar() {
+    var b = document.getElementById('send'); if (!b) return;
+    b.disabled = !valid() || S.sending; var p = document.querySelector('.prog span'); if (p) p.style.width = progress() + '%';
+    var hn = document.querySelector('.bar .hint'); if (valid() && hn) hn.remove(); else if (!valid() && !hn) { var d = document.createElement('div'); d.className = 'hint'; d.textContent = T('Заполните все поля и ответьте на все вопросы', 'Fill in all fields and answer every question'); b.after(d); }
+  }
+  document.addEventListener('click', function (e) {
+    var lb = e.target.closest('[data-lang]'); if (lb) { LANG = lb.getAttribute('data-lang'); if (S.link) render(); return; }
+    var o = e.target.closest('.opt'); if (o) {
+      var qid = o.getAttribute('data-q'), i = +o.getAttribute('data-i'), it = S.link.tpl.items.filter(function (x) { return x.id === qid; })[0];
+      if (it.type === 'multi') { var a = (S.ans[qid] || []).slice(), k = a.indexOf(i); if (k >= 0) a.splice(k, 1); else a.push(i); S.ans[qid] = a; } else S.ans[qid] = i;
+      Object.keys(S.ans).forEach(function (k) { if (!vis().some(function (x) { return x.id === k; })) delete S.ans[k]; });
+      render(); return;
+    }
+    if (e.target.id === 'send') send();
+  });
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t.id === 'fio') S.fio = t.value; else if (t.id === 'dob') S.dob = t.value; else if (t.id === 'phone') S.phone = t.value;
+    else if (t.getAttribute('data-num')) S.ans[t.getAttribute('data-num')] = t.value === '' ? null : +t.value;
+    else if (t.getAttribute('data-txt')) S.ans[t.getAttribute('data-txt')] = t.value.slice(0, 2000);
+    refreshBar();
+  });
+  document.addEventListener('change', function (e) { if (e.target.id === 'ok') { S.ok = e.target.checked; refreshBar(); } if (e.target.id === 'dob') { S.dob = e.target.value; refreshBar(); } });
+  function send() {
+    if (!valid() || S.sending) return;
+    S.sending = true; S.err = ''; render();
+    var ans = {}; vis().forEach(function (it) { ans[it.id] = S.ans[it.id]; });
+    db.collection('qresp').add({ link: tok, tid: S.link.tid, pid: S.link.pid || '', eid: S.link.eid || '', fio: S.fio.trim().replace(/\s+/g, ' ').slice(0, 150), dob: S.dob || '', phone: S.phone.trim().slice(0, 30), ans: ans, at: firebase.firestore.FieldValue.serverTimestamp(), status: 'new' })
+      .then(function () { S.sent = true; S.sending = false; render(); window.scrollTo(0, 0); })
+      .catch(function () { S.sending = false; S.err = T('Не удалось отправить. Проверьте интернет и попробуйте ещё раз.', 'Could not send. Check your connection and try again.'); render(); });
+  }
+})();
+</script>
+</body>
+</html>
