@@ -1589,6 +1589,7 @@ function savePatient() {
   delete dr.errs; logPatient(dr);
   if (dr.isNew) { DB.patients.push(p); DB.seq++; } else DB.patients = DB.patients.map(function (x) { return x.id === p.id ? p : x; });
   if (dr.linkRec) { var lr = DB.cols[dr.linkRec.k].filter(function (x) { return x.id === dr.linkRec.id; })[0]; if (lr) lr.pid = p.id; }
+  if (dr.qlAttach) { var qr0 = (QL.resp || []).filter(function (x) { return x.id === dr.qlAttach; })[0]; if (qr0) { qlAttach(qr0, p); if (CLOUD.db) CLOUD.db.collection('qresp').doc(qr0.id).update({ status: 'done', pid: p.id, doneAt: nowIso(), doneBy: me() }).catch(function () {}); QL.resp = QL.resp.filter(function (x) { return x.id !== qr0.id; }); } }
   var tgt = dr.target && dr.target !== 'all' ? regOf(dr.target) : null;
   S.drawer = null; if (save()) toast(tgt ? t('toast.savedTo', { n: pName(p), r: regName(tgt) }) : t('toast.saved', { n: pName(p) })); render();
 }
@@ -4284,8 +4285,10 @@ function qlLinkManual(id, pid) {
   var r = QL.resp.filter(function (x) { return x.id === id; })[0]; if (!r) return;
   var p;
   if (pid === '__new') {
-    p = { id: 'CR-' + String(DB.seq).padStart(4, '0'), d: { fio: r.fio, dob: r.dob || '', phone: r.phone || '' }, fu: {}, custom: {}, log: [{ ts: nowIso(), by: me(), act: 'create', note: LL('из онлайн-анкеты', 'from online questionnaire'), ch: [] }] };
-    if (r.dob) p.d.age = String(qlAge(r.dob)); DB.seq++; DB.patients.push(p);
+    var pd = { fio: r.fio }; if (r.dob) { pd.dob = r.dob; pd.age = String(qlAge(r.dob)); } if (r.phone) pd.phone = r.phone;
+    openPatient(null, pd); if (S.drawer) { S.drawer.qlAttach = id; render(); var sc = root.querySelector('#sec-ptags'); if (sc) sc.scrollIntoView({ block: 'start' }); }
+    toast(LL('Отметьте теги и нажмите «Сохранить»: анкета прикрепится к новой карточке', 'Pick tags and press Save: the response will attach to the new record'));
+    return;
   } else p = findPat(pid);
   if (!p) { toast(LL('Выберите пациента', 'Choose a patient')); return; }
   qlAttach(r, p); save();
