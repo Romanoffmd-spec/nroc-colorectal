@@ -1261,7 +1261,7 @@ function renderPatient() {
   h += '<div class="pbody"><nav class="pnav" aria-label="' + t('a11y.cardSections') + '">' + nav.map(function (g) {
     var ph = PHASES.filter(function (x) { return x[0] === g[0]; })[0];
     return (ph ? '<div class="pn-h ph-' + g[0] + '"><span class="pn-n">' + (PHASES.indexOf(ph) + 1) + '</span>' + t(ph[1]) + '</div>' : g[0] === 'more' ? '<div class="pn-h">' + t('ph.more') + '</div>' : '') + g[1].map(function (s) { return '<button type="button" data-act="jump" data-id="' + s.id + '">' + esc(s.title) + '</button>'; }).join('');
-  }).join('') + '</nav><div class="dbody">' + (!dr.isNew ? aiInline('pat-' + p.id, aiPatCtx(p), 'Сводка случая в 3-4 строках: диагноз, стадия, тактика, текущий этап. Затем 1-3 пункта, что не заполнено или требует внимания.', LL('ИИ: сводка случая', 'AI: case summary'), 'manual') : '');
+  }).join('') + '</nav><div class="dbody">' + (!dr.isNew ? aiInline('pat-' + p.id, aiPatCtx(p), 'Сводка случая в 3-4 строках: диагноз, стадия, тактика, текущий этап. Затем 1-3 пункта, что не заполнено или требует внимания.', LL('ИИ: сводка случая', 'AI: case summary'), true) : '');
   if (isStudent()) h += '<div class="lockbox">' + ico('lock', 15) + LL('Режим студента: данные обезличены, изменения не сохраняются.', 'Student mode: anonymised, changes are not saved.') + '</div>';
   if (dr.errs) h += '<div class="errbox"><b>' + ico('alert', 16) + LL('Карточку нельзя сохранить', 'Cannot save the record') + '</b><ul>' + dr.errs.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></div>';
   var enr = Object.keys(p.enroll || {}).map(function (sid) { var r = regOf(sid); return r ? { r: r, e: p.enroll[sid] } : null; }).filter(Boolean);
@@ -1325,9 +1325,9 @@ function renderCol(k) {
   if (k === 'pubs') h += '<button type="button" class="btn" data-act="orcid">' + ico('user', 16) + LL('Из ORCID', 'From ORCID') + '</button>';
   h += '<button type="button" class="btn" data-act="cxopen" data-k="' + k + '">' + ico('download', 16) + (k === 'pubs' ? LL('Отчёт за период', 'Report for period') : 'Excel') + '</button>';
   h += '<button type="button" class="btn primary" data-act="newrec" data-k="' + k + '">' + ico('plus', 16) + t('b.add') + '</button></div></div>';
-  if (k === 'mm') h += aiInline('col-mm', aiViewCtx('col:mm'), 'Общее саммари M&M сектора в 4-6 пунктах: сколько разборов, типы осложнений, повторяющиеся факторы, что стоит внедрить.', LL('ИИ: саммари M&M', 'AI: M&M summary'), 'daily');
-  if (k === 'mdt') h += aiInline('col-mdt', aiViewCtx('col:mdt'), 'Подготовка к ближайшей МДГ: по каждому ожидающему случаю одна строка, чего не хватает для решения (стадирование, морфология, МРТ, КТ, РЭА). В конце приоритет обсуждения.', LL('ИИ: к заседанию МДГ', 'AI: MDT prep'), 'daily');
-  if (k === 'planner') h += aiInline('col-planner', { title: 'Планировщик', data: briefText() }, 'Коротко по отделению: кто после операции и на какие сутки, у кого окно контрольных анализов, кто на операцию сегодня и завтра, на что обратить внимание. 4-6 пунктов.', LL('ИИ: отделение сегодня', 'AI: ward today'), 'daily');
+  if (k === 'mm') h += aiInline('col-mm', aiViewCtx('col:mm'), 'Общее саммари M&M сектора в 4-6 пунктах: сколько разборов, типы осложнений, повторяющиеся факторы, что стоит внедрить.', LL('ИИ: саммари M&M', 'AI: M&M summary'));
+  if (k === 'mdt') h += aiInline('col-mdt', aiViewCtx('col:mdt'), 'Подготовка к ближайшей МДГ: по каждому ожидающему случаю одна строка, чего не хватает для решения (стадирование, морфология, МРТ, КТ, РЭА). В конце приоритет обсуждения.', LL('ИИ: к заседанию МДГ', 'AI: MDT prep'));
+  if (k === 'planner') h += aiInline('col-planner', { title: 'Планировщик', data: briefText() }, 'Коротко по отделению: кто после операции и на какие сутки, у кого окно контрольных анализов, кто на операцию сегодня и завтра, на что обратить внимание. 4-6 пунктов.', LL('ИИ: отделение сегодня', 'AI: ward today'));
   var list = DB.cols[k].slice();
   var q = S.q.trim().toLowerCase();
   if (q) list = list.filter(function (r) { return c.fields.some(function (x) { var val = r[x.id]; return val && String(Array.isArray(val) ? val.join(' ') : val).toLowerCase().indexOf(q) >= 0; }); });
@@ -1437,7 +1437,7 @@ function renderRecord() {
   var o = S.rec, c = COLS[o.k], r = o.r;
   var h = '<div class="dim" data-act="closerec"></div><section class="drawer full rec" role="dialog" aria-modal="true" aria-label="' + esc(L(c.title)) + '">';
   h += '<div class="dhead"><div class="dh-main"><div class="dh-kicker">' + esc(L(c.title)) + '</div><div class="dh-title">' + esc(o.isNew ? t('rec.new') : recTitle(c, r)) + '</div></div><div class="dh-r">' + (r.notion ? '<a class="btn small" href="' + esc(r.notion) + '" target="_blank" rel="noopener">' + ico('ext', 15) + 'Notion</a>' : '') + '<button type="button" class="btn small ai' + (UI.aip ? ' on' : '') + '" data-act="aitoggle">' + ico('sparkle', 14) + LL('Ассистент', 'Assistant') + '</button><button type="button" class="iconbtn" aria-label="' + t('a11y.close') + '" data-act="closerec">' + ico('x', 20) + '</button></div></div>';
-  h += '<div class="dbody">' + (!o.isNew && ['mdt', 'mm', 'planner', 'pubs'].indexOf(o.k) >= 0 ? aiInline('rec-' + o.k + '-' + r.id, aiCtx(), { mdt: 'Суть случая в 2-3 строках и чего не хватает для решения МДГ.', mm: 'Кратко: что произошло, тяжесть по Clavien-Dindo, ключевые факторы, предотвратимость, 1-2 вывода.', planner: 'Кратко: что важно по этой госпитализации сегодня (сутки, контрольные анализы, что проверить).', pubs: 'Кратко: статус публикации и чего не хватает в карточке.' }[o.k], LL('ИИ: кратко', 'AI: in brief'), 'manual') : '') + '<section class="card"><div class="fgrid">' + c.fields.map(function (x) { return fieldHTML(x, r[x.id], 'r.' + x.id, r); }).join('') + '</div></section>';
+  h += '<div class="dbody">' + (!o.isNew && ['mdt', 'mm', 'planner', 'pubs'].indexOf(o.k) >= 0 ? aiInline('rec-' + o.k + '-' + r.id, aiCtx(), { mdt: 'Суть случая в 2-3 строках и чего не хватает для решения МДГ.', mm: 'Кратко: что произошло, тяжесть по Clavien-Dindo, ключевые факторы, предотвратимость, 1-2 вывода.', planner: 'Кратко: что важно по этой госпитализации сегодня (сутки, контрольные анализы, что проверить).', pubs: 'Кратко: статус публикации и чего не хватает в карточке.' }[o.k], LL('ИИ: кратко', 'AI: in brief'), true) : '') + '<section class="card"><div class="fgrid">' + c.fields.map(function (x) { return fieldHTML(x, r[x.id], 'r.' + x.id, r); }).join('') + '</div></section>';
   if (o.k === 'mdt') h += mpCard(r);
   if (o.k === 'pubs') h += pubTools(r);
   if (LINKED.indexOf(o.k) >= 0) {
@@ -2920,30 +2920,60 @@ function demoDB() {
 
 /* ======================= v10: AI assistant (Gemini) ======================= */
 var AI = { key: '', model: 'gemini-flash-latest', st: 'off', err: '', deid: true, threads: {}, busy: false };
-try { AI.key = localStorage.getItem('crr.aikey') || ''; AI.model = localStorage.getItem('crr.aimodel') || AI.model; AI.deid = localStorage.getItem('crr.aideid') !== '0'; } catch (e) {}
+var AI_PROV = { gemini: { name: 'Gemini', ph: 'AIza…', get: 'aistudio.google.com → Get API key', def: 'gemini-flash-latest' }, openai: { name: 'ChatGPT', ph: 'sk-…', get: 'platform.openai.com → API keys', def: 'gpt-4o-mini' }, anthropic: { name: 'Claude', ph: 'sk-ant-…', get: 'console.anthropic.com → API keys', def: 'claude-sonnet-4-5' }, deepseek: { name: 'DeepSeek', ph: 'sk-…', get: 'platform.deepseek.com → API keys', def: 'deepseek-chat' } };
+function aiKeyName(pv) { return pv === 'gemini' ? 'crr.aikey' : 'crr.aikey.' + pv; }
+function aiModelName(pv) { return pv === 'gemini' ? 'crr.aimodel' : 'crr.aimodel.' + pv; }
+function aiLoadProv() { try { AI.key = localStorage.getItem(aiKeyName(AI.prov)) || ''; AI.model = localStorage.getItem(aiModelName(AI.prov)) || AI_PROV[AI.prov].def; } catch (e) { AI.key = ''; AI.model = AI_PROV[AI.prov].def; } AI.avail = null; AI.shared = false; }
+try { AI.prov = localStorage.getItem('crr.aiprov') || 'gemini'; if (!AI_PROV[AI.prov]) AI.prov = 'gemini'; AI.deid = localStorage.getItem('crr.aideid') !== '0'; } catch (e) { AI.prov = 'gemini'; }
+aiLoadProv();
 var AI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 var AI_MODELS = [['gemini-flash-latest', 'Gemini Flash', LL('быстрая, по умолчанию', 'fast, default')], ['gemini-pro-latest', 'Gemini Pro', LL('глубже, медленнее', 'deeper, slower')]];
 function aiReady() { return AI.st === 'ok' && !!AI.key; }
-function aiSetKey(k) { AI.key = String(k || '').trim(); AI.shared = false; if (!AI.key && AI.sharedKey) { try { localStorage.removeItem('crr.aikey'); } catch (e) {} AI.key = AI.sharedKey; AI.shared = true; aiCheck(); return; } try { if (AI.key) localStorage.setItem('crr.aikey', AI.key); else localStorage.removeItem('crr.aikey'); } catch (e) {} aiCheck(); }
+function aiSetKey(k) { AI.key = String(k || '').trim(); AI.shared = false; if (!AI.key && AI.sharedKey && AI.prov === 'gemini') { try { localStorage.removeItem('crr.aikey'); } catch (e) {} AI.key = AI.sharedKey; AI.shared = true; aiCheck(); return; } try { if (AI.key) localStorage.setItem(aiKeyName(AI.prov), AI.key); else localStorage.removeItem(aiKeyName(AI.prov)); } catch (e) {} aiCheck(); }
+function aiSetProv(pv) { if (!AI_PROV[pv] || pv === AI.prov) return; AI.prov = pv; try { localStorage.setItem('crr.aiprov', pv); } catch (e) {} aiLoadProv(); AI.threads = {}; if (!AI.key && pv === 'gemini' && AI.sharedKey) { AI.key = AI.sharedKey; AI.shared = true; } aiCheck(); }
 function aiLoadShared() {
   if (!CLOUD.on || !CLOUD.db) return;
   CLOUD.db.collection('config').doc('ai').get().then(function (d) {
     var k = d.exists ? String(d.data().key || '') : '';
     AI.sharedKey = k; AI.sharedLoaded = true;
-    if (k && !AI.key) { AI.key = k; AI.shared = true; aiCheck(); }
+    if (k && !AI.key && AI.prov === 'gemini') { AI.key = k; AI.shared = true; aiCheck(); }
     else if (!k && AI.key && AI.st === 'ok') aiShareDefault(false);
     render();
   }).catch(function () { AI.sharedLoaded = true; });
 }
 function aiShareDefault(force) {
-  if (!CLOUD.on || !CLOUD.db || !SESSION || !isAdmin() || !AI.key || AI.shared || !AI.sharedLoaded) return;
+  if (!CLOUD.on || !CLOUD.db || !SESSION || !isAdmin() || !AI.key || AI.shared || !AI.sharedLoaded || AI.prov !== 'gemini') return;
   if (!force && AI.sharedKey) return;
   CLOUD.db.collection('config').doc('ai').set({ key: AI.key, by: me(), at: nowIso() }).then(function () { AI.sharedKey = AI.key; toast(LL('Ключ Gemini стал общим для всех пользователей', 'Gemini key is now shared with all users')); render(); }).catch(function (e) { toast(LL('Не удалось сохранить общий ключ: ', 'Could not save shared key: ') + (e.code || e.message)); });
 }
 function aiVer(n) { var m = /gemini-(\d+(?:\.\d+)?)/.exec(n); return m ? parseFloat(m[1]) : 0; }
+function aiHeaders(pv) {
+  if (pv === 'anthropic') return { 'x-api-key': AI.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true', 'Content-Type': 'application/json' };
+  return { 'Authorization': 'Bearer ' + AI.key, 'Content-Type': 'application/json' };
+}
+var AI_URL = { openai: 'https://api.openai.com/v1', anthropic: 'https://api.anthropic.com/v1', deepseek: 'https://api.deepseek.com' };
+function aiErrMsg(j, fallback) { return (j && j.error && (j.error.message || (typeof j.error === 'string' ? j.error : ''))) || (j && j.message) || fallback; }
+function aiCheckOther() {
+  var pv = AI.prov;
+  fetch(AI_URL[pv] + '/models' + (pv === 'anthropic' ? '?limit=100' : ''), { headers: aiHeaders(pv) }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw j; return j; }); })
+    .then(function (j) {
+      var list = (j.data || []).map(function (m) { return { id: m.id, name: m.display_name || m.id, t: m.created || (m.created_at ? Date.parse(m.created_at) / 1000 : 0) }; });
+      if (pv === 'openai') list = list.filter(function (m) { return /^(gpt-|o\d|chatgpt)/.test(m.id) && !/audio|realtime|transcribe|tts|image|search|embedding|moderation|instruct|dall|whisper|codex|preview/.test(m.id); });
+      list.sort(function (a, b) { return b.t - a.t; });
+      AI.avail = list;
+      var manual = false; try { manual = localStorage.getItem(aiModelName(pv) + '.m') === '1'; } catch (e) {}
+      if (list.length && (!manual || !list.some(function (m) { return m.id === AI.model; }))) {
+        var best = pv === 'anthropic' ? (list.filter(function (m) { return /sonnet/.test(m.id); })[0] || list[0]) : pv === 'openai' ? (list.filter(function (m) { return /^gpt-\d/.test(m.id) && !/nano|mini/.test(m.id); })[0] || list[0]) : (list.filter(function (m) { return m.id === 'deepseek-chat'; })[0] || list[0]);
+        AI.model = best.id;
+      }
+      AI.st = 'ok'; render(); aiMaybeGreet();
+    })
+    .catch(function (e) { AI.st = 'err'; AI.err = /Failed to fetch|NetworkError|Load failed/i.test(String(e && e.message)) ? LL('Нет связи с ', 'Cannot reach ') + AI_PROV[pv].name + LL(' (сеть или браузер блокирует запрос)', ' (network or browser blocked the request)') : aiErrMsg(e, LL('Ключ не принят', 'Key rejected')); render(); });
+}
 function aiCheck() {
   if (!AI.key) { AI.st = 'off'; AI.err = ''; render(); return; }
   AI.st = 'check'; AI.err = ''; render();
+  if (AI.prov !== 'gemini') { aiCheckOther(); return; }
   fetch(AI_BASE + '/models?pageSize=200&key=' + encodeURIComponent(AI.key)).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw j; return j; }); })
     .then(function (j) {
       var av = (j.models || []).filter(function (m) { return /gemini/.test(m.name) && (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0 && !/embedding|tts|image|audio|live|vision/.test(m.name); }).map(function (m) { return { id: m.name.replace(/^models\//, ''), name: m.displayName || m.name }; });
@@ -2953,12 +2983,45 @@ function aiCheck() {
         var pick = function (re) { return av.filter(function (m) { return re.test(m.id) && !/preview|exp|lite/.test(m.id); }).sort(function (a, b) { return aiVer(b.id) - aiVer(a.id); })[0]; };
         var best = pick(/flash/) || pick(/pro/) || av[0]; AI.model = best.id;
       }
-      var lites = av.filter(function (m) { return /flash-lite/.test(m.id) && !/exp/.test(m.id); }).sort(function (a, b) { return (/preview/.test(a.id) ? 1 : 0) - (/preview/.test(b.id) ? 1 : 0) || aiVer(b.id) - aiVer(a.id); }); AI.lite = lites[0] ? lites[0].id : null;
       AI.st = 'ok'; render(); aiMaybeGreet(); aiShareDefault(false);
     })
     .catch(function (e) { AI.st = 'err'; AI.err = (e && e.error && e.error.message) || LL('Нет связи с Google AI', 'Cannot reach Google AI'); render(); });
 }
+function aiStreamOther(o) {
+  var pv = AI.prov, msgs = (o.contents || []).map(function (c) { return { role: c.role === 'model' ? 'assistant' : 'user', content: (c.parts || []).map(function (x) { return x.text || ''; }).join('\n') }; });
+  var url, body;
+  if (pv === 'anthropic') { url = AI_URL.anthropic + '/messages'; body = { model: o.model || AI.model, max_tokens: 4096, temperature: o.temp === undefined ? 0.4 : o.temp, system: o.system || '', messages: msgs, stream: true }; }
+  else { url = AI_URL[pv] + (pv === 'openai' ? '/chat/completions' : '/chat/completions'); body = { model: o.model || AI.model, stream: true, messages: (o.system ? [{ role: 'system', content: o.system }] : []).concat(msgs) }; if (!/^o\d|gpt-5/.test(body.model)) body.temperature = o.temp === undefined ? 0.4 : o.temp; }
+  var text = '', ctrl = new AbortController(); if (!o.bg) AI.ctrl = ctrl;
+  fetch(url, { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify(body), signal: ctrl.signal })
+    .then(function (r) {
+      if (!r.ok) return r.json().then(function (j) { throw j; }, function () { throw { message: 'HTTP ' + r.status }; });
+      var rd = r.body.getReader(), dec = new TextDecoder(), buf = '';
+      function pump() {
+        return rd.read().then(function (x) {
+          if (x.done) { o.done(text, []); return; }
+          buf += dec.decode(x.value, { stream: true });
+          var lines = buf.split(/\r?\n/); buf = lines.pop();
+          lines.forEach(function (line) {
+            if (line.indexOf('data:') !== 0) return; var d = line.slice(5).trim(); if (!d || d === '[DONE]') return;
+            try { var j = JSON.parse(d);
+              if (pv === 'anthropic') { if (j.type === 'content_block_delta' && j.delta && j.delta.text) text += j.delta.text; }
+              else { var ch = (j.choices || [])[0]; if (ch && ch.delta && ch.delta.content) text += ch.delta.content; }
+            } catch (e) {}
+          });
+          o.chunk(text); return pump();
+        });
+      }
+      return pump();
+    })
+    .catch(function (e) {
+      if (e && e.name === 'AbortError') { o.done(text + (text ? '\n\n' : '') + LL('_(остановлено)_', '_(stopped)_'), []); return; }
+      var em = aiErrMsg(e, (e && e.message) || '');
+      o.fail(/Failed to fetch|NetworkError|Load failed/i.test(em) ? LL('Нет связи с ', 'Cannot reach ') + AI_PROV[pv].name + LL('. Проверьте интернет.', '. Check your connection.') : (em || LL('Ошибка запроса к ', 'Request failed: ') + AI_PROV[pv].name));
+    });
+}
 function aiStream(o) {
+  if (AI.prov !== 'gemini') { aiStreamOther(o); return; }
   var body = { contents: o.contents, generationConfig: { temperature: o.temp === undefined ? 0.4 : o.temp, maxOutputTokens: 8192 } };
   if (o.system) body.systemInstruction = { parts: [{ text: o.system }] };
   if (o.search) body.tools = [{ google_search: {} }];
@@ -2990,15 +3053,10 @@ function aiStream(o) {
     })
     .catch(function (e) {
       var em = (e && e.error && e.error.message) || (e && e.message) || '';
-      if (/RESOURCE_EXHAUSTED|quota|rate.?limit|429/i.test(em)) {
-        var qa = aiAltModel(o, true);
-        if (qa && !o.quotaAlt) { o.quotaAlt = true; o.model = qa; aiStream(o); return; }
-        o.fail(LL('Дневной лимит бесплатного ключа Gemini исчерпан для этой модели. Лимит обновится около 12:00 по Астане. Можно ввести свой ключ в окне Gemini.', 'The free Gemini key has used up its daily quota for this model. It resets around 07:00 UTC. You can enter your own key.')); return;
-      }
-      if (/high demand|overloaded|unavailable|try again later|503/i.test(em) && (o.busyTry || 0) < 2) {
+      if (/high demand|overloaded|unavailable|try again later|RESOURCE_EXHAUSTED|rate limit|429|503/i.test(em) && (o.busyTry || 0) < 3) {
         o.busyTry = (o.busyTry || 0) + 1;
-        if (o.busyTry === 2) { var oa = aiAltModel(o, false); if (oa) o.model = oa; }
-        setTimeout(function () { aiStream(o); }, 2000 * o.busyTry); return;
+        if (o.busyTry >= 2 && AI.avail && AI.avail.length) { var alt = AI.avail.filter(function (m) { return /flash/.test(m.id) && !/preview|exp/.test(m.id) && m.id !== AI.model && !(o.tried || []).some(function (x) { return x === m.id; }); }).sort(function (a, b) { return aiVer(b.id) - aiVer(a.id); })[0]; if (alt) { o.tried = (o.tried || []).concat([AI.model]); o.model = alt.id; } }
+        setTimeout(function () { aiStream(o); }, 1500 * o.busyTry); return;
       }
       if (!o.retried && /no longer available|not found|is not supported|deprecated/i.test(em)) {
         var sug = /models\/(gemini-[\w.\-]+)/g, mm, cand = null; while ((mm = sug.exec(em))) { if (mm[1] !== AI.model) cand = mm[1]; }
@@ -3134,47 +3192,22 @@ function aiViewCtx(v) {
 }
 function hashStr(x) { var h = 5381; for (var i = 0; i < x.length; i++) h = ((h << 5) + h + x.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
 AI.inl = {};
-AI.inlGo = {};
-function aiAltModel(o, preferLite) {
-  if (!AI.avail || !AI.avail.length) return null;
-  var cur = o.model || AI.model, tried = (o.tried = (o.tried || []).concat([cur]));
-  var c = AI.avail.filter(function (m) { return /flash/.test(m.id) && !/exp/.test(m.id) && tried.indexOf(m.id) < 0; });
-  c.sort(function (a, b) { var la = /lite/.test(a.id) ? 1 : 0, lb = /lite/.test(b.id) ? 1 : 0, pa = /preview/.test(a.id) ? 1 : 0, pb = /preview/.test(b.id) ? 1 : 0; return (preferLite ? lb - la : la - lb) || pa - pb || aiVer(b.id) - aiVer(a.id); });
-  return c[0] ? c[0].id : null;
-}
-function aiInlineRun(st, name, ctx, prompt, cacheId, force) {
-  var go = function () {
-    aiStream({ bg: true, temp: 0.3, search: false, model: AI.lite || undefined,
-      system: AI_SYS + '\nСегодня: ' + fmtDate(isoOf(new Date())) + '. Отвечай очень кратко, без вступлений и без повторения исходных данных.\n\n=== КОНТЕКСТ (' + ctx.title + ') ===\n' + ctx.data,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      chunk: function (t) { st.text = t; var el = document.getElementById('ail-' + name); if (el) el.innerHTML = md(t); },
-      done: function (t) { st.text = t || ''; st.st = 'ok'; st.at = nowIso();
-        if (cacheId && st.text) { try { localStorage.setItem('crr.ail.' + cacheId, JSON.stringify({ text: st.text, at: st.at })); } catch (e) {} if (CLOUD.on && CLOUD.db && can('edit')) CLOUD.db.collection('aicache').doc(cacheId).set({ text: st.text, at: st.at, by: me() }).catch(function () {}); }
-        render(); },
-      fail: function (e) { st.text = e; st.st = 'err'; if (/API key|PERMISSION|403|401/i.test(e)) { AI.st = 'err'; AI.err = e; } render(); } });
-  };
-  if (!cacheId || force) { setTimeout(go, 0); return; }
-  var loc = null; try { loc = JSON.parse(localStorage.getItem('crr.ail.' + cacheId) || 'null'); } catch (e) {}
-  if (loc && loc.text) { st.text = loc.text; st.at = loc.at; st.st = 'ok'; return; }
-  if (CLOUD.on && CLOUD.db) CLOUD.db.collection('aicache').doc(cacheId).get().then(function (d) {
-    if (d.exists && d.data().text) { st.text = d.data().text; st.at = d.data().at; st.st = 'ok'; try { localStorage.setItem('crr.ail.' + cacheId, JSON.stringify({ text: st.text, at: st.at })); } catch (e) {} render(); }
-    else go();
-  }).catch(go);
-  else setTimeout(go, 0);
-}
-function aiInline(name, ctx, prompt, title, mode) {
+function aiInline(name, ctx, prompt, title, stable) {
   if (!aiReady() || !SESSION || !ctx || !ctx.data) return '';
-  var daily = mode === 'daily', manual = mode === 'manual' || mode === true;
-  var key = daily ? name + '_' + isoOf(new Date()) + '_' + LANG + (AI.deid ? 'd' : 'n') : name + ':' + hashStr(prompt + '|' + AI.deid + LANG), st = AI.inl[key];
+  var key = name + ':' + hashStr((stable ? '' : ctx.data) + '|' + prompt + '|' + AI.deid + LANG + AI.prov + AI.model), st = AI.inl[key];
   if (!st) {
-    if (manual && !AI.inlGo[key]) return '<div class="bai bai-idle"><button type="button" class="bai-go" data-act="ailgo" data-k="' + key + '">' + ico('sparkle', 14) + esc(title) + '</button></div>';
-    Object.keys(AI.inl).forEach(function (k) { if (k.indexOf(name + (daily ? '_' : ':')) === 0) delete AI.inl[k]; });
+    Object.keys(AI.inl).forEach(function (k) { if (k.indexOf(name + ':') === 0) delete AI.inl[k]; });
     st = AI.inl[key] = { st: 'run', text: '' };
-    aiInlineRun(st, name, ctx, prompt, daily ? key : null, !!AI.inlGo[key + '!']);
-    delete AI.inlGo[key + '!'];
+    setTimeout(function () {
+      aiStream({ bg: true, temp: 0.3, search: false,
+        system: AI_SYS + '\nСегодня: ' + fmtDate(isoOf(new Date())) + '. Отвечай очень кратко, без вступлений и без повторения исходных данных.\n\n=== КОНТЕКСТ (' + ctx.title + ') ===\n' + ctx.data,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        chunk: function (t) { st.text = t; var el = document.getElementById('ail-' + name); if (el) el.innerHTML = md(t); },
+        done: function (t) { st.text = t || ''; st.st = 'ok'; render(); },
+        fail: function (e) { st.text = e; st.st = 'err'; if (/API key|PERMISSION|403|401/i.test(e)) { AI.st = 'err'; AI.err = e; } render(); } });
+    }, 0);
   }
-  var when = st.at && st.st === 'ok' ? '<em>' + LL('обновлено ', 'updated ') + new Date(st.at).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) + '</em>' : '';
-  return '<div class="bai' + (st.st === 'err' ? ' err' : '') + '"><div class="bai-h">' + ico('sparkle', 13) + '<span>' + esc(title) + '</span>' + (st.st === 'run' ? '<em>' + LL('анализирую…', 'thinking…') + '</em>' : when + '<button type="button" class="linkbtn" data-act="ailre" data-k="' + key + '" title="' + LL('Обновить', 'Refresh') + '">' + ico('refresh', 13) + '</button>') + '</div><div id="ail-' + name + '" class="bai-t">' + (st.text ? (st.st === 'err' ? esc(st.text) : md(st.text)) : '') + '</div></div>';
+  return '<div class="bai' + (st.st === 'err' ? ' err' : '') + '"><div class="bai-h">' + ico('sparkle', 13) + '<span>' + esc(title) + '</span>' + (st.st === 'run' ? '<em>' + LL('анализирую…', 'thinking…') + '</em>' : '<button type="button" class="linkbtn" data-act="ailre" data-k="' + key + '" title="' + LL('Обновить', 'Refresh') + '">' + ico('refresh', 13) + '</button>') + '</div><div id="ail-' + name + '" class="bai-t">' + (st.text ? (st.st === 'err' ? esc(st.text) : md(st.text)) : '') + '</div></div>';
 }
 function aiThread(key) { return AI.threads[key] || (AI.threads[key] = { msgs: [], greeted: false }); }
 function aiRun(ctx, hiddenPrompt, visibleText, sendText) {
@@ -3206,14 +3239,16 @@ function aiSendInput() {
 }
 function renderAIPill() {
   var st = AI.st, open = S.menu === 'aikey';
-  var lbl = { off: LL('ИИ выкл.', 'AI off'), check: LL('Проверка…', 'Checking…'), ok: 'Gemini', err: LL('Ошибка ключа', 'Key error') }[st];
-  var h = '<div class="dd"><button type="button" class="aipill s-' + st + '" data-act="menu" data-id="aikey" aria-expanded="' + open + '" title="' + LL('Ключ API Gemini и статус подключения', 'Gemini API key and status') + '"><span class="tgl"><i></i></span><span>' + lbl + '</span></button>';
+  var lbl = { off: LL('ИИ выкл.', 'AI off'), check: LL('Проверка…', 'Checking…'), ok: AI_PROV[AI.prov].name, err: LL('Ошибка ключа', 'Key error') }[st];
+  var h = '<div class="dd"><button type="button" class="aipill s-' + st + '" data-act="menu" data-id="aikey" aria-expanded="' + open + '" title="' + LL('Ключ API ИИ и статус подключения', 'AI API key and status') + '"><span class="tgl"><i></i></span><span>' + lbl + '</span></button>';
   if (open) {
+    var PV = AI_PROV[AI.prov];
     h += '<div class="pop right aipop"><div class="np-h"><b>' + ico('sparkle', 16) + LL('Подключение ИИ', 'AI connection') + '</b></div><div class="aipop-b">';
-    h += '<label class="af"><span>' + (AI.shared ? LL('Используется общий ключ сектора. Свой ключ (необязательно)', 'Using the shared unit key. Your own key (optional)') : LL('Ваш ключ Gemini API', 'Your Gemini API key')) + '</span><input type="password" id="aikey-in" value="' + (AI.shared ? '' : esc(AI.key)) + '" placeholder="AIza…" autocomplete="off" data-enter="aikey"></label>';
-    h += '<p class="fhint">' + (AI.sharedKey ? LL('Если ввести свой ключ, на этом устройстве будет использоваться он вместо общего.', 'Your own key replaces the shared one on this device.') : LL('Ключ сохраняется на этом устройстве. Получить бесплатно: aistudio.google.com → Get API key.', 'Saved on this device. Get one free at aistudio.google.com → Get API key.')) + '</p>';
+    h += '<div class="seg full aiprov">' + Object.keys(AI_PROV).map(function (k) { return '<button type="button" class="' + (AI.prov === k ? 'on' : '') + '" data-act="aiprov" data-v="' + k + '">' + AI_PROV[k].name + '</button>'; }).join('') + '</div>';
+    h += '<label class="af"><span>' + (AI.shared ? LL('Используется общий ключ сектора. Свой ключ (необязательно)', 'Using the shared unit key. Your own key (optional)') : LL('Ваш ключ API ', 'Your API key: ') + PV.name) + '</span><input type="password" id="aikey-in" value="' + (AI.shared ? '' : esc(AI.key)) + '" placeholder="' + PV.ph + '" autocomplete="off" data-enter="aikey"></label>';
+    h += '<p class="fhint">' + (AI.sharedKey && AI.prov === 'gemini' ? LL('Если ввести свой ключ, на этом устройстве будет использоваться он вместо общего.', 'Your own key replaces the shared one on this device.') : LL('Ключ сохраняется на этом устройстве. Где взять: ', 'Saved on this device. Get one: ') + PV.get + '.') + (AI.prov !== 'gemini' ? ' ' + LL('Поиск статей в интернете работает только с Gemini.', 'Web search for articles works with Gemini only.') : '') + '</p>';
     if (CLOUD.on && isAdmin() && AI.key && !AI.shared && AI.st === 'ok' && AI.sharedKey !== AI.key) h += '<button type="button" class="btn small" data-act="aishare" style="margin-bottom:10px">' + ico('users', 14) + LL('Сделать этот ключ общим для всех', 'Make this key the default for everyone') + '</button>';
-    h += '<label class="af"><span>' + LL('Модель', 'Model') + '</span><select id="aimodel">' + (AI.avail && AI.avail.length ? AI.avail.map(function (m) { return [m.id, m.name, m.id]; }) : AI_MODELS).map(function (m) { return '<option value="' + m[0] + '"' + (AI.model === m[0] ? ' selected' : '') + '>' + esc(m[1]) + ' · ' + esc(m[2]) + '</option>'; }).join('') + '</select></label>';
+    h += '<label class="af"><span>' + LL('Модель', 'Model') + '</span><select id="aimodel">' + (AI.avail && AI.avail.length ? AI.avail.map(function (m) { return [m.id, m.name, m.id]; }) : AI.prov === 'gemini' ? AI_MODELS : [[AI.model, AI.model, AI_PROV[AI.prov].name]]).map(function (m) { return '<option value="' + m[0] + '"' + (AI.model === m[0] ? ' selected' : '') + '>' + esc(m[1]) + ' · ' + esc(m[2]) + '</option>'; }).join('') + '</select></label>';
     h += '<label class="chk"><input type="checkbox" id="aideid"' + (AI.deid ? ' checked' : '') + '><span>' + LL('Обезличивать данные перед отправкой (ФИО, ИИН, ИБ, адрес)', 'De-identify data before sending (name, ID, case no., address)') + '</span></label>';
     h += '<div class="aistat s-' + st + '"><span class="dot"></span>' + ({ off: LL('Ключ не введён', 'No key'), check: LL('Проверяю ключ…', 'Checking key…'), ok: LL('Подключено: ключ принят, всё работает', 'Connected: key accepted, all good'), err: esc(AI.err) }[st]) + '</div>';
     h += '<div class="actions"><button type="button" class="btn primary small" data-act="aikeysave">' + LL('Сохранить и проверить', 'Save and test') + '</button>' + (AI.key && !AI.shared ? '<button type="button" class="btn small ghost" data-act="aikeyclear">' + (AI.sharedKey ? LL('Вернуть общий ключ', 'Back to shared key') : LL('Отключить', 'Disconnect')) + '</button>' : '') + '</div></div></div>';
@@ -3226,7 +3261,7 @@ function renderAIPanel() {
   h += '<button type="button" class="iconbtn sm" data-act="airegreet" title="' + LL('Обновить анализ', 'Refresh analysis') + '"' + (aiReady() ? '' : ' disabled') + '>' + ico('refresh', 16) + '</button><button type="button" class="iconbtn sm" data-act="aitoggle" aria-label="' + t('a11y.close') + '">' + ico('x', 16) + '</button></div>';
   h += '<div class="aip-body">';
   if (!aiReady()) {
-    h += '<div class="ai-empty"><div class="ai-orb">' + ico('sparkle', 26) + '</div><b>' + (AI.st === 'check' ? LL('Проверяю ключ…', 'Checking key…') : LL('Подключите Gemini', 'Connect Gemini')) + '</b><p>' + LL('Ассистент читает открытый экран, делает сводку, находит пропуски, сверяет с рекомендациями и даёт ссылки на статьи. Он ничего не меняет в данных.', 'The assistant reads the open screen, summarises, finds gaps, checks guidelines and cites papers. It never changes data.') + '</p>' + (AI.st === 'err' ? '<div class="aerr">' + esc(AI.err) + '</div>' : '') + '<button type="button" class="btn primary" data-act="menu" data-id="aikey">' + LL('Ввести ключ API', 'Enter API key') + '</button></div>';
+    h += '<div class="ai-empty"><div class="ai-orb">' + ico('sparkle', 26) + '</div><b>' + (AI.st === 'check' ? LL('Проверяю ключ…', 'Checking key…') : LL('Подключите ИИ', 'Connect AI')) + '</b><p>' + LL('Ассистент читает открытый экран, делает сводку, находит пропуски, сверяет с рекомендациями и даёт ссылки на статьи. Он ничего не меняет в данных.', 'The assistant reads the open screen, summarises, finds gaps, checks guidelines and cites papers. It never changes data.') + '</p>' + (AI.st === 'err' ? '<div class="aerr">' + esc(AI.err) + '</div>' : '') + '<button type="button" class="btn primary" data-act="menu" data-id="aikey">' + LL('Ввести ключ API', 'Enter API key') + '</button></div>';
   } else {
     if (!th.msgs.length) h += '<div class="ai-empty sm"><p>' + LL('Готовлю анализ…', 'Preparing analysis…') + '</p></div>';
     th.msgs.forEach(function (m, i) {
@@ -3253,7 +3288,7 @@ function corpusPick(d, n) {
   return list.sort(function (a, b) { return b.sc - a.sc; }).slice(0, n || 3).map(function (x) { return x.e; });
 }
 function aiProtocol() {
-  if (!aiReady()) { UI.aip = true; saveUI(); render(); toast(LL('Сначала подключите ключ Gemini', 'Connect a Gemini key first')); return; }
+  if (!aiReady()) { UI.aip = true; saveUI(); render(); toast(LL('Сначала подключите ключ ИИ', 'Connect an AI key first')); return; }
   var dr = S.drawer, p = dr.p, d = p.d, ex = corpusPick(d, 3), ta = root.querySelector('#protoText');
   var facts = patText(p, false), skeleton = buildProtocol(p);
   var sys = 'Ты пишешь протоколы операций колоректального сектора ННОЦ (Астана) в точности в стиле отделения. Ниже реальные обезличенные протоколы отделения: копируй их лексику, порядок изложения, формулировки (Тайм-аут, обработка операционного поля, ТВВА+ИВЛ, карбоксиперитонеум, троакары, ревизия, мобилизация, пересечение сосудов, ТМЭ, анастомоз, проверка герметичности, дренирование, ушивание, асептическая повязка).\n' +
@@ -3436,7 +3471,7 @@ function renderHome() {
   var labsBody = b.labs.length ? b.labs.map(function (x) { return '<div class="bi bi-' + x.st + '"><span class="pod">' + x.pod + '<i>' + LL('сут', 'POD') + '</i></span><div class="bi-t"><b>' + esc(x.name || x.who) + '</b><span>' + esc(x.op) + ' · ' + x.route + ' · ' + LL('окно ', 'window ') + x.win[0] + '-' + x.win[1] + LL(' сут', ' d') + (x.noRoute ? ' · <button type="button" class="linkbtn" data-act="openrec" data-k="planner" data-id="' + x.rid + '">' + LL('указать путь', 'set route') + '</button>' : '') + '</span></div><span class="bi-s">' + x.stTxt + '</span>' + (can('edit') ? '<button type="button" class="btn small" data-act="labsdone" data-id="' + x.rid + '">' + ico('check', 14) + LL('Взяты', 'Taken') + '</button>' : '') + '</div>'; }).join('') : '<p class="bnone">' + LL('Сегодня контрольные анализы никому не положены.', 'No control labs due today.') + '</p>';
   h += '<section class="panel brief wide"><div class="ph"><h2>' + LL('Брифинг на сегодня', 'Today\'s briefing') + '</h2><button type="button" class="btn small ai" data-act="aiopen">' + ico('sparkle', 14) + LL('Разбор ИИ', 'AI review') + '</button></div>';
   h += '<div class="bsum">' + briefSumLines(b.sum).map(function (l) { return '<div class="sl"><span class="sl-ic">' + ico(l[0], 15) + '</span><div class="sl-b"><div class="sl-t">' + l[1] + '</div>' + (l[2] && l[2].length ? '<div class="bchips">' + l[2].map(function (x) { return '<button type="button" class="bchip" data-act="openrec" data-k="' + x.k + '" data-id="' + x.id + '"><b>' + esc(x.name) + '</b>' + (x.x ? '<span>' + esc(x.x) + '</span>' : '') + '</button>'; }).join('') + '</div>' : '') + '</div></div>'; }).join('') + '</div>';
-  h += aiInline('home', aiViewCtx('home'), 'Главное на сегодня для врачей сектора: 3-5 коротких пунктов по срочности (кому что сделать, кого проверить, риски). Только то, что требует действия.', LL('ИИ: главное на сегодня', 'AI: what matters today'), 'daily');
+  h += aiInline('home', aiViewCtx('home'), 'Главное на сегодня для врачей сектора: 3-5 коротких пунктов по срочности (кому что сделать, кого проверить, риски). Только то, что требует действия.', LL('ИИ: главное на сегодня', 'AI: what matters today'));
   h += '<div class="bgrid"><div>';
   h += sec(LL('Контрольные анализы после операции', 'Post-op control labs'), 'flask', labsBody, b.labs.length) + '</div><div>';
   h += sec(LL('Операции сегодня и завтра', 'Surgery today and tomorrow'), 'knife', b.ops.length ? b.ops.map(function (x) { return '<button type="button" class="bi link" data-act="openrec" data-k="planner" data-id="' + x.rid + '"><span class="pod op">' + ico('knife', 15) + '</span><div class="bi-t"><b>' + esc(x.name || x.who) + '</b><span>' + esc(x.when) + (x.what ? ' · ' + esc(x.what) : '') + '</span></div></button>'; }).join('') : '<p class="bnone">' + LL('Не запланировано', 'Nothing scheduled') + '</p>', b.ops.length);
@@ -3857,11 +3892,11 @@ document.addEventListener('click', function (ev) {
     case 'aicopy': { var am = aiThread(aiCtx().key).msgs[+g('i')]; if (am) { navigator.clipboard && navigator.clipboard.writeText(am.text); toast(LL('Скопировано', 'Copied')); } break; }
     case 'aichip': { var cx0 = aiCtx(), ch0 = (cx0.chips || [])[+g('i')]; if (ch0 && !AI.busy) aiRun(cx0, null, ch0[0], ch0[1]); break; }
     case 'aisend': aiSendInput(); break;
-    case 'ailre': delete AI.inl[g('k')]; AI.inlGo[g('k')] = true; AI.inlGo[g('k') + '!'] = true; try { localStorage.removeItem('crr.ail.' + g('k')); } catch (e) {} render(); break;
-    case 'ailgo': AI.inlGo[g('k')] = true; render(); break;
+    case 'ailre': delete AI.inl[g('k')]; render(); break;
     case 'aistop': if (AI.ctrl) AI.ctrl.abort(); break;
-    case 'aikeysave': { var ki = root.querySelector('#aikey-in'), mo = root.querySelector('#aimodel'), de = root.querySelector('#aideid'); if (mo && mo.value !== AI.model) try { localStorage.setItem('crr.aimodel.m', '1'); } catch (e) {} AI.model = mo ? mo.value : AI.model; AI.deid = de ? de.checked : AI.deid; try { localStorage.setItem('crr.aimodel', AI.model); localStorage.setItem('crr.aideid', AI.deid ? '1' : '0'); } catch (e) {} AI.threads = {}; aiSetKey(ki ? ki.value : ''); break; }
+    case 'aikeysave': { var ki = root.querySelector('#aikey-in'), mo = root.querySelector('#aimodel'), de = root.querySelector('#aideid'); if (mo && mo.value !== AI.model) try { localStorage.setItem(aiModelName(AI.prov) + '.m', '1'); } catch (e) {} AI.model = mo ? mo.value : AI.model; AI.deid = de ? de.checked : AI.deid; try { localStorage.setItem(aiModelName(AI.prov), AI.model); localStorage.setItem('crr.aideid', AI.deid ? '1' : '0'); } catch (e) {} AI.threads = {}; aiSetKey(ki ? ki.value : ''); break; }
     case 'aikeyclear': AI.threads = {}; aiSetKey(''); break;
+    case 'aiprov': aiSetProv(g('v')); break;
     case 'theme': UI.theme = themeCur() === 'dark' ? 'light' : 'dark'; saveUI(); themeApply(); render(); break;
     case 'qlnew': qlCreate(g('id'), g('pid'), g('eid')); break;
     case 'qlclose': S.qlink = null; render(); break;
