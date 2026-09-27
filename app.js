@@ -627,6 +627,20 @@ function migrate(db) {
     db.mig.p8 = 1;
   }
   if (!db.pending) db.pending = [];
+  if (!db.mig.p10) {
+    var tdW = isoOf(new Date()), who = ['исабеков', 'сулейменова', 'князев', 'абдрахманова'], keep = {};
+    who.forEach(function (sn) {
+      var rows = (db.cols.planner || []).filter(function (r) { return r.status !== 'Отменено' && nameTokens(r.fio)[0] === sn; }).sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
+      if (rows[0]) keep[rows[0].id] = 1;
+    });
+    (db.cols.planner || []).forEach(function (r) {
+      var was = r.status;
+      if (keep[r.id]) { r.status = 'В отделении'; if (!r.date || r.date > tdW) r.date = r.date && r.date <= tdW ? r.date : tdW; delete r.discharge; }
+      else if (r.status === 'В отделении' || (r.status !== 'Отменено' && r.status !== 'Завершено' && r.surgeryDate && r.surgeryDate <= tdW) || (r.status === 'Планируется' && r.date && r.date <= tdW)) r.status = 'Завершено';
+      if (was !== r.status) r.log = (r.log || []).concat([{ ts: nowIso(), by: LL('Сверка отделения', 'Ward reconciliation'), act: 'edit', ch: [{ f: 'status', a: was, b: r.status }] }]);
+    });
+    db.mig.p10 = 1; db._dirty = true;
+  }
   if (!db.cols.pubs) db.cols.pubs = [];
   plannerAuto(db);
   return db;
@@ -674,6 +688,7 @@ function load() {
 }
 function save() { if (typeof SESSION !== 'undefined' && isStudent()) return true; try { localStorage.setItem(KEY, JSON.stringify(DB)); if (typeof CLOUD !== 'undefined' && CLOUD.on) cloudPush(); return true; } catch (e) { toast(t('toast.saveFail')); return false; } }
 DB = load();
+if (DB._dirty) { delete DB._dirty; if (!CLOUD_MODE) try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {} }
 
 var UI = { lang: 'ru', side: true, colView: {}, cal: {} };
 try { var u = JSON.parse(localStorage.getItem(UIKEY) || '{}'); Object.keys(u).forEach(function (k) { UI[k] = u[k]; }); } catch (e) {}
@@ -2756,6 +2771,7 @@ function cloudListen() {
     CLOUD.cache = map; CLOUD.empty = false;
     var busy = S.drawer || S.rec || S.edit || S.enr || S.fill;
     DB = migrate(dbFromDocs(map));
+    if (DB._dirty) { delete DB._dirty; if (can('edit')) save(); }
     try { localStorage.setItem(KEY_CLOUD, JSON.stringify(DB)); } catch (e) {}
     if (!busy) render(); else CLOUD.stale = true;
   }, function (e) { CLOUD.err = e.code || e.message; render(); });
