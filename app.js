@@ -399,6 +399,12 @@ var MODULES = [
 
 var MEDIA = [f('phBefore', 'До лучевой', 'Before RT', 'files'), f('phAfterRt', 'После лучевой', 'After RT', 'files'), f('phMid', 'Середина консолидации', 'Mid consolidation', 'files'), f('phAfterCons', 'После консолидации', 'After consolidation', 'files'), f('phControl', 'Контроль', 'Follow-up', 'files')];
 var FU = [['d30', 30, 'fu.d30'], ['d90', 90, 'fu.d90'], ['d365', 365, 'fu.y1']];
+var FU_ITEMS = {
+  d30: [['exam', ['Осмотр хирурга: рана, стома, самочувствие', 'Surgeon review: wound, stoma']], ['cx', ['Осложнения за 30 дней по Clavien-Dindo', '30-day complications (Clavien-Dindo)']], ['readm', ['Повторная госпитализация или реоперация', 'Readmission or reoperation']], ['lab', ['ОАК, биохимия крови', 'Blood count, biochemistry']], ['histo', ['Гистология получена и обсуждена на МДГ', 'Histology received and discussed at MDT']]],
+  d90: [['exam', ['Осмотр онколога', 'Oncologist review']], ['cea', ['РЭА', 'CEA']], ['adj', ['Адъювантная химиотерапия: начата или не показана', 'Adjuvant chemotherapy: started or not indicated']], ['stoma', ['Решение по закрытию стомы', 'Stoma closure decision']], ['q', ['Анкеты LARS и Wexner (если стома закрыта)', 'LARS and Wexner questionnaires (if stoma closed)']]],
+  d365: [['exam', ['Осмотр онколога', 'Oncologist review']], ['cea', ['РЭА, СА 19-9', 'CEA, CA 19-9']], ['ct', ['КТ грудной клетки и брюшной полости с контрастом', 'Contrast CT chest and abdomen']], ['mri', ['МРТ малого таза (рак прямой кишки)', 'Pelvic MRI (rectal cancer)']], ['colo', ['Колоноскопия', 'Colonoscopy']], ['q', ['Анкеты LARS и Wexner', 'LARS and Wexner questionnaires']]]
+};
+function fuItems(p, key) { var c = (p.fuc || {})[key] || {}, all = !!p.fu[key] && !Object.keys(c).length; return (FU_ITEMS[key] || []).map(function (x) { return { id: x[0], label: L(x[1]), done: all || !!c[x[0]], date: typeof c[x[0]] === 'string' ? c[x[0]] : '' }; }); }
 var CF_TYPES = [['num', 'cf.num'], ['text', 'cf.text'], ['yn', 'cf.yn'], ['sel', 'cf.sel'], ['date', 'cf.date']];
 
 function secOn(s, d) { return !s.when || s.when(d) || secHasData(s, d); }
@@ -778,7 +784,7 @@ function fuList(p) {
   return FU.map(function (x) {
     var due = addDays(p.d.date, x[1]); var days = Math.round((due - td) / 86400000);
     var st = p.fu[x[0]] ? 'done' : days < 0 ? 'overdue' : days <= 14 ? 'soon' : 'plan';
-    return { key: x[0], label: t(x[2]), due: isoOf(due), days: days, st: st };
+    return { key: x[0], label: t(x[2]), due: isoOf(due), days: days, st: st, items: fuItems(p, x[0]) };
   });
 }
 function fuDueAll() {
@@ -904,10 +910,11 @@ function thSort(scope, k, label) {
 function fuPatInfo(p) {
   var out = { late: [], done: [], next: [] };
   fuList(p).forEach(function (f) {
-    var nm = LL('Контроль ', 'Follow-up ') + f.label;
-    if (f.st === 'done') out.done.push({ t: nm, s: typeof p.fu[f.key] === 'string' ? fmtDate(p.fu[f.key]) : '' });
-    else if (f.st === 'overdue') out.late.push({ t: nm, s: LL('срок ', 'due ') + fmtDate(f.due) + ', ' + LL('просрочено на ', 'overdue by ') + (-f.days) + LL(' дн', ' d'), fu: f.key });
-    else out.next.push({ t: nm, s: fmtDate(f.due) + (f.days === 0 ? LL(', сегодня', ', today') : ', ' + LL('через ', 'in ') + f.days + LL(' дн', ' d')), fu: f.key, soon: f.st === 'soon' });
+    var nm = LL('Контроль ', 'Follow-up ') + f.label, dn = f.items.filter(function (i) { return i.done; }), nd = f.items.filter(function (i) { return !i.done; });
+    var lst = function (a) { return a.map(function (i) { return i.label + (i.date ? ' (' + fmtDate(i.date) + ')' : ''); }); };
+    if (f.st === 'done') out.done.push({ t: nm + (typeof p.fu[f.key] === 'string' ? ', ' + fmtDate(p.fu[f.key]) : ''), ok: lst(dn) });
+    else if (f.st === 'overdue') out.late.push({ t: nm, s: LL('срок ', 'due ') + fmtDate(f.due) + ', ' + LL('просрочено на ', 'overdue by ') + (-f.days) + LL(' дн', ' d'), miss: lst(nd), ok: lst(dn) });
+    else out.next.push({ t: nm, s: fmtDate(f.due) + (f.days === 0 ? LL(', сегодня', ', today') : ', ' + LL('через ', 'in ') + f.days + LL(' дн', ' d')), miss: lst(nd), ok: lst(dn), soon: f.st === 'soon' });
   });
   (p.q || []).forEach(function (e) {
     var nm = LL('Анкета ', 'Questionnaire ') + qShort(qTpl(e.tid)) + (e.label ? ' (' + e.label + ')' : '');
@@ -918,7 +925,7 @@ function fuPatInfo(p) {
 }
 function fuCell(list, cls, pid) {
   if (!list.length) return '<span class="muted">—</span>';
-  return '<ul class="ful ' + cls + '">' + list.map(function (x) { return '<li><b>' + esc(x.t) + '</b><span>' + esc(x.s) + '</span>' + (x.fu && pid && can('edit') ? '<button type="button" class="linkbtn" data-act="fudone" data-id="' + pid + '" data-k="' + x.fu + '">' + LL('выполнен', 'mark done') + '</button>' : '') + '</li>'; }).join('') + '</ul>';
+  return '<ul class="ful ' + cls + '">' + list.map(function (x) { return '<li><b>' + esc(x.t) + '</b>' + (x.s ? '<span>' + esc(x.s) + '</span>' : '') + (x.miss && x.miss.length ? '<div class="fu-d fu-miss"><i>' + (cls === 'late' ? LL('Не сделано:', 'Not done:') : LL('Что нужно:', 'To do:')) + '</i>' + x.miss.map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</div>' : '') + (x.ok && x.ok.length ? '<div class="fu-d fu-ok"><i>' + LL('Сделано:', 'Done:') + '</i>' + x.ok.map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</div>' : '') + '</li>'; }).join('') + '</ul>';
 }
 function fuTable(rows) {
   return '<div class="tablewrap"><table class="grid futab"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + LL('Операция', 'Surgery') + '</th><th>' + LL('Просрочено', 'Overdue') + '</th><th>' + LL('Ожидается', 'Upcoming') + '</th><th>' + LL('Выполнено', 'Done') + '</th></tr></thead><tbody>' + rows.map(function (x) {
@@ -1301,7 +1308,8 @@ function renderPatient() {
       if (!fl.length) h += '<p class="hint">' + t('pc.fuHint') + '</p>';
       fl.forEach(function (x) {
         var st = x.st === 'done' ? '<span class="tag ok">' + t('fu.done') + '</span>' : x.st === 'overdue' ? '<span class="tag due">' + t('fu.overdue') + '</span>' : x.st === 'soon' ? '<span class="tag">' + t('fu.soon') + '</span>' : '<span class="muted">' + t('fu.planned') + '</span>';
-        h += '<div class="furow"><label class="chk"><input type="checkbox" data-bind="fu.' + x.key + '"' + (p.fu[x.key] ? ' checked' : '') + '>' + esc(x.label) + ', ' + t('fu.until') + ' ' + fmtDate(x.due) + '</label>' + st + '</div>';
+        h += '<div class="furow"><label class="chk"><input type="checkbox" data-bind="fu.' + x.key + '"' + (p.fu[x.key] ? ' checked' : '') + '><b>' + esc(LL('Контроль ', 'Follow-up ') + x.label) + '</b><span class="muted">' + t('fu.until') + ' ' + fmtDate(x.due) + '</span></label>' + st + '</div>';
+        h += '<div class="fuitems">' + x.items.map(function (it) { return '<label class="chk"><input type="checkbox" data-bind="fuc.' + x.key + '.' + it.id + '"' + (it.done ? ' checked' : '') + '>' + esc(it.label) + (it.date ? ' <em>' + fmtDate(it.date) + '</em>' : '') + '</label>'; }).join('') + '</div>';
       });
       h += '</section>';
       h += qCard(p, dr.isNew);
@@ -1524,7 +1532,8 @@ function target(path) {
 }
 function bind(path, val) {
   var head = path.split('.')[0], rest = path.slice(head.length + 1);
-  if (head === 'fu') { if (val) S.drawer.p.fu[rest] = isoOf(new Date()); else delete S.drawer.p.fu[rest]; return; }
+  if (head === 'fu') { var dp = S.drawer.p; dp.fuc = dp.fuc || {}; if (val) { dp.fu[rest] = isoOf(new Date()); var cc = dp.fuc[rest] = dp.fuc[rest] || {}; (FU_ITEMS[rest] || []).forEach(function (x) { if (!cc[x[0]]) cc[x[0]] = isoOf(new Date()); }); } else { delete dp.fu[rest]; delete dp.fuc[rest]; } return; }
+  if (head === 'fuc') { var dq = S.drawer.p, kk = rest.split('.'); dq.fuc = dq.fuc || {}; var c2 = dq.fuc[kk[0]] = dq.fuc[kk[0]] || {}; if (!Object.keys(c2).length && dq.fu[kk[0]]) (FU_ITEMS[kk[0]] || []).forEach(function (x) { c2[x[0]] = typeof dq.fu[kk[0]] === 'string' ? dq.fu[kk[0]] : isoOf(new Date()); }); if (val) c2[kk[1]] = isoOf(new Date()); else delete c2[kk[1]]; var allD = (FU_ITEMS[kk[0]] || []).every(function (x) { return c2[x[0]]; }); if (allD) dq.fu[kk[0]] = dq.fu[kk[0]] || isoOf(new Date()); else delete dq.fu[kk[0]]; return; }
   if (head === 'm') { S.drawer.members[rest] = !!val; return; }
   var tg = target(path); if (tg) setPath(tg[0], tg[1], val);
 }

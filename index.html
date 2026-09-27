@@ -1128,6 +1128,13 @@ button.lockbtn:hover{background:var(--accent-soft);color:var(--navy)}
 .kchip:hover{border-color:var(--accent-line)}
 .kchip.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
 @media (max-width:760px){.kgrp{grid-template-columns:1fr;gap:4px}.kgrp>span{padding-top:0}}
+.fuitems{display:flex;flex-direction:column;gap:4px;margin:2px 0 12px 26px;padding-left:12px;border-left:2px solid var(--line)}
+.fuitems .chk{font-size:13px;color:var(--ink2)}.fuitems em{font-style:normal;color:var(--muted);font-size:12px;margin-left:4px}
+.fu-d{display:flex;flex-direction:column;margin-top:4px;font-size:12px;line-height:1.35}
+.fu-d i{font-style:normal;font-weight:600;color:var(--ink2);margin-bottom:1px}
+.fu-d span{color:var(--ink2)!important}.fu-d span::before{content:'· ';color:var(--muted)}
+.fu-miss i{color:var(--due)}.ful.next .fu-miss i{color:var(--warn)}.fu-ok i{color:var(--ok)}
+.futab .ful{min-width:230px}
 /*DARK-START*/
 .pt-lang{display:flex;gap:8px;align-items:center}
 .themebtn svg{transition:transform .3s ease}.themebtn:hover svg{transform:rotate(-20deg)}
@@ -1255,9 +1262,9 @@ html[data-theme="dark"] ::-webkit-scrollbar{width:10px;height:10px}html[data-the
 <body>
 <div id="root"></div>
 <input type="file" id="importFile" accept=".json,.js,application/json,text/javascript" hidden>
-<script src="firebase-config.js?v=d2af819c"></script>
-<script src="i18n.js?v=d2af819c"></script>
-<script src="ai-corpus.js?v=d2af819c"></script>
-<script src="app.js?v=d2af819c"></script>
+<script src="firebase-config.js?v=cb6ec75f"></script>
+<script src="i18n.js?v=cb6ec75f"></script>
+<script src="ai-corpus.js?v=cb6ec75f"></script>
+<script src="app.js?v=cb6ec75f"></script>
 </body>
 </html>
