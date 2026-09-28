@@ -83,7 +83,7 @@ ui: {
   'reg.open': ['Лапаротомия', 'Open surgery'],
   'reg.ileo': ['С илеостомой', 'With ileostomy'],
   'reg.vte': ['Венозные тромбоэмболии', 'Venous thromboembolism'],
-  'reg.allSub': ['Все карточки пациентов. Разделы в меню ниже показывают их по тегам', 'All patient records. Sections below filter them by tags'],
+  'reg.allSub': ['Все карточки пациентов. Регистры в верхнем меню показывают их по тегам', 'All patient records. Registries in the top menu filter them by tags'],
   'reg.search': ['Поиск: ФИО, ID, диагноз', 'Search: name, ID, diagnosis'],
   'reg.configure': ['Настроить регистр', 'Registry settings'],
   'reg.export': ['Выгрузить в Excel', 'Export to Excel'],

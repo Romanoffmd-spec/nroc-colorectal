@@ -4470,10 +4470,12 @@ function renderPortal() {
 function navGroups() {
   var g = [{ id: 'home', label: LL('Главная', 'Home'), v: 'home', icon: 'home' }];
   g.push({ id: 'work', label: LL('Работа', 'Work'), icon: 'cal', items: ['planner', 'mdt', 'mm'].map(function (k) { return { v: 'col:' + k, icon: COLS[k].icon, label: L(COLS[k].title), cnt: DB.cols[k].length }; }) });
-  var pts = [{ v: 'reg:all', icon: 'users', label: t('nav.allPatients'), cnt: DB.patients.length }, { v: 'fu', icon: 'clock', label: t('nav.followup'), badge: fuDueAll().length || null }, { sep: LL('Разделы по тегам', 'Sections by tag') }];
-  (function walk(list, d) { list.forEach(function (r) { pts.push({ v: 'reg:' + r.id, icon: d ? 'dot' : (r.id === 'g_endo' ? 'scope' : r.id === 'g_surg' ? 'knife' : 'tag'), label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, false), d + 1); }); })(kids(null, false), 0);
-  if (can('edit')) pts.push({ act: 'newreg', icon: 'plus', label: t('nav.newRegistry') });
-  g.push({ id: 'pts', label: LL('Пациенты', 'Patients'), icon: 'users', items: pts, wide: true });
+  var pts = [{ v: 'reg:all', icon: 'users', label: t('nav.allPatients'), cnt: DB.patients.length }, { v: 'fu', icon: 'clock', label: t('nav.followup'), badge: fuDueAll().length || null }];
+  g.push({ id: 'pts', label: LL('Пациенты', 'Patients'), icon: 'users', items: pts });
+  var regs = [];
+  (function walk(list, d) { list.forEach(function (r) { regs.push({ v: 'reg:' + r.id, icon: d ? 'dot' : (r.id === 'g_endo' ? 'scope' : r.id === 'g_surg' ? 'knife' : 'tag'), label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, false), d + 1); }); })(kids(null, false), 0);
+  if (can('edit')) regs.push({ act: 'newreg', icon: 'plus', label: t('nav.newRegistry') });
+  g.push({ id: 'regs', label: LL('Регистры', 'Registries'), icon: 'tag', items: regs, wide: true });
   var sci = [{ v: 'studies', icon: 'flask', label: t('nav.studies') }];
   (function walk(list, d) { list.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'dot', label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, true), d + 1); }); })(kids(null, true), 1);
   if ((DB.pending || []).length) sci.push({ v: 'appr', icon: 'check', label: LL('На одобрении', 'Awaiting approval'), badge: apprMine().length || null });
