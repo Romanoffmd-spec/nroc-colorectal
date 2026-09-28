@@ -648,6 +648,14 @@ function migrate(db) {
     });
     db.mig.p10 = 1; db._dirty = true;
   }
+  if (!db.mig.p11) {
+    var R11 = function (id) { return (db.registries || []).filter(function (r) { return r.id === id; })[0]; };
+    ['rg_tnt', 'rg_ww', 'rg_teo', 'rg_llnd', 'rg_relapse'].forEach(function (id) { var r = R11(id); if (!r || r.sci) return; if (r.parent === 'rg_rect') r.rules = [{ f: 'kind', not: ['Эндоскопическое'] }, { f: 'loc', vals: ['Прямая кишка'] }].concat(r.rules || []); r.parent = null; r.sci = true; });
+    var gone = {}, more = true; (db.registries || []).forEach(function (r) { if (r.parent === 'g_endo') gone[r.id] = 1; });
+    while (more) { more = false; (db.registries || []).forEach(function (r) { if (r.parent && gone[r.parent] && !gone[r.id]) { gone[r.id] = 1; more = true; } }); }
+    db.registries = (db.registries || []).filter(function (r) { return !gone[r.id]; });
+    db.mig.p11 = 1; db._dirty = true;
+  }
   if (!db.cols.pubs) db.cols.pubs = [];
   plannerAuto(db);
   return db;
@@ -721,7 +729,30 @@ function inReg(p, reg) {
   if (reg.mode === 'manual') return reg.members.indexOf(p.id) >= 0;
   return reg.rules.every(function (r) { return ruleOk(p, r); });
 }
-function kids(pid, study) { return DB.registries.filter(function (r) { return (r.parent || null) === (pid || null) && !!(r.kind === 'study') === !!study; }); }
+var REG_ORDER = { g_surg: 0, g_endo: 1 };
+function kids(pid, study, sci) {
+  var out = DB.registries.filter(function (r) { return (r.parent || null) === (pid || null) && !!(r.kind === 'study') === !!study && (study || pid || !!r.sci === !!sci); });
+  if (!pid && !study) out = out.map(function (r, i) { return [r, i]; }).sort(function (x, y) { var ox = REG_ORDER[x[0].id], oy = REG_ORDER[y[0].id]; ox = ox === undefined ? 9 : ox; oy = oy === undefined ? 9 : oy; return ox - oy || x[1] - y[1]; }).map(function (x) { return x[0]; });
+  return out;
+}
+/* date filters: admission / discharge (from Planner stays), all-stages-done */
+function inRange(v, f, t2) { if (!f && !t2) return true; if (!v) return false; return (!f || v >= f) && (!t2 || v <= t2); }
+function dfltOn() { var d = UI.dflt || {}; return !!(d.aF || d.aT || d.dF || d.dT); }
+function dfltStay(r) { var d = UI.dflt || {}; return inRange(r.date, d.aF, d.aT) && inRange(r.discharge, d.dF, d.dT); }
+function patStays(p) { var sn = nameTokens(p.d.fio)[0]; return (DB.cols.planner || []).filter(function (r) { return r.status !== 'Отменено' && (r.pid ? r.pid === p.id : !!sn && nameTokens(r.fio)[0] === sn); }); }
+function dfltPat(p) { return !dfltOn() || patStays(p).some(dfltStay); }
+function dfltRec(k, r) { if (!dfltOn()) return true; if (k === 'planner') return dfltStay(r); var p = r.pid ? DB.patients.filter(function (x) { return x.id === r.pid; })[0] : null; if (!p && r.fio) { var sn = nameTokens(r.fio)[0]; p = DB.patients.filter(function (x) { return nameTokens(x.d.fio)[0] === sn; })[0]; } return p ? dfltPat(p) : false; }
+function stagesDone(p) { var f = fuList(p); return f.length > 0 && f.every(function (x) { return x.st === 'done'; }) && !(p.q || []).some(function (e) { return !e.date; }); }
+function renderDateFilters(withStage) {
+  var d = UI.dflt || {}, fl = UI.flt || {}, any = dfltOn() || (withStage && fl.stg);
+  function di(id, ph) { return '<input type="date" class="fdate-i' + (d[id] ? ' on' : '') + '" data-act="dflt" data-id="' + id + '" value="' + esc(d[id] || '') + '" aria-label="' + ph + '" title="' + ph + '">'; }
+  var h = '<div class="filters fdates" role="group" aria-label="' + LL('Фильтры по датам', 'Date filters') + '"><span class="flabel">' + ico('cal', 15) + LL('Даты', 'Dates') + '</span>';
+  h += '<span class="fdate"><b>' + LL('Поступление', 'Admission') + '</b>' + di('aF', LL('с', 'from')) + '<i>–</i>' + di('aT', LL('по', 'to')) + '</span>';
+  h += '<span class="fdate"><b>' + LL('Выписка', 'Discharge') + '</b>' + di('dF', LL('с', 'from')) + '<i>–</i>' + di('dT', LL('по', 'to')) + '</span>';
+  if (withStage) h += '<label class="fsel' + (fl.stg ? ' on' : '') + '"><span class="sr">' + LL('Этапы', 'Stages') + '</span><select data-act="flt" data-id="stg"><option value="">' + LL('Этапы: любые', 'Stages: any') + '</option><option value="done"' + (fl.stg === 'done' ? ' selected' : '') + '>' + LL('Этапы: все завершены', 'Stages: all completed') + '</option><option value="open"' + (fl.stg === 'open' ? ' selected' : '') + '>' + LL('Этапы: не завершены', 'Stages: not completed') + '</option></select></label>';
+  if (any) h += '<button type="button" class="btn small ghost" data-act="dfltreset">' + LL('Сбросить даты', 'Clear dates') + '</button>';
+  return h + '</div>';
+}
 function ancestors(reg) { var out = [], r = reg; while (r && r.parent) { r = regOf(r.parent); if (r) out.unshift(r); } return out; }
 function tagsOf(match) {
   var ids = {}; match.forEach(function (r) { ids[r.id] = 1; });
@@ -825,6 +856,8 @@ function listForReg() {
   if (reg) list = list.filter(function (p) { return inReg(p, reg); });
   var fl = UI.flt || {};
   FILTERS.forEach(function (g) { var v = fl[g.id]; if (!v) return; var o = g.opts.filter(function (x) { return x[0] === v; })[0]; if (o) list = list.filter(function (p) { return o[2](p.d); }); });
+  if (dfltOn()) list = list.filter(dfltPat);
+  if (fl.stg) list = list.filter(function (p) { return stagesDone(p) === (fl.stg === 'done'); });
   var q = S.q.trim().toLowerCase();
   if (q) list = list.filter(function (p) { return (p.id + ' ' + (p.d.fio || '') + ' ' + (p.d.dxText || '') + ' ' + (p.d.loc || '') + ' ' + (p.d.proc || '')).toLowerCase().indexOf(q) >= 0; });
   return { reg: reg, list: list };
@@ -863,7 +896,7 @@ function renderRegistry() {
   var isSt = reg && reg.kind === 'study', h;
   if (isSt) h = studyHead(reg);
   else {
-    h = '<div class="head"><div>' + (crumbs ? '<div class="crumbs">' + crumbs + '</div>' : '<div class="kicker">' + LL('Регистр', 'Registry') + '</div>') + '<h1>' + esc(reg ? regName(reg) : t('nav.allPatients')) + '</h1><p class="sub">' + esc(reg ? ruleText(reg) : t('reg.allSub')) + '</p></div>';
+    h = '<div class="head"><div>' + (crumbs ? '<div class="crumbs">' + crumbs + '</div>' : '<div class="kicker">' + (reg && reg.sci ? LL('Научный регистр', 'Research registry') : LL('Регистр', 'Registry')) + '</div>') + '<h1>' + esc(reg ? regName(reg) : t('nav.allPatients')) + '</h1><p class="sub">' + esc(reg ? ruleText(reg) : t('reg.allSub')) + '</p></div>';
     h += '<div class="actions"><input class="search" type="search" data-act="search" placeholder="' + t('reg.search') + '" aria-label="' + t('reg.search') + '" value="' + esc(S.q) + '">';
     if (reg) h += '<button type="button" class="btn" data-act="editreg" data-id="' + reg.id + '">' + t('reg.configure') + '</button>';
     h += '<div class="dd"><button type="button" class="btn" data-act="menu" data-id="xl">' + ico('sheet', 16) + 'Excel' + ico('down', 14) + '</button>' + (S.menu === 'xl' ? '<div class="pop right" role="menu"><button type="button" class="opt" data-act="csv">' + ico('download', 16) + LL('Экспорт в Excel', 'Export to Excel') + '</button><button type="button" class="opt" data-act="imp">' + ico('upload', 16) + LL('Импорт из Excel или CSV', 'Import from Excel or CSV') + '</button><div class="pop-note">' + LL('Экспорт с кодами и кодбуком, обезличенный вариант. Импорт обновляет карточки по ID или № ИБ.', 'Export with codes and codebook, anonymised option. Import updates records by ID or case no.') + '</div></div>' : '') + '</div>';
@@ -875,7 +908,7 @@ function renderRegistry() {
   var op = list.filter(function (p) { return p.d.date; }).length;
   var rK = list.filter(function (p) { return has(p.d.r); }), r0 = rK.filter(function (p) { return p.d.r === 'R0'; }).length;
   h += '<div class="stats">' + tile(list.length, plural(list.length, 'pl.patient').replace(/^\d+ /, '')) + tile(avg === null ? t('st.nodata') : avg, t('st.avgAge')) + tile(ww, t('st.ww')) + tile(op, t('st.operated')) + tile(rK.length ? Math.round(r0 / rK.length * 100) + '%' : t('st.nodata'), t('st.r0')) + '</div>';
-  h += renderFilters();
+  h += renderFilters() + renderDateFilters(true);
   h += '<div class="tablewrap">';
   if (!list.length) h += '<div class="empty">' + (reg && reg.mode === 'manual' ? t('reg.emptyManual') : t('reg.empty')) + '</div>';
   else {
@@ -935,12 +968,13 @@ function fuTable(rows) {
   }).join('') + '</tbody></table></div>';
 }
 function renderFu() {
-  var rows = DB.patients.filter(function (p) { return p.d.date || (p.q || []).length; }).map(function (p) { return { p: p, i: fuPatInfo(p) }; });
+  var rows = DB.patients.filter(function (p) { return (p.d.date || (p.q || []).length) && dfltPat(p); }).map(function (p) { return { p: p, i: fuPatInfo(p) }; });
   var att = rows.filter(function (x) { return x.i.late.length || x.i.next.some(function (n) { return n.soon; }); }), fine = rows.filter(function (x) { return att.indexOf(x) < 0; });
   att.sort(function (a, b) { return b.i.late.length - a.i.late.length || String(a.p.d.date).localeCompare(String(b.p.d.date)); });
   fine.sort(function (a, b) { return String(b.p.d.date || '').localeCompare(String(a.p.d.date || '')); });
   var late = att.filter(function (x) { return x.i.late.length; }).length;
   var h = '<div class="head"><div><h1>' + t('nav.followup') + '</h1><p class="sub">' + LL('Контроли через 30 дней, 90 дней и 1 год после операции и назначенные анкеты', 'Follow-ups at 30 days, 90 days and 1 year after surgery, plus scheduled questionnaires') + '</p></div></div>';
+  h += renderDateFilters(false);
   h += grpHead(LL('Просрочено или подходит срок (14 дней)', 'Overdue or due within 14 days'), att.length, 'attn', late ? '<span class="tag due">' + LL('с просрочкой: ', 'with overdue: ') + late + '</span>' : '');
   h += att.length ? fuTable(att) : '<div class="grp-empty">' + LL('Просроченных и срочных контролей нет', 'Nothing overdue or due soon') + '</div>';
   h += grpHead(LL('В порядке: всё выполнено или срок ещё не подошёл', 'On track: done or not yet due'), fine.length, 'okg');
@@ -1379,6 +1413,7 @@ function renderCol(k) {
   if (k === 'mdt') h += aiInline('col-mdt', aiViewCtx('col:mdt'), 'Подготовка к ближайшей МДГ: по каждому ожидающему случаю одна строка, чего не хватает для решения (стадирование, морфология, МРТ, КТ, РЭА). В конце приоритет обсуждения.', LL('ИИ: к заседанию МДГ', 'AI: MDT prep'));
   if (k === 'planner') h += aiInline('col-planner', { title: 'Планировщик', data: briefText() }, 'Коротко по отделению: кто после операции и на какие сутки, у кого окно контрольных анализов, кто на операцию сегодня и завтра, на что обратить внимание. 4-6 пунктов.', LL('ИИ: отделение сегодня', 'AI: ward today'));
   var list = DB.cols[k].slice();
+  if (['planner', 'mdt', 'mm'].indexOf(k) >= 0) { h += renderDateFilters(false); if (dfltOn()) list = list.filter(function (r) { return dfltRec(k, r); }); }
   var q = S.q.trim().toLowerCase();
   if (q) list = list.filter(function (r) { return c.fields.some(function (x) { var val = r[x.id]; return val && String(Array.isArray(val) ? val.join(' ') : val).toLowerCase().indexOf(q) >= 0; }); });
   if (v === 'cal') h += renderCal(k, list);
@@ -1534,7 +1569,7 @@ function renderPick() {
       walk(r.id, dep + 1);
     });
   })(null, 0);
-  var st = kids(null, true);
+  var st = kids(null, false, true).concat(kids(null, true));
   if (st.length) {
     h += '<div class="pk-h">' + t('nav.studies') + '</div>';
     st.forEach(function (r) { h += '<button type="button" class="pk-row" data-act="pickreg" data-id="' + r.id + '">' + ico('flask', 18) + '<span><b>' + esc(regName(r)) + '</b></span><span class="cnt">' + regCount(r) + '</span></button>'; });
@@ -3895,7 +3930,8 @@ document.addEventListener('click', function (ev) {
     case 'newreg': openEditor(null); break;
     case 'newstudy': openEditor(null, 'study'); break;
     case 'tog': UI.open = UI.open || {}; UI.open[g('id')] = !(g('id') === 'studies' ? UI.open.studies !== false : isOpen(g('id'))); saveUI(); render(); break;
-    case 'fltreset': UI.flt = {}; saveUI(); render(); break;
+    case 'fltreset': var stg0 = (UI.flt || {}).stg; UI.flt = {}; if (stg0) UI.flt.stg = stg0; saveUI(); render(); break;
+    case 'dfltreset': UI.dflt = {}; if (UI.flt) delete UI.flt.stg; saveUI(); render(); break;
     case 'editreg': openEditor(g('id')); break;
     case 'eclose': S.edit = null; render(); break;
     case 'esave': saveEditor(); break;
@@ -4053,6 +4089,7 @@ document.addEventListener('input', function (ev) {
 });
 document.addEventListener('change', function (ev) {
   var tg = ev.target, b = tg.getAttribute('data-bind');
+  if (tg.getAttribute('data-act') === 'dflt') { UI.dflt = UI.dflt || {}; if (tg.value) UI.dflt[tg.getAttribute('data-id')] = tg.value; else delete UI.dflt[tg.getAttribute('data-id')]; saveUI(); render(); return; }
   if (tg.getAttribute('data-act') === 'flt') { UI.flt = UI.flt || {}; if (tg.value) UI.flt[tg.getAttribute('data-id')] = tg.value; else delete UI.flt[tg.getAttribute('data-id')]; saveUI(); render(); return; }
   if (b) { bind(b, tg.type === 'checkbox' ? tg.checked : tg.value); if (tg.tagName === 'SELECT' || tg.type === 'checkbox' || tg.type === 'date') render(); return; }
   var e = tg.getAttribute('data-ebind');
@@ -4445,7 +4482,6 @@ function renderPortal() {
   h += '<section class="l-hero sm" id="top"><div class="l-hero-img" style="background-image:url(media/nroc-hero-hd.webp)"></div><div class="l-wrap l-hero-in"><div class="l-kick">' + LL('Национальный научный онкологический центр · Астана', 'National Research Oncology Center · Astana') + '</div><h1>Колоректальная хирургия</h1><p>Лечение рака ободочной и прямой кишки: от подготовки к операции до восстановления и наблюдения. Ниже памятки для пациентов и их близких.</p><div class="l-cta"><a class="btn l-btn-w" href="tel:+77750076442">' + ico('phone', 16) + 'Записаться на приём</a><button type="button" class="btn l-btn-o" data-act="lpop" data-id="contacts">Все контакты</button></div></div></section>';
   var U = landTopic('urgent');
   h += '<main class="l-sec l2-main"><div class="l-wrap">';
-  h += '<button type="button" class="l2-urg" data-act="lpop" data-id="urgent"><span class="l-ic">' + ico('alert', 22) + '</span><span class="l2-urg-t"><b>' + U.t + '</b><span>Температура 38 °C и выше, нарастающая боль в животе, кровотечение, рвота, стома изменила цвет. Нажмите, чтобы увидеть полный список.</span></span>' + ico('right', 18) + '</button>';
   var stages = [
     ['1', 'До госпитализации', 'Подготовка и сборы', ['prep', 'bag']],
     ['2', 'После операции', 'Восстановление и уход', ['after', 'stoma', 'diet']],
@@ -4457,6 +4493,7 @@ function renderPortal() {
       return '<button type="button" class="l2-row" data-act="lpop" data-id="' + id + '"><span class="l-ic">' + ico(c.ic, 20) + '</span><span class="l2-row-t"><b>' + c.t + '</b><span>' + sub + '</span></span>' + ico('right', 16) + '</button>';
     }).join('') + '</section>';
   }).join('') + '</div>';
+  h += '<button type="button" class="l2-urg" data-act="lpop" data-id="urgent"><span class="l-ic">' + ico('alert', 22) + '</span><span class="l2-urg-t"><b>' + U.t + '</b><span>Температура 38 °C и выше, нарастающая боль в животе, кровотечение, рвота, стома изменила цвет. Нажмите, чтобы увидеть полный список.</span></span>' + ico('right', 18) + '</button>';
   h += '<section class="l2-contacts"><header><h2>Контакты</h2><p>г. Астана, ул. Керей и Жанибек ханов, 3/2</p></header><div class="lp-contacts">' + LAND_CONTACTS.map(function (x) { return '<div class="lp-contact"><b>' + x[0] + '</b>' + x[1].map(landTel).join('') + '</div>'; }).join('') + '</div></section>';
   h += '</div></main>';
   h += '<footer class="l-foot"><div class="l-wrap l-foot-in"><img src="media/nroc-logo.png" alt="NROC"><p>Информация на странице носит справочный характер и не заменяет консультацию лечащего врача. Все назначения выполняйте по рекомендациям вашей лечащей команды.</p><span>© ' + new Date().getFullYear() + ' ' + LL('Колоректальный сектор ННОЦ', 'NROC Colorectal unit') + '</span></div></footer>';
@@ -4478,6 +4515,8 @@ function navGroups() {
   g.push({ id: 'regs', label: LL('Регистры', 'Registries'), icon: 'tag', items: regs, wide: true });
   var sci = [{ v: 'studies', icon: 'flask', label: t('nav.studies') }];
   (function walk(list, d) { list.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'dot', label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, true), d + 1); }); })(kids(null, true), 1);
+  var sreg = kids(null, false, true);
+  if (sreg.length) { sci.push({ sep: LL('Научные регистры', 'Research registries') }); sreg.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'dot', label: regName(r), cnt: regCount(r), depth: 1 }); }); }
   if ((DB.pending || []).length) sci.push({ v: 'appr', icon: 'check', label: LL('На одобрении', 'Awaiting approval'), badge: apprMine().length || null });
   if (can('edit')) sci.push({ act: 'newstudy', icon: 'plus', label: t('nav.newStudy') });
   sci.push({ sep: LL('Материалы', 'Materials') });
