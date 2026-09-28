@@ -986,6 +986,8 @@ function renderFu() {
 /* ======================= Field rendering ======================= */
 function fieldHTML(x, val, path, d, attrs) {
   var out = fieldHTML0(x, val, path, d, attrs); if (!out) return out;
+  var af = S.drawer && S.drawer.aiFilled && path === 'd.' + x.id ? S.drawer.aiFilled[x.id] : null;
+  if (af) out = out.replace('class="fld', 'title="' + esc(LL('Заполнено из документа', 'Filled from document') + ' (' + Math.round(af.c * 100) + '%): ' + (af.q || '')) + '" class="fld aifill' + (af.c < 0.7 ? ' ailow' : ''));
   var fl = has(val);
   out = out.replace('class="fld', 'class="fld f-' + x.type + (fl ? ' filled' : ''));
   if (x.type === 'sel' && !fl) out = out.replace('<select ', '<select class="empty" ');
@@ -1331,7 +1333,7 @@ function renderPatient() {
   h += '<div class="dhead"><span class="av xl">' + esc(d.fio ? initials(d.fio) : '+') + '</span><div class="dh-main"><div class="dh-kicker">' + (dr.isNew ? t('pc.new') : LL('Карточка пациента', 'Patient record')) + (d.ib ? ' · ИБ ' + esc(d.ib) : '') + '</div><div class="dh-title">' + esc(d.fio || (dr.isNew ? t('pc.new') : p.id)) + '</div>';
   h += '<div class="dh-sub"><span class="mono">' + p.id + '</span>' + [ [ov(d.sex), d.age ? d.age + ' ' + t('u.years') : ''].filter(Boolean).join(', '), ov(d.loc) ].filter(Boolean).map(function (s) { return ' · ' + esc(s); }).join('') + '</div>';
   h += '<div class="facts">' + [[t('col.stage'), d.stage], [t('col.approach'), (d.tactic || []).map(function (v) { return ov(tacShort(v)); }).join(' → ')], [t('col.proc'), ov(d.proc || d.endo)], [t('col.phase'), ov(d.phase)], [LL('Дата операции', 'Surgery date'), fmtDate(d.date)]].filter(function (x) { return x[1]; }).map(function (x) { return '<span class="fact"><em>' + esc(x[0]) + '</em>' + esc(x[1]) + '</span>'; }).join('') + '</div></div>';
-  h += '<div class="dh-r">' + (p.notion ? '<a class="btn small" href="' + esc(p.notion) + '" target="_blank" rel="noopener">' + ico('ext', 15) + 'Notion</a>' : '') + '<button type="button" class="btn small ai' + (UI.aip ? ' on' : '') + '" data-act="aitoggle">' + ico('sparkle', 14) + LL('Ассистент', 'Assistant') + '</button>' + '<button type="button" class="iconbtn" aria-label="' + t(dr.full ? 'a11y.shrink' : 'a11y.expandCard') + '" title="' + t(dr.full ? 'a11y.shrink' : 'a11y.expandCard') + '" data-act="full">' + ico(dr.full ? 'shrink' : 'expand', 18) + '</button><button type="button" class="iconbtn" aria-label="' + t('a11y.close') + '" data-act="close">' + ico('x', 20) + '</button></div></div>';
+  h += '<div class="dh-r">' + (can('edit') && !isStudent() ? '<button type="button" class="btn small dxbtn" data-act="dxopen" title="' + LL('Загрузить PDF выписки, осмотра или протокола: ИИ сам заполнит поля и покажет сводку', 'Upload a PDF: AI fills the fields and shows a summary') + '">' + ico('upload', 14) + LL('Из документа', 'From document') + '</button>' : '') + (p.notion ? '<a class="btn small" href="' + esc(p.notion) + '" target="_blank" rel="noopener">' + ico('ext', 15) + 'Notion</a>' : '') + '<button type="button" class="btn small ai' + (UI.aip ? ' on' : '') + '" data-act="aitoggle">' + ico('sparkle', 14) + LL('Ассистент', 'Assistant') + '</button>' + '<button type="button" class="iconbtn" aria-label="' + t(dr.full ? 'a11y.shrink' : 'a11y.expandCard') + '" title="' + t(dr.full ? 'a11y.shrink' : 'a11y.expandCard') + '" data-act="full">' + ico(dr.full ? 'shrink' : 'expand', 18) + '</button><button type="button" class="iconbtn" aria-label="' + t('a11y.close') + '" data-act="close">' + ico('x', 20) + '</button></div></div>';
   var nav = [['', [{ id: 'links', title: t('lk.title') }]]];
   PHASES.forEach(function (ph) {
     var ss = SECTIONS.filter(function (s) { return s.phase === ph[0] && secOn(s, d); }).map(function (s) { return { id: s.id, title: L(s.title) }; });
@@ -3025,7 +3027,8 @@ function demoDB() {
 
 /* ======================= v10: AI assistant (Gemini) ======================= */
 var AI = { key: '', model: 'gemini-flash-latest', st: 'off', err: '', deid: true, threads: {}, busy: false };
-var AI_PROV = { gemini: { name: 'Gemini', ph: 'AIza…', get: 'aistudio.google.com → Get API key', def: 'gemini-flash-latest' }, openai: { name: 'ChatGPT', ph: 'sk-…', get: 'platform.openai.com → API keys', def: 'gpt-4o-mini' }, anthropic: { name: 'Claude', ph: 'sk-ant-…', get: 'console.anthropic.com → API keys', def: 'claude-sonnet-4-5' }, deepseek: { name: 'DeepSeek', ph: 'sk-…', get: 'platform.deepseek.com → API keys', def: 'deepseek-chat' } };
+var AI_PROV = { gemini: { name: 'Gemini', ph: 'AIza…', get: 'aistudio.google.com → Get API key', def: 'gemini-flash-latest' }, openai: { name: 'ChatGPT', ph: 'sk-…', get: 'platform.openai.com → API keys', def: 'gpt-4o-mini' }, anthropic: { name: 'Claude', ph: 'sk-ant-…', get: 'console.anthropic.com → API keys', def: 'claude-sonnet-4-5' }, deepseek: { name: 'DeepSeek', ph: 'sk-…', get: 'platform.deepseek.com → API keys', def: 'deepseek-chat' }, local: { name: LL('Локальная', 'Local'), ph: LL('обычно не нужен', 'usually not needed'), get: LL('у администратора сервера ИИ центра', 'from the centre\'s AI server admin'), def: 'qwen2.5vl:7b' } };
+function aiUrl(pv) { if (pv === 'local') { var u = ''; try { u = localStorage.getItem('crr.ai.localurl') || ''; } catch (e) {} return (u || 'http://localhost:11434/v1').replace(/\/+$/, ''); } return AI_URL[pv]; }
 function aiKeyName(pv) { return pv === 'gemini' ? 'crr.aikey' : 'crr.aikey.' + pv; }
 function aiModelName(pv) { return pv === 'gemini' ? 'crr.aimodel' : 'crr.aimodel.' + pv; }
 function aiLoadProv() { try { AI.key = localStorage.getItem(aiKeyName(AI.prov)) || ''; AI.model = localStorage.getItem(aiModelName(AI.prov)) || AI_PROV[AI.prov].def; } catch (e) { AI.key = ''; AI.model = AI_PROV[AI.prov].def; } AI.avail = null; AI.shared = false; }
@@ -3033,7 +3036,7 @@ try { AI.prov = localStorage.getItem('crr.aiprov') || 'gemini'; if (!AI_PROV[AI.
 aiLoadProv();
 var AI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 var AI_MODELS = [['gemini-flash-latest', 'Gemini Flash', LL('быстрая, по умолчанию', 'fast, default')], ['gemini-pro-latest', 'Gemini Pro', LL('глубже, медленнее', 'deeper, slower')]];
-function aiReady() { return AI.st === 'ok' && !!AI.key; }
+function aiReady() { return AI.st === 'ok' && (!!AI.key || AI.prov === 'local'); }
 function aiSetKey(k) { AI.key = String(k || '').trim(); AI.shared = false; if (!AI.key && AI.sharedKey && AI.prov === 'gemini') { try { localStorage.removeItem('crr.aikey'); } catch (e) {} AI.key = AI.sharedKey; AI.shared = true; aiCheck(); return; } try { if (AI.key) localStorage.setItem(aiKeyName(AI.prov), AI.key); else localStorage.removeItem(aiKeyName(AI.prov)); } catch (e) {} aiCheck(); }
 function aiSetProv(pv) { if (!AI_PROV[pv] || pv === AI.prov) return; AI.prov = pv; try { localStorage.setItem('crr.aiprov', pv); } catch (e) {} aiLoadProv(); AI.threads = {}; if (!AI.key && pv === 'gemini' && AI.sharedKey) { AI.key = AI.sharedKey; AI.shared = true; } aiCheck(); }
 function aiLoadShared() {
@@ -3053,6 +3056,7 @@ function aiShareDefault(force) {
 }
 function aiVer(n) { var m = /gemini-(\d+(?:\.\d+)?)/.exec(n); return m ? parseFloat(m[1]) : 0; }
 function aiHeaders(pv) {
+  if (pv === 'local') { var hl = { 'Content-Type': 'application/json' }; if (AI.key) hl.Authorization = 'Bearer ' + AI.key; return hl; }
   if (pv === 'anthropic') return { 'x-api-key': AI.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true', 'Content-Type': 'application/json' };
   return { 'Authorization': 'Bearer ' + AI.key, 'Content-Type': 'application/json' };
 }
@@ -3060,7 +3064,7 @@ var AI_URL = { openai: 'https://api.openai.com/v1', anthropic: 'https://api.anth
 function aiErrMsg(j, fallback) { return (j && j.error && (j.error.message || (typeof j.error === 'string' ? j.error : ''))) || (j && j.message) || fallback; }
 function aiCheckOther() {
   var pv = AI.prov;
-  fetch(AI_URL[pv] + '/models' + (pv === 'anthropic' ? '?limit=100' : ''), { headers: aiHeaders(pv) }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw j; return j; }); })
+  fetch(aiUrl(pv) + '/models' + (pv === 'anthropic' ? '?limit=100' : ''), { headers: aiHeaders(pv) }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw j; return j; }); })
     .then(function (j) {
       var list = (j.data || []).map(function (m) { return { id: m.id, name: m.display_name || m.id, t: m.created || (m.created_at ? Date.parse(m.created_at) / 1000 : 0) }; });
       if (pv === 'openai') list = list.filter(function (m) { return /^(gpt-|o\d|chatgpt)/.test(m.id) && !/audio|realtime|transcribe|tts|image|search|embedding|moderation|instruct|dall|whisper|codex|preview/.test(m.id); });
@@ -3076,7 +3080,7 @@ function aiCheckOther() {
     .catch(function (e) { AI.st = 'err'; AI.err = /Failed to fetch|NetworkError|Load failed/i.test(String(e && e.message)) ? LL('Нет связи с ', 'Cannot reach ') + AI_PROV[pv].name + LL(' (сеть или браузер блокирует запрос)', ' (network or browser blocked the request)') : aiErrMsg(e, LL('Ключ не принят', 'Key rejected')); render(); });
 }
 function aiCheck() {
-  if (!AI.key) { AI.st = 'off'; AI.err = ''; render(); return; }
+  if (!AI.key && AI.prov !== 'local') { AI.st = 'off'; AI.err = ''; render(); return; }
   AI.st = 'check'; AI.err = ''; render();
   if (AI.prov !== 'gemini') { aiCheckOther(); return; }
   fetch(AI_BASE + '/models?pageSize=200&key=' + encodeURIComponent(AI.key)).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw j; return j; }); })
@@ -3096,7 +3100,7 @@ function aiStreamOther(o) {
   var pv = AI.prov, msgs = (o.contents || []).map(function (c) { return { role: c.role === 'model' ? 'assistant' : 'user', content: (c.parts || []).map(function (x) { return x.text || ''; }).join('\n') }; });
   var url, body;
   if (pv === 'anthropic') { url = AI_URL.anthropic + '/messages'; body = { model: o.model || AI.model, max_tokens: 4096, temperature: o.temp === undefined ? 0.4 : o.temp, system: o.system || '', messages: msgs, stream: true }; }
-  else { url = AI_URL[pv] + (pv === 'openai' ? '/chat/completions' : '/chat/completions'); body = { model: o.model || AI.model, stream: true, messages: (o.system ? [{ role: 'system', content: o.system }] : []).concat(msgs) }; if (!/^o\d|gpt-5/.test(body.model)) body.temperature = o.temp === undefined ? 0.4 : o.temp; }
+  else { url = aiUrl(pv) + '/chat/completions'; body = { model: o.model || AI.model, stream: true, messages: (o.system ? [{ role: 'system', content: o.system }] : []).concat(msgs) }; if (!/^o\d|gpt-5/.test(body.model)) body.temperature = o.temp === undefined ? 0.4 : o.temp; }
   var text = '', ctrl = new AbortController(); if (!o.bg) AI.ctrl = ctrl;
   fetch(url, { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify(body), signal: ctrl.signal })
     .then(function (r) {
@@ -3365,6 +3369,7 @@ function renderAIPill() {
     var PV = AI_PROV[AI.prov];
     h += '<div class="pop right aipop"><div class="np-h"><b>' + ico('sparkle', 16) + LL('Подключение ИИ', 'AI connection') + '</b></div><div class="aipop-b">';
     h += '<div class="seg full aiprov">' + Object.keys(AI_PROV).map(function (k) { return '<button type="button" class="' + (AI.prov === k ? 'on' : '') + '" data-act="aiprov" data-v="' + k + '">' + AI_PROV[k].name + '</button>'; }).join('') + '</div>';
+    if (AI.prov === 'local') h += '<label class="af"><span>' + LL('Адрес сервера ИИ центра (OpenAI-совместимый API: Ollama, vLLM, LM Studio)', 'Centre AI server URL (OpenAI-compatible: Ollama, vLLM, LM Studio)') + '</span><input type="url" id="aiurl-in" value="' + esc(aiUrl('local')) + '" placeholder="http://llm.nroc.local:11434/v1" autocomplete="off"></label>';
     h += '<label class="af"><span>' + (AI.shared ? LL('Используется общий ключ сектора. Свой ключ (необязательно)', 'Using the shared unit key. Your own key (optional)') : LL('Ваш ключ API ', 'Your API key: ') + PV.name) + '</span><input type="password" id="aikey-in" value="' + (AI.shared ? '' : esc(AI.key)) + '" placeholder="' + PV.ph + '" autocomplete="off" data-enter="aikey"></label>';
     h += '<p class="fhint">' + (AI.sharedKey && AI.prov === 'gemini' ? LL('Если ввести свой ключ, на этом устройстве будет использоваться он вместо общего.', 'Your own key replaces the shared one on this device.') : LL('Ключ сохраняется на этом устройстве. Где взять: ', 'Saved on this device. Get one: ') + PV.get + '.') + (AI.prov !== 'gemini' ? ' ' + LL('Поиск статей в интернете работает только с Gemini.', 'Web search for articles works with Gemini only.') : '') + '</p>';
     if (CLOUD.on && isAdmin() && AI.key && !AI.shared && AI.st === 'ok' && AI.sharedKey !== AI.key) h += '<button type="button" class="btn small" data-act="aishare" style="margin-bottom:10px">' + ico('users', 14) + LL('Сделать этот ключ общим для всех', 'Make this key the default for everyone') + '</button>';
@@ -3692,6 +3697,7 @@ function render() {
   if (S.qs) h += renderQSched();
   if (S.qb) h += renderQB();
   if (S.enr) h += renderEnroll();
+  if (S.dx && S.drawer) h += renderDx();
   if (S.randShow) h += renderRandShow();
   if (S.fill) h += renderFill();
   if (S.cs) h += renderCloudSetup();
@@ -3876,6 +3882,13 @@ document.addEventListener('click', function (ev) {
     }
     case 'fileDel': { var td2 = target(g('path')); var fd = (getPath(td2[0], td2[1]) || []).slice(); if (fd[+g('i')] && fd[+g('i')].fid) fileDelBlob(fd[+g('i')].fid); fd.splice(+g('i'), 1); bind(g('path'), fd.length ? fd : ''); render(); break; }
     case 'savep': savePatient(); break;
+    case 'dxopen': dxOpen(); break;
+    case 'dxclose': if (S.dx && S.dx.step === 'run') break; S.dx = null; render(); break;
+    case 'dxrun': { var kp = root.querySelector('#dxkeep'), ag = root.querySelector('#dxagree'); S.dx.keep = kp ? kp.checked : true; S.dx.agree = ag ? ag.checked : false; dxRun(); break; }
+    case 'dxback': S.dx.step = 'pick'; render(); break;
+    case 'dxundo': dxUndo(g('id')); break;
+    case 'dxtake': dxTake(g('id')); break;
+    case 'dxundoall': if (confirm(LL('Отменить все изменения из документа?', 'Revert all changes from the document?'))) dxUndoAll(); break;
     case 'delp':
       if (confirm(t('confirm.delPatient', { n: pName(S.drawer.p) }))) {
         var pid = S.drawer.p.id; DB.patients = DB.patients.filter(function (x) { return x.id !== pid; });
@@ -4020,7 +4033,7 @@ document.addEventListener('click', function (ev) {
     case 'aisend': aiSendInput(); break;
     case 'ailre': delete AI.inl[g('k')]; render(); break;
     case 'aistop': if (AI.ctrl) AI.ctrl.abort(); break;
-    case 'aikeysave': { var ki = root.querySelector('#aikey-in'), mo = root.querySelector('#aimodel'), de = root.querySelector('#aideid'); if (mo && mo.value !== AI.model) try { localStorage.setItem(aiModelName(AI.prov) + '.m', '1'); } catch (e) {} AI.model = mo ? mo.value : AI.model; AI.deid = de ? de.checked : AI.deid; try { localStorage.setItem(aiModelName(AI.prov), AI.model); localStorage.setItem('crr.aideid', AI.deid ? '1' : '0'); } catch (e) {} AI.threads = {}; aiSetKey(ki ? ki.value : ''); break; }
+    case 'aikeysave': { var ui0 = root.querySelector('#aiurl-in'); if (ui0) try { localStorage.setItem('crr.ai.localurl', ui0.value.trim()); } catch (e) {} var ki = root.querySelector('#aikey-in'), mo = root.querySelector('#aimodel'), de = root.querySelector('#aideid'); if (mo && mo.value !== AI.model) try { localStorage.setItem(aiModelName(AI.prov) + '.m', '1'); } catch (e) {} AI.model = mo ? mo.value : AI.model; AI.deid = de ? de.checked : AI.deid; try { localStorage.setItem(aiModelName(AI.prov), AI.model); localStorage.setItem('crr.aideid', AI.deid ? '1' : '0'); } catch (e) {} AI.threads = {}; aiSetKey(ki ? ki.value : ''); break; }
     case 'aikeyclear': AI.threads = {}; aiSetKey(''); break;
     case 'ptag': ptagToggle(g('id')); break;
     case 'aiprov': aiSetProv(g('v')); break;
@@ -4089,6 +4102,7 @@ document.addEventListener('input', function (ev) {
 });
 document.addEventListener('change', function (ev) {
   var tg = ev.target, b = tg.getAttribute('data-bind');
+  if (tg.id === 'dxfile' && S.dx) { var kp0 = root.querySelector('#dxkeep'), ag0 = root.querySelector('#dxagree'); if (kp0) S.dx.keep = kp0.checked; if (ag0) S.dx.agree = ag0.checked; S.dx.file = tg.files && tg.files[0] || null; render(); return; }
   if (tg.getAttribute('data-act') === 'dflt') { UI.dflt = UI.dflt || {}; if (tg.value) UI.dflt[tg.getAttribute('data-id')] = tg.value; else delete UI.dflt[tg.getAttribute('data-id')]; saveUI(); render(); return; }
   if (tg.getAttribute('data-act') === 'flt') { UI.flt = UI.flt || {}; if (tg.value) UI.flt[tg.getAttribute('data-id')] = tg.value; else delete UI.flt[tg.getAttribute('data-id')]; saveUI(); render(); return; }
   if (b) { bind(b, tg.type === 'checkbox' ? tg.checked : tg.value); if (tg.tagName === 'SELECT' || tg.type === 'checkbox' || tg.type === 'date') render(); return; }
@@ -4114,6 +4128,9 @@ document.addEventListener('drop', function (ev) {
   else { if (v) r[c.statusField] = v; else delete r[c.statusField]; toast(t('toast.status', { s: v ? ov(v) : t('board.none') })); }
   dragId = null; save(); render();
 });
+document.addEventListener('dragover', function (ev) { if (S.dx && S.dx.step === 'pick') { ev.preventDefault(); var z = root.querySelector('.dxdrop'); if (z) z.classList.add('over'); } });
+document.addEventListener('dragleave', function (ev) { var z = root.querySelector('.dxdrop'); if (z && !ev.relatedTarget) z.classList.remove('over'); });
+document.addEventListener('drop', function (ev) { if (!S.dx || S.dx.step !== 'pick') return; ev.preventDefault(); var f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0]; if (f) { var kp1 = root.querySelector('#dxkeep'), ag1 = root.querySelector('#dxagree'); if (kp1) S.dx.keep = kp1.checked; if (ag1) S.dx.agree = ag1.checked; S.dx.file = f; render(); } });
 document.getElementById('importFile').addEventListener('change', function (ev) {
   var fl = ev.target.files[0]; if (!fl) return; var rd = new FileReader();
   rd.onload = function () {
@@ -4535,6 +4552,232 @@ function renderPortal() {
   h += '</div>';
   if (S.lpop && !open) h += renderLandPop();
   if (open) h += '<div class="dim" data-act="authhide"></div><section class="modal authm" role="dialog" aria-modal="true"><button type="button" class="iconbtn authx" data-act="authhide" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button><div class="authm-b"><img src="media/nroc-logo.png" alt="NROC" class="authm-logo">' + renderAuthCard() + '</div></section>';
+  return h;
+}
+
+/* ======================= Document → card auto-fill (AI extraction) ======================= */
+var DX = { lib: null };
+function dxLoadScript(src) { return new Promise(function (ok, no) { var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = function () { no(new Error('load ' + src)); }; document.head.appendChild(s); }); }
+function dxPdfLib() {
+  if (window.pdfjsLib && window.pdfjsWorker) return Promise.resolve(window.pdfjsLib);
+  return dxLoadScript('lib/pdf.worker.min.js').then(function () { return dxLoadScript('lib/pdf.min.js'); }).then(function () { return window.pdfjsLib; });
+}
+function dxB64(buf) { var b = new Uint8Array(buf), s = '', i, n = 0x8000; for (i = 0; i < b.length; i += n) s += String.fromCharCode.apply(null, b.subarray(i, i + n)); return btoa(s); }
+function dxReadFile(file) {
+  return file.arrayBuffer().then(function (buf) {
+    var name = file.name || 'document', type = file.type || '', out = { name: name, type: type, size: file.size, text: '', pages: 0, images: [], b64: '' };
+    if (/pdf/i.test(type) || /\.pdf$/i.test(name)) {
+      out.kind = 'pdf'; out.b64 = dxB64(buf);
+      return dxPdfLib().then(function (lib) { return lib.getDocument({ data: new Uint8Array(buf) }).promise; }).then(function (pdf) {
+        out.pages = pdf.numPages; var seq = Promise.resolve(), texts = [];
+        for (var i = 1; i <= pdf.numPages; i++) (function (i) {
+          seq = seq.then(function () { return pdf.getPage(i).then(function (pg) {
+            return pg.getTextContent().then(function (tc) {
+              var t = '', lastY = null; tc.items.forEach(function (it) { var y = it.transform ? Math.round(it.transform[5]) : 0; if (lastY !== null && Math.abs(y - lastY) > 2) t += '\n'; else if (t && !/\s$/.test(t)) t += ' '; t += it.str; lastY = y; });
+              texts.push('--- Страница ' + i + ' ---\n' + t.trim());
+              if (t.replace(/\s/g, '').length < 40 && out.images.length < 8) {
+                var vp = pg.getViewport({ scale: 1.6 }), cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+                return pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise.then(function () { out.images.push(cv.toDataURL('image/jpeg', 0.82).split(',')[1]); });
+              }
+            });
+          }); });
+        })(i);
+        return seq.then(function () { out.text = texts.join('\n\n'); out.scanned = out.text.replace(/---[^\n]*---/g, '').replace(/\s/g, '').length < 40 * out.pages; return out; });
+      });
+    }
+    if (/^image\//.test(type) || /\.(jpe?g|png|webp)$/i.test(name)) { out.kind = 'image'; out.images = [dxB64(buf)]; out.imgType = type || 'image/jpeg'; out.scanned = true; return out; }
+    out.kind = 'text'; out.text = new TextDecoder('utf-8').decode(buf); return out;
+  });
+}
+/* schema: every card field the model may fill */
+function dxFields() {
+  var seen = {}, list = [];
+  SECTIONS.forEach(function (s) {
+    s.fields.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = 1; list.push({ x: x, sec: L(s.title) }); } });
+    MODULES.forEach(function (m) { if (m.sec !== s.id) return; m.fields.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = 1; list.push({ x: x, sec: L(s.title) + ' / ' + L(m.title) }); } }); });
+  });
+  return list.filter(function (o) { return ['files', 'nodes'].indexOf(o.x.type) < 0 && ['ib', 'studyNo'].indexOf(o.x.id) < 0; });
+}
+function dxSchemaText() {
+  var TY = { text: 'строка', long: 'текст', num: 'число', date: 'дата YYYY-MM-DD', sel: 'один вариант из списка', seg: 'один вариант из списка', multi: 'массив вариантов из списка' };
+  var cur = '';
+  return dxFields().map(function (o) {
+    var x = o.x, head = o.sec !== cur ? '\n# ' + (cur = o.sec) + '\n' : '';
+    return head + x.id + ' | ' + x.label[0] + ' | ' + (TY[x.type] || x.type) + (x.unit ? ' (' + t(x.unit) + ')' : '') + (x.options ? ' | ' + x.options.map(function (v) { return '"' + v + '"'; }).join(', ') : '');
+  }).join('\n');
+}
+var DX_SYS = 'Ты модуль извлечения данных колоректального регистра ННОЦ (Астана). На вход: медицинский документ (выписной эпикриз, первичный осмотр, консультативный лист, протокол операции, гистология, заключение МРТ/КТ, эндоскопия) и схема карточки пациента. ' +
+  'Задача: найти в документе значения для полей карточки и вернуть СТРОГО один JSON-объект без пояснений и без markdown.\n' +
+  'Правила:\n1. Заполняй поле только если значение прямо следует из документа. Не додумывай и не выводи по косвенным признакам. Если поле требует вывода (например стадия по TNM), укажи это в note и снизь confidence.\n' +
+  '2. Для полей со списком значение должно ТОЧНО совпадать с одним из вариантов (для multi: массив вариантов). Если в документе есть информация, но она не укладывается в варианты, не заполняй поле, а добавь issue с kind "not_in_options".\n' +
+  '3. Даты: YYYY-MM-DD. Числа: только число без единиц, в единицах схемы (переводи при необходимости и укажи перевод в note).\n' +
+  '4. Для каждого значения дай quote: дословную короткую цитату из документа (до 150 символов), на которой оно основано, и confidence от 0 до 1.\n' +
+  '5. issues: всё, что мешало: неразборчиво (unreadable), двусмысленно (ambiguous), противоречия внутри документа (conflict), нет варианта в списке (not_in_options), клинически несогласованно (inconsistent: например стадия не соответствует TNM, возраст не соответствует дате рождения).\n' +
+  '6. questions: конкретные вопросы врачу, ответ на которые позволит заполнить или уточнить поля.\n' +
+  '7. Не включай в ответ ИИН, адрес и номера документов.\n' +
+  'Формат ответа:\n{"doc":{"type":"вид документа","date":"YYYY-MM-DD или пусто","summary":"2-3 предложения о содержании"},' +
+  '"fields":[{"id":"id поля","value":<значение>,"confidence":0.0,"quote":"цитата","note":"пояснение при необходимости"}],' +
+  '"issues":[{"id":"id поля или пусто","kind":"ambiguous|conflict|unreadable|not_in_options|inconsistent","text":"что именно не так"}],' +
+  '"questions":["вопрос"]}';
+function dxParseJSON(s) {
+  s = String(s || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+  var a = s.indexOf('{'), b = s.lastIndexOf('}'); if (a < 0 || b < a) throw new Error(LL('ИИ вернул ответ не в формате JSON', 'AI did not return JSON'));
+  return JSON.parse(s.slice(a, b + 1));
+}
+function dxCall(doc, schema) {
+  var pv = AI.prov, prompt = 'СХЕМА КАРТОЧКИ (id | название | тип | варианты):\n' + schema + '\n\nДОКУМЕНТ «' + doc.name + '»' + (doc.text && !doc.scanned ? ' (текстовый слой):\n' + doc.text.slice(0, 60000) : (doc.text ? ' (текстовый слой почти пуст, смотри изображения страниц)' : ' (см. приложенный файл)')) + '\n\nВерни JSON по формату.';
+  if (AI.coolUntil && Date.now() < AI.coolUntil) return Promise.reject(new Error(aiQuotaMsg()));
+  var fail = function (r) { return r.json().then(function (j) { throw new Error(aiErrMsg(j, 'HTTP ' + r.status)); }, function () { throw new Error('HTTP ' + r.status); }); };
+  if (pv === 'gemini') {
+    var parts = [];
+    if (doc.kind === 'pdf') parts.push({ inline_data: { mime_type: 'application/pdf', data: doc.b64 } });
+    else if (doc.kind === 'image') parts.push({ inline_data: { mime_type: doc.imgType, data: doc.images[0] } });
+    parts.push({ text: prompt });
+    var body = { systemInstruction: { parts: [{ text: DX_SYS }] }, contents: [{ role: 'user', parts: parts }], generationConfig: { temperature: 0.1, maxOutputTokens: 16384, responseMimeType: 'application/json' } };
+    return fetch(AI_BASE + '/models/' + AI.model + ':generateContent?key=' + encodeURIComponent(AI.key), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
+      .then(function (j) { var c = (j.candidates || [])[0] || {}; return ((c.content || {}).parts || []).filter(function (p) { return p.text && !p.thought; }).map(function (p) { return p.text; }).join(''); });
+  }
+  if (pv === 'anthropic') {
+    var content = [];
+    if (doc.kind === 'pdf') content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: doc.b64 } });
+    else if (doc.kind === 'image') content.push({ type: 'image', source: { type: 'base64', media_type: doc.imgType, data: doc.images[0] } });
+    content.push({ type: 'text', text: prompt });
+    return fetch(AI_URL.anthropic + '/messages', { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify({ model: AI.model, max_tokens: 8192, temperature: 0.1, system: DX_SYS, messages: [{ role: 'user', content: content }] }) })
+      .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
+      .then(function (j) { return (j.content || []).map(function (c) { return c.text || ''; }).join(''); });
+  }
+  /* OpenAI-compatible: ChatGPT, DeepSeek, local LLM of the centre (Ollama / vLLM / LM Studio) */
+  var visual = pv !== 'deepseek' && doc.images.length && (doc.scanned || doc.kind === 'image');
+  var uc = visual ? [{ type: 'text', text: prompt }].concat(doc.images.map(function (b) { return { type: 'image_url', image_url: { url: 'data:' + (doc.imgType || 'image/jpeg') + ';base64,' + b } }; })) : prompt;
+  if (!visual && doc.scanned) return Promise.reject(new Error(LL('Документ отсканирован (нет текстового слоя), а выбранная модель не читает изображения. Нужна модель с распознаванием изображений или OCR.', 'Scanned document without text layer; the selected model cannot read images. Use a vision model or OCR.')));
+  var ob = { model: AI.model, messages: [{ role: 'system', content: DX_SYS }, { role: 'user', content: uc }], response_format: { type: 'json_object' } };
+  if (!/^o\d|gpt-5/.test(AI.model)) ob.temperature = 0.1;
+  return fetch(aiUrl(pv) + '/chat/completions', { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify(ob) })
+    .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
+    .then(function (j) { var ch = (j.choices || [])[0]; return ch && ch.message ? ch.message.content || '' : ''; });
+}
+/* offline fallback: simple pattern matching, to show the flow without AI */
+function dxRules(doc) {
+  var tx = String(doc.text || '').replace(/ /g, ' '), F = [], I = [], m;
+  function add(id, v, q, c, note) { if (has(v)) F.push({ id: id, value: v, confidence: c || 0.6, quote: String(q || '').trim().slice(0, 150), note: note || '' }); }
+  if ((m = /(?:Пациент|ФИО)\s*[:：]\s*([А-ЯЁӘІҢҒҮҰҚӨҺ][^\n,]{3,60})/.exec(tx))) add('fio', m[1].replace(/\s+/g, ' ').trim(), m[0], 0.8);
+  if ((m = /Дата\s+рождения\s*[:：]?\s*(\d{2})\.(\d{2})\.(\d{4})/i.exec(tx))) { add('dob', m[3] + '-' + m[2] + '-' + m[1], m[0], 0.85); var ag = Math.floor((Date.now() - new Date(m[3] + '-' + m[2] + '-' + m[1])) / 31557600000); add('age', ag, m[0], 0.7, LL('Возраст рассчитан по дате рождения на сегодня', 'Age computed from DOB')); }
+  if ((m = /\b(?:[cу]?)T\s?([0-4x][ab]?)\s?N\s?([0-3x][abc]?)\s?M\s?([01x])/i.exec(tx))) {
+    var T = 'cT' + m[1].toLowerCase(), N = 'cN' + m[2].toLowerCase().replace(/[abc]$/, ''), M = 'cM' + m[3].toLowerCase();
+    if (FIELD.cT.options.indexOf(T) >= 0) add('cT', T, m[0], 0.75); else I.push({ id: 'cT', kind: 'not_in_options', text: 'T: ' + m[0] });
+    if (FIELD.cN.options.indexOf(N) >= 0) add('cN', N, m[0], 0.7); else I.push({ id: 'cN', kind: 'ambiguous', text: LL('N указан как ', 'N given as ') + m[2] + LL(': в карточке нет варианта Nx, уточните по МРТ', ': no Nx option in the card') });
+    if (FIELD.cM.options.indexOf(M) >= 0) add('cM', M, m[0], 0.75);
+  }
+  if ((m = /\bSt\.?\s*(IV|III|II|I)\b/.exec(tx)) || (m = /стади[ия]\s*(IV|III|II|I)\b/i.exec(tx))) add('stage', m[1], m[0], 0.7);
+  if ((m = /ECOG\s*[:：]?\s*([0-4])/i.exec(tx))) add('ecog', m[1], m[0], 0.8);
+  if (/прямой\s+кишки/i.test(tx)) add('loc', 'Прямая кишка', (/[^\n]{0,40}прямой\s+кишки[^\n]{0,20}/i.exec(tx) || [''])[0], 0.6);
+  if ((m = /(нижне|средне|верхне)ампулярн/i.exec(tx))) add('rLevel', { 'нижне': 'Нижнеампулярный', 'средне': 'Среднеампулярный', 'верхне': 'Верхнеампулярный' }[m[1].toLowerCase()], m[0], 0.75);
+  if ((m = /Диагноз\s*[:：]\s*([\s\S]{10,600}?)(?:\n\s*(?:Сопутствующ|Рекомендовано|Код)|$)/i.exec(tx))) add('dxText', m[1].replace(/\s+/g, ' ').trim(), m[1].slice(0, 120), 0.8);
+  if (/лучев[а-я]+\s+терап/i.test(tx) && /неоадъювантн/i.test(tx)) I.push({ id: 'tactic', kind: 'ambiguous', text: LL('Упоминается неоадъювантная лучевая терапия, но схема (короткий курс или ХЛТ) не ясна без ИИ', 'Neoadjuvant RT mentioned but regimen unclear') });
+  return { doc: { type: LL('Документ (простое распознавание без ИИ)', 'Document (rule-based, no AI)'), summary: LL('ИИ не подключён, поэтому использовано простое распознавание по шаблонам: только ФИО, дата рождения, TNM, стадия, ECOG, локализация и текст диагноза. Подключите ИИ для полного заполнения.', 'AI not connected: rule-based parsing only.') }, fields: F, issues: I, questions: [] };
+}
+/* normalise model output against the card schema */
+function dxNorm(x, v) {
+  if (v === null || v === undefined || v === '') return { err: 'empty' };
+  if (x.type === 'num') { var n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.').replace(/[^\d.\-]/g, '')); return isNaN(n) ? { err: LL('не число: ', 'not a number: ') + v } : { v: String(n) }; }
+  if (x.type === 'date') { var s = String(v).trim(), m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s) || null; if (!m && (m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(s))) return { v: m[3] + '-' + m[2] + '-' + m[1] }; return m ? { v: m[1] + '-' + m[2] + '-' + m[3] } : { err: LL('дата не распознана: ', 'bad date: ') + s }; }
+  function opt(z) { z = String(z).trim(); var o = x.options || []; if (o.indexOf(z) >= 0) return z; var lz = z.toLowerCase(); return o.filter(function (q) { return q.toLowerCase() === lz; })[0] || null; }
+  if (x.type === 'sel' || x.type === 'seg') { var o1 = opt(Array.isArray(v) ? v[0] : v); return o1 ? { v: o1 } : { err: LL('нет такого варианта: ', 'no such option: ') + v }; }
+  if (x.type === 'multi') { var arr = (Array.isArray(v) ? v : [v]).map(opt), bad = (Array.isArray(v) ? v : [v]).filter(function (z, i) { return !arr[i]; }); arr = arr.filter(Boolean); return arr.length ? { v: arr, warn: bad.length ? LL('не распознаны варианты: ', 'unknown options: ') + bad.join(', ') : '' } : { err: LL('нет таких вариантов: ', 'no such options: ') + [].concat(v).join(', ') }; }
+  return { v: String(v).trim() };
+}
+function dxSame(a, b) { return JSON.stringify(Array.isArray(a) ? a.slice().sort() : String(a)) === JSON.stringify(Array.isArray(b) ? b.slice().sort() : String(b)); }
+function dxApply(res, keep) {
+  var dr = S.drawer, d = dr.p.d, rep = { doc: res.doc || {}, filled: [], same: [], conflict: [], rejected: [], issues: [], questions: (res.questions || []).filter(Boolean), missing: [] };
+  dr.aiFilled = dr.aiFilled || {};
+  (res.fields || []).forEach(function (r) {
+    var x = FIELD[r.id]; if (!x || ['files', 'nodes'].indexOf(x.type) >= 0) { if (r.id) rep.rejected.push({ id: r.id, label: r.id, why: LL('такого поля нет в карточке', 'no such field'), quote: r.quote, raw: r.value }); return; }
+    var nv = dxNorm(x, r.value), row = { id: x.id, label: L(x.label), quote: r.quote || '', conf: typeof r.confidence === 'number' ? r.confidence : 0.5, note: r.note || '', raw: r.value };
+    if (nv.err) { if (nv.err !== 'empty') rep.rejected.push(Object.assign(row, { why: nv.err })); return; }
+    row.v = nv.v; if (nv.warn) row.note = (row.note ? row.note + '. ' : '') + nv.warn;
+    var old = d[x.id];
+    if (has(old) && !(Array.isArray(old) && !old.length)) {
+      if (dxSame(old, nv.v)) { rep.same.push(row); return; }
+      row.old = old; if (keep) { rep.conflict.push(row); return; }
+    }
+    row.prev = old; d[x.id] = nv.v; dr.aiFilled[x.id] = { q: row.quote, c: row.conf }; rep.filled.push(row);
+  });
+  var vis = dxVisible(d); rep.filled.forEach(function (r) { if (!vis[r.id]) { r.hidden = true; r.note = (r.note ? r.note + '. ' : '') + LL('Поле скрыто при текущих данных карточки и при сохранении не останется. Проверьте связанные поля.', 'Field hidden with current data; will not be kept on save.'); } });
+  rep.issues = (res.issues || []).map(function (i) { var x = FIELD[i.id]; return { id: i.id || '', label: x ? L(x.label) : '', kind: i.kind || 'ambiguous', text: i.text || '' }; });
+  var issueIds = {}; rep.issues.concat(rep.rejected).forEach(function (i) { if (i.id) issueIds[i.id] = 1; });
+  SECTIONS.forEach(function (s) {
+    if (!secOn(s, d)) return;
+    var fl = s.fields.filter(function (x) { return !x.show || x.show(d); });
+    MODULES.forEach(function (m) { if (m.sec === s.id && m.when(d)) fl = fl.concat(m.fields.filter(function (x) { return !x.show || x.show(d); })); });
+    var miss = fl.filter(function (x) { var v = d[x.id]; return ['files', 'nodes'].indexOf(x.type) < 0 && ['ib', 'studyNo'].indexOf(x.id) < 0 && (!has(v) || (Array.isArray(v) && !v.length)); });
+    if (miss.length) rep.missing.push({ sec: L(s.title), items: miss.map(function (x) { return { id: x.id, label: L(x.label), flagged: !!issueIds[x.id] }; }) });
+  });
+  return rep;
+}
+function dxVisible(d) {
+  var keep = {};
+  SECTIONS.forEach(function (s) { if (secOn(s, d)) s.fields.forEach(function (x) { if (!x.show || x.show(d)) keep[x.id] = 1; }); });
+  MODULES.forEach(function (m) { var sc = SECTIONS.filter(function (z) { return z.id === m.sec; })[0]; if (m.when(d) && (!sc || secOn(sc, d))) m.fields.forEach(function (x) { if (!x.show || x.show(d)) keep[x.id] = 1; }); });
+  return keep;
+}
+function dxOpen() { if (!S.drawer) return; S.dx = { step: 'pick', keep: true, agree: false }; render(); }
+function dxRun() {
+  var dx = S.dx; if (!dx || !dx.file) return;
+  var cloud = aiReady() && AI.prov !== 'local';
+  if (aiReady() && cloud && !dx.agree) { toast(LL('Подтвердите отправку документа во внешний сервис ИИ', 'Confirm sending the document to the external AI service')); return; }
+  dx.step = 'run'; dx.log = [LL('Читаю файл «', 'Reading «') + dx.file.name + '»']; render();
+  dxReadFile(dx.file).then(function (doc) {
+    dx.doc = doc;
+    dx.log.push(doc.kind === 'pdf' ? LL('PDF: страниц ', 'PDF: pages ') + doc.pages + (doc.scanned ? LL(', скан без текстового слоя', ', scanned, no text layer') : LL(', текст извлечён', ', text extracted')) : doc.kind === 'image' ? LL('Изображение', 'Image') : LL('Текстовый файл', 'Text file'));
+    if (!aiReady()) { dx.log.push(LL('ИИ не подключён: простое распознавание по шаблонам', 'AI not connected: rule-based parsing')); render(); if (doc.scanned) throw new Error(LL('Документ отсканирован, без ИИ его прочитать нельзя. Подключите ИИ (Gemini, Claude или локальную модель с распознаванием изображений).', 'Scanned document: AI needed.')); return dxRules(doc); }
+    dx.log.push(LL('Отправляю в ', 'Sending to ') + AI_PROV[AI.prov].name + ' · ' + AI.model + LL(' и жду ответ (обычно 20-60 секунд)…', ' (20-60 s)…')); render();
+    return dxCall(doc, dxSchemaText()).then(dxParseJSON);
+  }).then(function (res) {
+    if (!S.dx || !S.drawer) return;
+    dx.rep = dxApply(res, dx.keep); dx.rep.src = aiReady() ? AI_PROV[AI.prov].name + ' · ' + AI.model : LL('шаблоны без ИИ', 'rules, no AI'); dx.rep.file = dx.file.name; dx.rep.at = nowIso();
+    var dr = S.drawer; dr.p.docsAI = (dr.p.docsAI || []).concat([{ name: dx.file.name, at: dx.rep.at, by: me(), src: dx.rep.src, n: dx.rep.filled.length }]);
+    dx.step = 'rep'; render();
+  }).catch(function (e) { if (!S.dx) return; dx.step = 'err'; dx.err = (e && e.message) || String(e); render(); });
+}
+function dxUndo(id) { var dx = S.dx, dr = S.drawer; if (!dx || !dr) return; var row = dx.rep.filled.filter(function (r) { return r.id === id; })[0]; if (!row) return; if (has(row.prev)) dr.p.d[id] = row.prev; else delete dr.p.d[id]; delete dr.aiFilled[id]; row.undone = true; render(); }
+function dxTake(id) { var dx = S.dx, dr = S.drawer; if (!dx || !dr) return; var row = dx.rep.conflict.filter(function (r) { return r.id === id; })[0]; if (!row) return; row.prev = row.old; dr.p.d[id] = row.v; dr.aiFilled[id] = { q: row.quote, c: row.conf }; row.taken = true; render(); }
+function dxUndoAll() { var dx = S.dx; if (!dx || !dx.rep) return; dx.rep.filled.forEach(function (r) { if (!r.undone) dxUndo(r.id); }); dx.rep.conflict.forEach(function (r) { if (r.taken) { S.drawer.p.d[r.id] = r.old; delete S.drawer.aiFilled[r.id]; r.taken = false; } }); S.dx = null; toast(LL('Изменения из документа отменены', 'Changes from the document reverted')); render(); }
+function dxVal(r, v) { var x = FIELD[r.id]; return esc(fmtVal(x, v)); }
+var DX_KIND = { ambiguous: ['Двусмысленно', 'Ambiguous'], conflict: ['Противоречие в документе', 'Conflict in document'], unreadable: ['Неразборчиво', 'Unreadable'], not_in_options: ['Нет подходящего варианта', 'No matching option'], inconsistent: ['Клиническая несогласованность', 'Clinically inconsistent'] };
+function renderDx() {
+  var dx = S.dx, h = '<div class="dim top" data-act="dxclose"></div>';
+  if (dx.step !== 'rep') {
+    h += '<section class="modal dxm" role="dialog" aria-modal="true"><div class="dhead"><div><div class="dh-title">' + ico('sparkle', 18) + LL('Заполнить карточку из документа', 'Fill the record from a document') + '</div><div class="hint">' + LL('Выписка, первичный осмотр, консультативный лист, протокол операции, гистология, МРТ/КТ', 'Discharge summary, consultation, operative note, pathology, MRI/CT') + '</div></div><button type="button" class="iconbtn" data-act="dxclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
+    if (dx.step === 'pick') {
+      h += '<label class="dxdrop' + (dx.file ? ' on' : '') + '"><input type="file" id="dxfile" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,application/pdf,image/*,text/plain" hidden>' + ico(dx.file ? 'doc' : 'upload', 28) + '<b>' + (dx.file ? esc(dx.file.name) + ' · ' + Math.max(1, Math.round(dx.file.size / 1024)) + ' КБ' : LL('Выберите или перетащите файл', 'Choose or drop a file')) + '</b><span>' + LL('PDF (в том числе скан), фото документа или текст', 'PDF (incl. scans), photo or text') + '</span></label>';
+      h += '<label class="chk"><input type="checkbox" id="dxkeep"' + (dx.keep ? ' checked' : '') + '><span>' + LL('Не перезаписывать уже заполненные поля (расхождения покажу отдельно)', 'Keep fields that are already filled (differences listed separately)') + '</span></label>';
+      if (aiReady()) {
+        var loc = AI.prov === 'local';
+        h += '<div class="dxprov ' + (loc ? 'ok' : 'warn') + '">' + ico(loc ? 'lock' : 'alert', 16) + '<div><b>' + LL('Обработка: ', 'Processing: ') + esc(AI_PROV[AI.prov].name) + ' · ' + esc(AI.model) + '</b><span>' + (loc ? LL('Документ обрабатывается на сервере ИИ центра и не покидает его сеть.', 'Processed on the centre\'s own AI server.') : LL('Документ целиком уйдёт во внешний облачный сервис. Обезличить PDF автоматически нельзя. Для реальных документов используйте локальную модель центра; сейчас лучше пробовать на обезличенных или тестовых файлах.', 'The whole document goes to an external cloud service and cannot be de-identified automatically. Use the centre\'s local model for real records.')) + '</span></div></div>';
+        if (!loc) h += '<label class="chk"><input type="checkbox" id="dxagree"' + (dx.agree ? ' checked' : '') + '><span>' + LL('Понимаю и подтверждаю отправку этого документа', 'I understand and confirm sending this document') + '</span></label>';
+      } else h += '<div class="dxprov warn">' + ico('alert', 16) + '<div><b>' + LL('ИИ не подключён', 'AI not connected') + '</b><span>' + LL('Сработает только простое распознавание по шаблонам для текстовых PDF (ФИО, дата рождения, TNM, стадия, ECOG, диагноз). Для полного заполнения подключите ИИ в правом верхнем углу.', 'Only rule-based parsing of text PDFs will run. Connect AI for full extraction.') + '</span></div></div>';
+      h += '<div class="actions"><button type="button" class="btn primary" data-act="dxrun"' + (dx.file ? '' : ' disabled') + '>' + ico('sparkle', 16) + LL('Распознать и заполнить', 'Extract and fill') + '</button><button type="button" class="btn ghost" data-act="dxclose">' + t('b.cancel') + '</button></div>';
+    } else if (dx.step === 'run') {
+      h += '<div class="dxrun"><span class="spin"></span><ul>' + dx.log.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul></div>';
+    } else {
+      h += '<div class="errbox"><b>' + ico('alert', 16) + LL('Не получилось', 'Failed') + '</b><p>' + esc(dx.err) + '</p></div><div class="actions"><button type="button" class="btn" data-act="dxback">' + LL('Попробовать ещё раз', 'Try again') + '</button><button type="button" class="btn ghost" data-act="dxclose">' + LL('Закрыть', 'Close') + '</button></div>';
+    }
+    return h + '</div></section>';
+  }
+  var r = dx.rep, nMiss = r.missing.reduce(function (a, s) { return a + s.items.length; }, 0), low = r.filled.filter(function (x) { return !x.undone && x.conf < 0.7; });
+  var probs = r.issues.length + r.rejected.length;
+  h += '<section class="modal dxrep" role="dialog" aria-modal="true"><div class="dhead"><div><div class="dh-title">' + ico('sparkle', 18) + LL('Сводка заполнения из документа', 'Document extraction summary') + '</div><div class="hint">' + esc(r.file) + ' · ' + esc(r.src) + '</div></div><button type="button" class="iconbtn" data-act="dxclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
+  if (r.doc && (r.doc.type || r.doc.summary)) h += '<div class="dxdoc"><b>' + esc(r.doc.type || '') + (r.doc.date ? ' · ' + fmtDate(r.doc.date) : '') + '</b><p>' + esc(r.doc.summary || '') + '</p></div>';
+  h += '<div class="dxtiles">' + [[r.filled.filter(function (x) { return !x.undone; }).length, LL('заполнено', 'filled'), 'ok'], [low.length, LL('проверить: низкая уверенность', 'check: low confidence'), 'warn'], [r.conflict.length, LL('расходятся с карточкой', 'differ from record'), 'warn'], [probs, LL('трудности и неточности', 'difficulties'), 'bad'], [r.questions.length, LL('вопросы врачу', 'questions'), 'q'], [nMiss, LL('пусто: нет в документе', 'empty: not in document'), 'mut']].map(function (x) { return '<div class="dxt ' + x[2] + '"><b>' + x[0] + '</b><span>' + x[1] + '</span></div>'; }).join('') + '</div>';
+  function conf(c) { var p = Math.round(c * 100); return '<span class="dxc ' + (c >= 0.85 ? 'hi' : c >= 0.7 ? 'mid' : 'lo') + '">' + p + '%</span>'; }
+  if (r.filled.length) h += '<h3 class="dxh">' + ico('check', 16) + LL('Заполнено из документа', 'Filled from the document') + '</h3><div class="tablewrap"><table class="grid dxtab"><thead><tr><th>' + LL('Поле', 'Field') + '</th><th>' + LL('Значение', 'Value') + '</th><th>' + LL('Основание в документе', 'Evidence') + '</th><th>' + LL('Уверенность', 'Confidence') + '</th><th></th></tr></thead><tbody>' + r.filled.map(function (x) { return '<tr class="' + (x.undone ? 'undone' : x.conf < 0.7 ? 'low' : '') + '"><td class="strong">' + esc(x.label) + '</td><td>' + dxVal(x, x.v) + (has(x.prev) ? '<div class="muted small">' + LL('было: ', 'was: ') + dxVal(x, x.prev) + '</div>' : '') + '</td><td><q>' + esc(x.quote) + '</q>' + (x.note ? '<div class="muted small">' + esc(x.note) + '</div>' : '') + '</td><td>' + conf(x.conf) + '</td><td>' + (x.undone ? '<span class="muted">' + LL('отменено', 'reverted') + '</span>' : '<button type="button" class="btn small ghost" data-act="dxundo" data-id="' + x.id + '">' + LL('Отменить', 'Revert') + '</button>') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+  if (r.conflict.length) h += '<h3 class="dxh warn">' + ico('alert', 16) + LL('Расходится с уже заполненным (не изменено)', 'Differs from existing values (not changed)') + '</h3><div class="tablewrap"><table class="grid dxtab"><thead><tr><th>' + LL('Поле', 'Field') + '</th><th>' + LL('В карточке', 'In record') + '</th><th>' + LL('В документе', 'In document') + '</th><th>' + LL('Основание', 'Evidence') + '</th><th></th></tr></thead><tbody>' + r.conflict.map(function (x) { return '<tr><td class="strong">' + esc(x.label) + '</td><td>' + dxVal(x, x.old) + '</td><td>' + dxVal(x, x.v) + ' ' + conf(x.conf) + '</td><td><q>' + esc(x.quote) + '</q></td><td>' + (x.taken ? '<span class="muted">' + LL('заменено', 'replaced') + '</span>' : '<button type="button" class="btn small" data-act="dxtake" data-id="' + x.id + '">' + LL('Заменить', 'Replace') + '</button>') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+  if (probs) h += '<h3 class="dxh bad">' + ico('alert', 16) + LL('Трудности: информация была, но заполнить точно не удалось', 'Difficulties: information present but could not be filled reliably') + '</h3><ul class="dxlist">' + r.rejected.map(function (x) { return '<li><b>' + esc(x.label) + '</b><span class="tag due">' + LL('не принято', 'rejected') + '</span> ' + esc(x.why) + (x.quote ? ' <q>' + esc(x.quote) + '</q>' : '') + '</li>'; }).join('') + r.issues.map(function (x) { return '<li><b>' + esc(x.label || LL('Документ', 'Document')) + '</b><span class="tag ' + (x.kind === 'conflict' || x.kind === 'inconsistent' ? 'due' : 'soon') + '">' + L(DX_KIND[x.kind] || [x.kind, x.kind]) + '</span> ' + esc(x.text) + '</li>'; }).join('') + '</ul>';
+  if (r.questions.length) h += '<h3 class="dxh q">' + ico('chat', 16) + LL('Вопросы врачу', 'Questions for the doctor') + '</h3><ol class="dxlist">' + r.questions.map(function (q) { return '<li>' + esc(q) + '</li>'; }).join('') + '</ol>';
+  if (r.same.length) h += '<p class="muted dxsame">' + LL('Совпало с уже заполненным: ', 'Already matching: ') + r.same.map(function (x) { return esc(x.label); }).join(', ') + '</p>';
+  if (nMiss) h += '<h3 class="dxh mut">' + LL('Остались пустыми: в документе этих сведений нет', 'Still empty: not in the document') + '</h3><div class="dxmiss">' + r.missing.map(function (s) { return '<div><b>' + esc(s.sec) + '</b><p>' + s.items.map(function (x) { return x.flagged ? '<span class="fl">' + esc(x.label) + '</span>' : esc(x.label); }).join(', ') + '</p></div>'; }).join('') + '</div>';
+  h += '</div><div class="dfoot"><span class="muted small">' + LL('Изменения ещё не сохранены: проверьте поля (подсвечены в карточке) и нажмите «Сохранить».', 'Not saved yet: review highlighted fields and press Save.') + '</span><div class="actions"><button type="button" class="btn ghost danger" data-act="dxundoall">' + LL('Отменить всё', 'Revert all') + '</button><button type="button" class="btn primary" data-act="dxclose">' + LL('Перейти к карточке', 'Go to the record') + '</button></div></div></section>';
   return h;
 }
 
