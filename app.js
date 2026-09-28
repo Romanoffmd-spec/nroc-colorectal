@@ -157,21 +157,55 @@ var SECTIONS = [
     f('age', 'Возраст', 'Age', 'num', { unit: 'u.years' }),
     f('dob', 'Дата рождения', 'Date of birth', 'date'),
     f('phone', 'Телефон', 'Phone', 'text', { ph: '+7 7__ ___ __ __' }),
-    f('bmi', 'ИМТ', 'BMI', 'num'),
+    f('iin', 'ИИН', 'National ID (IIN)', 'text', { ph: '12 цифр' }),
+    f('regDate', 'Дата регистрации', 'Registration date', 'date'),
+    f('address', 'Адрес места жительства', 'Home address', 'text', { wide: true }),
+    f('nation', 'Национальность', 'Ethnicity', 'text'),
+    f('height', 'Рост', 'Height', 'num', { unit: 'u.cm' }),
+    f('weight', 'Вес', 'Weight', 'num', { unit: 'u.kg' }),
+    f('bmi', 'ИМТ', 'BMI', 'num', { hint: 'f.bmiAuto' }),
     f('asa', 'ASA', 'ASA', 'sel', { options: ['I', 'II', 'III', 'IV'] }),
     f('ecog', 'ECOG', 'ECOG', 'sel', { options: ['0', '1', '2', '3', '4'] }),
+    f('cci', 'Индекс коморбидности Чарлсон (CCI)', 'Charlson comorbidity index (CCI)', 'num', { unit: 'u.points' }),
     f('studyNo', '№ в исследовании', 'Study no.', 'text')
+  ]},
+  { id: 'hx', phase: 'pre', title: ['Коморбидность и анамнез', 'Comorbidity and history'], fields: [
+    f('comorb', 'Сопутствующие заболевания', 'Comorbidities', 'seg', { options: YN }),
+    f('dm', 'Сахарный диабет', 'Diabetes', 'seg', { options: YN }),
+    f('htn', 'Артериальная гипертензия', 'Hypertension', 'seg', { options: YN }),
+    f('cvd', 'Заболевания сердечно-сосудистой системы', 'Cardiovascular disease', 'seg', { options: YN }),
+    f('lung', 'Заболевания лёгких', 'Lung disease', 'seg', { options: YN }),
+    f('cvb', 'Цереброваскулярные болезни (ЦВБ)', 'Cerebrovascular disease', 'seg', { options: YN }),
+    f('liverDz', 'Заболевания печени', 'Liver disease', 'seg', { options: YN }),
+    f('comorbOther', 'Другие сопутствующие', 'Other comorbidities', 'text', { wide: true }),
+    f('oncoHx', 'Онкологический анамнез', 'Previous cancer', 'text', { wide: true }),
+    f('smoke', 'Курение', 'Smoking', 'sel', { options: ['Нет', 'Курит', 'Бросил'] }),
+    f('ecig', 'Электронные сигареты', 'E-cigarettes', 'seg', { options: YN }),
+    f('smokeYrs', 'Стаж курения', 'Smoking history', 'num', { unit: 'u.years' }),
+    f('alcohol', 'Употребление алкоголя', 'Alcohol use', 'sel', { options: ['Нет', 'Редко', 'Регулярно', 'Злоупотребление'] }),
+    f('famCa', 'Семейный анамнез по раку', 'Family history of cancer', 'seg', { options: YN }),
+    f('famCrc', 'Семейный анамнез по колоректальному раку', 'Family history of CRC', 'seg', { options: YN }),
+    f('prevOps', 'Перенесённые операции', 'Previous surgery', 'text', { wide: true })
   ]},
   { id: 'dx', phase: 'pre', title: ['Диагноз и обследование', 'Diagnosis and work-up'], fields: [
     f('loc', 'Локализация', 'Location', 'sel', { options: LOCS }),
     f('rLevel', 'Отдел прямой кишки', 'Rectal level', 'sel', { options: ['Нижнеампулярный', 'Среднеампулярный', 'Верхнеампулярный'], show: function (d) { return d.loc === 'Прямая кишка'; } }),
+    f('anusDist', 'Расстояние от ануса (клинически, колоноскопия)', 'Distance from anal verge (clinical)', 'num', { unit: 'u.cm' }),
+    f('primary', 'Опухоль', 'Tumour', 'seg', { options: ['Первичная', 'Рецидивная'] }),
+    f('multiPrim', 'Первично-множественный рак', 'Multiple primary cancer', 'seg', { options: YN }),
+    f('otherTumor', 'Локализация другой опухоли', 'Other tumour site', 'text', { show: function (d) { return d.multiPrim === 'Да'; } }),
+    f('symptoms', 'Симптомы', 'Symptoms', 'multi', { options: ['Кровь в стуле', 'Изменение ритма стула', 'Боль в животе', 'Анемия', 'Кишечная непроходимость', 'Потеря веса', 'Тенезмы', 'Бессимптомно (скрининг)', 'Другое'], dd: true }),
     f('cT', 'cT', 'cT', 'sel', { options: ['cTx', 'cT0', 'cT1', 'cT2', 'cT3', 'cT4a', 'cT4b'] }),
     f('cN', 'cN', 'cN', 'sel', { options: ['cN0', 'cN1', 'cN2', 'cN3'] }),
     f('cM', 'cM', 'cM', 'sel', { options: ['cM0', 'cM1'] }),
+    f('metsSite', 'Отдалённые метастазы', 'Distant metastases', 'multi', { options: ['Печень', 'Лёгкие', 'Брюшина', 'Отдалённые лимфоузлы', 'Кости', 'Яичники', 'Другое'], dd: true, show: function (d) { return d.cM === 'cM1'; } }),
     f('stage', 'Стадия', 'Stage', 'sel', { options: ['I', 'II', 'III', 'IV'] }),
     f('grade', 'Степень дифференцировки (биопсия)', 'Grade (biopsy)', 'sel', { options: ['G1', 'G2', 'G3', 'Gx'] }),
     f('hist', 'Гистология (биопсия)', 'Histology (biopsy)', 'sel', { options: ['Аденокарцинома', 'Муцинозная аденокарцинома', 'Перстневидноклеточный рак', 'Нейроэндокринная опухоль', 'Другое'] }),
-    f('dxText', 'Клинический диагноз', 'Clinical diagnosis', 'long', { wide: true })
+    f('dxText', 'Клинический диагноз', 'Clinical diagnosis', 'long', { wide: true }),
+    f('cea0', 'РЭА до операции', 'CEA before surgery', 'num', { unit: 'u.ngml' }),
+    f('ca199_0', 'СА 19-9 до операции', 'CA 19-9 before surgery', 'num', { unit: 'u.uml' }),
+    f('hb0', 'Гемоглобин до операции', 'Haemoglobin before surgery', 'num', { unit: 'u.gl' })
   ]},
   { id: 'tx', phase: 'pre', title: ['Тактика лечения', 'Treatment strategy'], fields: [
     f('tactic', 'Тактика', 'Strategy', 'multi', { options: TACTICS, dd: true, hint: 'f.ddOrder', ordered: true }),
@@ -191,6 +225,11 @@ var SECTIONS = [
     f('incision', 'Лапаротомия', 'Laparotomy', 'sel', { options: INCISIONS, show: function (d) { return hasSurg(d) && (d.access === 'Открытый' || d.conv === 'Да'); } }),
     f('opTime', 'Длительность операции', 'Operative time', 'num', { unit: 'u.min', show: hasProc }),
     f('ebl', 'Кровопотеря', 'Blood loss', 'num', { unit: 'u.ml', show: hasSurg }),
+    f('transf', 'Гемотрансфузия', 'Blood transfusion', 'seg', { options: YN, show: hasProc }),
+    f('simult', 'Симультанная операция', 'Simultaneous procedure', 'seg', { options: YN, show: hasSurg }),
+    f('simultType', 'Симультанно: на каких органах', 'Simultaneous: organs', 'multi', { options: ['Печень', 'Мочевой пузырь', 'Гинекологические', 'Лимфодиссекция тазовая', 'Лимфодиссекция паховая', 'ЖКТ', 'Другое'], dd: true, show: function (d) { return d.simult === 'Да'; } }),
+    f('simultNote', 'Симультанная операция: описание', 'Simultaneous: details', 'text', { wide: true, show: function (d) { return d.simult === 'Да'; } }),
+    f('intraCx', 'Интраоперационные осложнения', 'Intraoperative complications', 'text', { wide: true, show: hasProc }),
     f('revDev', 'Находки при ревизии: отличия от нормы', 'Exploration: findings that differ from normal', 'multi', { options: REV_DEV, dd: true, wide: true, none: 'f.revStd', show: function (d) { return hasSurg(d) && P_TEO.concat(P_STCLOSE).indexOf(d.proc) < 0; } }),
     f('revision', 'Другие находки при ревизии (свободный текст)', 'Other findings (free text)', 'long', { wide: true, rows: 2, ph: 'f.revisionPh', show: function (d) { return hasSurg(d) && P_TEO.concat(P_STCLOSE).indexOf(d.proc) < 0; } }),
     f('anast', 'Анастомоз', 'Anastomosis', 'seg', { options: YN, show: function (d) { return hasSurg(d) && P_TEO.concat(P_APR, P_HART, P_STFORM).indexOf(d.proc) < 0; } }),
@@ -199,18 +238,38 @@ var SECTIONS = [
     f('drain', 'Дренирование', 'Drains', 'multi', { options: ['Малый таз', 'Правый латеральный канал', 'Левый латеральный канал', 'Подпечёночное пространство', 'Промежностная рана', 'Не дренировалось'], dd: true, show: hasSurg }),
     f('postRoute', 'Перевод после операции', 'Transfer after surgery', 'seg', { options: ['Палата пробуждения', 'Реанимация (ОАРИТ)'], show: hasProc, wide: true })
   ]},
+  { id: 'hosp', phase: 'op', title: ['Госпитализация', 'Hospital stay'], fields: [
+    f('admDate', 'Дата поступления', 'Admission date', 'date'),
+    f('disDate', 'Дата выписки', 'Discharge date', 'date'),
+    f('icuDays', 'Койко-дни в ОАРИТ', 'ICU days', 'num', { unit: 'u.days' })
+  ]},
   { id: 'cx', phase: 'post', title: ['Послеоперационные осложнения', 'Postoperative complications'], when: function (d) { return hasProc(d); }, fields: [
     f('cd', 'Clavien-Dindo, макс.', 'Clavien-Dindo, max', 'sel', { options: ['Нет', 'I', 'II', 'IIIa', 'IIIb', 'IVa', 'IVb', 'V'] }),
     f('leak', 'Несостоятельность (ISREC)', 'Anastomotic leak (ISREC)', 'sel', { options: ['Нет', 'A', 'B', 'C'], show: function (d) { return d.anast === 'Да'; } }),
     f('ssi', 'Инфекция области хирургического вмешательства (ИОХВ)', 'Surgical site infection (SSI)', 'sel', { options: ['Нет', 'Поверхностная', 'Глубокая', 'Органная/полостная'] }),
     f('vte', 'Венозные тромбоэмболии', 'Venous thromboembolism', 'sel', { options: ['Нет', 'ТГВ', 'ТЭЛА'] }),
     f('los', 'Койко-день', 'Length of stay', 'num', { unit: 'u.days' }),
-    f('cxNote', 'Описание осложнений', 'Complications, details', 'long', { wide: true })
+    f('cxNote', 'Описание осложнений', 'Complications, details', 'long', { wide: true }),
+    f('reop30', 'Повторная операция в течение 30 дней', 'Reoperation within 30 days', 'seg', { options: YN }),
+    f('reopName', 'Название повторной операции', 'Reoperation', 'text', { wide: true, show: function (d) { return d.reop30 === 'Да'; } }),
+    f('reopDate', 'Дата повторной операции', 'Reoperation date', 'date', { show: function (d) { return d.reop30 === 'Да'; } }),
+    f('mort30', 'Послеоперационная летальность (30 дней)', '30-day mortality', 'seg', { options: YN }),
+    f('cea1', 'РЭА после операции', 'CEA after surgery', 'num', { unit: 'u.ngml' }),
+    f('ca199_1', 'СА 19-9 после операции', 'CA 19-9 after surgery', 'num', { unit: 'u.uml' }),
+    f('crp3', 'СРБ на 3-и сутки', 'CRP day 3', 'num', { unit: 'u.mgl' }),
+    f('crp5', 'СРБ на 5-е сутки', 'CRP day 5', 'num', { unit: 'u.mgl' }),
+    f('hb1', 'Гемоглобин после операции', 'Haemoglobin after surgery', 'num', { unit: 'u.gl' })
   ]},
   { id: 'path', phase: 'post', title: ['Патоморфология', 'Pathology'], when: function (d) { return (hasSurg(d) && P_STFORM.concat(P_STCLOSE).indexOf(d.proc) < 0) || (d.kind === 'Эндоскопическое' && ['ESD', 'EMR', 'Полипэктомия'].indexOf(d.endo) >= 0); }, fields: [
     f('y', 'После неоадъюванта (y)', 'After neoadjuvant (y)', 'seg', { options: YN, show: function (d) { return hasTac(d, NEO_T); } }),
     f('pT', 'pT', 'pT', 'sel', { options: ['pT0', 'pTis', 'pT1', 'pT2', 'pT3', 'pT4a', 'pT4b'] }),
     f('pN', 'pN', 'pN', 'sel', { options: ['pN0', 'pN1a', 'pN1b', 'pN1c', 'pN2a', 'pN2b'] }),
+    f('pM', 'pM', 'pM', 'sel', { options: ['pM0', 'pM1a', 'pM1b', 'pM1c'] }),
+    f('pStage', 'Стадия AJCC (8-е изд.)', 'AJCC stage (8th ed.)', 'sel', { options: ['0', 'I', 'IIA', 'IIB', 'IIC', 'IIIA', 'IIIB', 'IIIC', 'IVA', 'IVB', 'IVC'] }),
+    f('histPost', 'Гистология (операционный материал)', 'Histology (specimen)', 'sel', { options: ['Аденокарцинома', 'Муцинозная аденокарцинома', 'Перстневидноклеточный рак', 'Нейроэндокринная опухоль', 'Полный ответ (нет опухоли)', 'Другое'] }),
+    f('tumSize', 'Размер опухоли', 'Tumour size', 'num', { unit: 'u.cm' }),
+    f('tmeQ', 'Качество ТМЭ (по Quirke)', 'TME quality (Quirke)', 'sel', { options: ['Полная (мезоректальная)', 'Почти полная (интрамезоректальная)', 'Неполная (мышечная)'] }),
+    f('crmDist', 'CRM: расстояние до края', 'CRM distance', 'num', { unit: 'u.mm' }),
     f('pTRG', 'Регресс опухоли (TRG)', 'Tumour regression (TRG)', 'sel', { options: ['0', '1', '2', '3'], show: function (d) { return hasTac(d, NEO_T); } }),
     f('gPost', 'Степень дифференцировки', 'Grade', 'sel', { options: ['G1', 'G2', 'G3'] }),
     f('lnT', 'Лимфоузлов удалено', 'Lymph nodes removed', 'num'),
@@ -219,11 +278,32 @@ var SECTIONS = [
     f('lvi', 'Лимфоваскулярная инвазия (LVI)', 'Lymphovascular invasion (LVI)', 'seg', { options: YN }),
     f('pni', 'Периневральная инвазия (PNI)', 'Perineural invasion (PNI)', 'seg', { options: YN })
   ]},
+  { id: 'adj', phase: 'post', title: ['Адъювантная терапия', 'Adjuvant therapy'], fields: [
+    f('adj', 'Адъювантная химиотерапия', 'Adjuvant chemotherapy', 'seg', { options: YN }),
+    f('adjRegimen', 'Режим', 'Regimen', 'sel', { options: ['CAPOX', 'FOLFOX', 'Капецитабин', 'FOLFIRI', 'FOLFOXIRI', 'Другое'], show: function (d) { return d.adj === 'Да'; } }),
+    f('adjComplete', 'Полноценность ХТ', 'Completion', 'sel', { options: ['Проведена полностью', 'Не полностью', 'Прервана из-за токсичности'], show: function (d) { return d.adj === 'Да'; } }),
+    f('adjStart', 'Начало терапии', 'Start', 'date', { show: function (d) { return d.adj === 'Да'; } }),
+    f('adjEnd', 'Конец терапии', 'End', 'date', { show: function (d) { return d.adj === 'Да'; } })
+  ]},
+  { id: 'mol', phase: 'post', title: ['Молекулярный статус', 'Molecular status'], fields: [
+    f('kras', 'KRAS', 'KRAS', 'sel', { options: ['Дикий тип', 'Мутация', 'Не исследовался'] }),
+    f('nras', 'NRAS', 'NRAS', 'sel', { options: ['Дикий тип', 'Мутация', 'Не исследовался'] }),
+    f('braf', 'BRAF', 'BRAF', 'sel', { options: ['Дикий тип', 'Мутация V600E', 'Мутация (другая)', 'Не исследовался'] }),
+    f('msi', 'MSI / MMR', 'MSI / MMR', 'sel', { options: ['MSS / pMMR', 'MSI-L', 'MSI-H / dMMR', 'Не исследовался'] })
+  ]},
   { id: 'late', phase: 'post', title: ['Отдалённые результаты', 'Long-term outcomes'], when: function (d) { return hasProc(d); }, fields: [
     f('closure', 'Дата закрытия стомы', 'Stoma closure date', 'date', { show: function (d) { return d.stoma && d.stoma !== 'Нет'; } }),
     f('recur', 'Рецидив', 'Recurrence', 'sel', { options: ['Нет', 'Местный рецидив', 'Отдалённые метастазы', 'Местный рецидив и метастазы'] }),
     f('recurDate', 'Дата выявления', 'Date detected', 'date', { show: function (d) { return d.recur && d.recur !== 'Нет'; } }),
+    f('recurMethod', 'Метод выявления рецидива', 'How recurrence was detected', 'sel', { options: ['КТ', 'МРТ', 'ПЭТ-КТ', 'Колоноскопия', 'Рост РЭА', 'Клинически'], show: function (d) { return d.recur && d.recur !== 'Нет'; } }),
+    f('localRecLoc', 'Локализация местного рецидива', 'Local recurrence site', 'text', { show: function (d) { return /Местный/.test(d.recur || ''); } }),
+    f('metLoc', 'Локализация отдалённых метастазов', 'Distant metastasis sites', 'multi', { options: ['Печень', 'Лёгкие', 'Брюшина', 'Отдалённые лимфоузлы', 'Кости', 'Головной мозг', 'Другое'], dd: true, show: function (d) { return /метастаз/i.test(d.recur || ''); } }),
+    f('metDate', 'Дата выявления отдалённых метастазов', 'Distant metastasis date', 'date', { show: function (d) { return /метастаз/i.test(d.recur || ''); } }),
+    f('lateCd', 'Поздние осложнения (после 30 дней), Clavien-Dindo макс.', 'Late complications (>30 d), Clavien-Dindo max', 'sel', { options: ['Нет', 'I', 'II', 'IIIa', 'IIIb', 'IVa', 'IVb', 'V'] }),
+    f('lateCxNote', 'Поздние осложнения: описание', 'Late complications: details', 'long', { wide: true, show: function (d) { return d.lateCd && d.lateCd !== 'Нет'; } }),
     f('vital', 'Статус', 'Vital status', 'seg', { options: ['Жив', 'Умер'] }),
+    f('deathDate', 'Дата смерти', 'Date of death', 'date', { show: function (d) { return d.vital === 'Умер'; } }),
+    f('deathCause', 'Причина смерти', 'Cause of death', 'text', { wide: true, show: function (d) { return d.vital === 'Умер'; } }),
     f('lastFu', 'Последний контакт', 'Last contact', 'date')
   ]}
 ];
@@ -234,6 +314,9 @@ var MODULES = [
     f('mrT', 'mrT', 'mrT', 'sel', { options: ['mrT1', 'mrT2', 'mrT3a', 'mrT3b', 'mrT3c', 'mrT3d', 'mrT4a', 'mrT4b'] }),
     f('mrCRM', 'CRM (мезоректальная фасция)', 'CRM (mesorectal fascia)', 'seg', { options: ['Отрицательный', 'Положительный'] }),
     f('emvi', 'EMVI', 'EMVI', 'seg', { options: ['Отрицательный', 'Положительный'] }),
+    f('mrLen', 'Продольный размер опухоли', 'Tumour length', 'num', { unit: 'u.cm' }),
+    f('mrLN', 'Мезоректальные лимфоузлы (МРТ)', 'Mesorectal nodes (MRI)', 'seg', { options: YN }),
+    f('mrLNsize', 'Размер мезоректального лимфоузла', 'Mesorectal node size', 'num', { unit: 'u.mm', show: function (d) { return d.mrLN === 'Да'; } }),
     f('mrLat', 'Увеличенные латеральные тазовые лимфоузлы', 'Enlarged lateral nodes', 'seg', { options: YN }),
     f('llBefore', 'Размер латерального лимфоузла до лечения', 'Lateral node size before treatment', 'num', { unit: 'u.mm', show: function (d) { return d.mrLat === 'Да'; } }),
     f('llAfter', 'Размер после неоадъюванта', 'Size after neoadjuvant', 'num', { unit: 'u.mm', show: function (d) { return d.mrLat === 'Да' && hasTac(d, NEO_T); } })
@@ -242,6 +325,7 @@ var MODULES = [
     f('tntScheme', 'Схема', 'Regimen', 'sel', { options: ['SCRT → CAPOX', 'SCRT → FOLFOX', 'ХЛТ → консолидирующая ПХТ', 'Индукционная ПХТ → ХЛТ', 'Другое'] }),
     f('rtStart', 'Начало лучевой', 'RT start', 'date'),
     f('rtEnd', 'Конец лучевой', 'RT end', 'date'),
+    f('sod', 'Суммарная очаговая доза (СОД)', 'Total dose', 'num', { unit: 'u.gy' }),
     f('mrTRGrt', 'mrTRG после ЛТ', 'mrTRG after RT', 'sel', { options: ['1', '2', '3', '4', '5'] }),
     f('consChemo', 'Консолидирующая ХТ', 'Consolidation chemo', 'text'),
     f('chStart', 'Начало ХТ', 'Chemo start', 'date'),
@@ -740,7 +824,7 @@ function inRange(v, f, t2) { if (!f && !t2) return true; if (!v) return false; r
 function dfltOn() { var d = UI.dflt || {}; return !!(d.aF || d.aT || d.dF || d.dT); }
 function dfltStay(r) { var d = UI.dflt || {}; return inRange(r.date, d.aF, d.aT) && inRange(r.discharge, d.dF, d.dT); }
 function patStays(p) { var sn = nameTokens(p.d.fio)[0]; return (DB.cols.planner || []).filter(function (r) { return r.status !== 'Отменено' && (r.pid ? r.pid === p.id : !!sn && nameTokens(r.fio)[0] === sn); }); }
-function dfltPat(p) { return !dfltOn() || patStays(p).some(dfltStay); }
+function dfltPat(p) { return !dfltOn() || patStays(p).some(dfltStay) || ((p.d.admDate || p.d.disDate) && dfltStay({ date: p.d.admDate, discharge: p.d.disDate })); }
 function dfltRec(k, r) { if (!dfltOn()) return true; if (k === 'planner') return dfltStay(r); var p = r.pid ? DB.patients.filter(function (x) { return x.id === r.pid; })[0] : null; if (!p && r.fio) { var sn = nameTokens(r.fio)[0]; p = DB.patients.filter(function (x) { return nameTokens(x.d.fio)[0] === sn; })[0]; } return p ? dfltPat(p) : false; }
 function stagesDone(p) { var f = fuList(p); return f.length > 0 && f.every(function (x) { return x.st === 'done'; }) && !(p.q || []).some(function (e) { return !e.date; }); }
 function renderDateFilters(withStage) {
@@ -1600,7 +1684,9 @@ function bind(path, val) {
   if (head === 'fuc') { var dq = S.drawer.p, kk = rest.split('.'); dq.fuc = dq.fuc || {}; var c2 = dq.fuc[kk[0]] = dq.fuc[kk[0]] || {}; if (!Object.keys(c2).length && dq.fu[kk[0]]) (FU_ITEMS[kk[0]] || []).forEach(function (x) { c2[x[0]] = typeof dq.fu[kk[0]] === 'string' ? dq.fu[kk[0]] : isoOf(new Date()); }); if (val) c2[kk[1]] = isoOf(new Date()); else delete c2[kk[1]]; var allD = (FU_ITEMS[kk[0]] || []).every(function (x) { return c2[x[0]]; }); if (allD) dq.fu[kk[0]] = dq.fu[kk[0]] || isoOf(new Date()); else delete dq.fu[kk[0]]; return; }
   if (head === 'm') { S.drawer.members[rest] = !!val; return; }
   var tg = target(path); if (tg) setPath(tg[0], tg[1], val);
+  if ((path === 'd.height' || path === 'd.weight') && S.drawer) bmiAuto(S.drawer.p.d);
 }
+function bmiAuto(d) { var h = num(d.height), w = num(d.weight); if (h && w && h > 100 && h < 230 && w > 25 && w < 300) d.bmi = String(Math.round(w / Math.pow(h / 100, 2) * 10) / 10); }
 function openPatient(id, preset) {
   var p = id ? DB.patients.filter(function (x) { return x.id === id; })[0] : null, isNew = !p;
   if (isNew) {
@@ -1948,7 +2034,8 @@ function readCsv(text) {
 }
 
 /* ======================= Registry export ======================= */
-var ANON = { fio: 1, ib: 1 };
+var ANON = { fio: 1, ib: 1, iin: 1, phone: 1, address: 1 };
+var PII = { fio: 1, ib: 1, iin: 1, phone: 1, address: 1, nation: 1 };
 function fieldOpts(x) { return x.options || (x.optionsFn ? x.optionsFn({}) : []) || []; }
 function nodeCodes() { var o = []; LN_ST.forEach(function (st) { if (st[3] === 2) { o.push(st[0] + ' rt'); o.push(st[0] + ' lt'); } else o.push(st[0]); }); return o; }
 function exportCols(list, reg, o) {
@@ -3235,7 +3322,7 @@ function patText(p, full) {
   if (!AI.deid && d.fio) out.push('ФИО: ' + d.fio);
   PHASES.forEach(function (ph) {
     SECTIONS.filter(function (s) { return s.phase === ph[0] && secOn(s, d); }).forEach(function (s) {
-      var rows = s.fields.filter(function (x) { return x.id !== 'fio' && x.id !== 'ib' && has(d[x.id]) && (!x.show || x.show(d)); }).map(function (x) { return '  ' + lab(x) + ': ' + fmtVal(x, d[x.id]); });
+      var rows = s.fields.filter(function (x) { return !(PII[x.id] && (AI.deid || x.id === 'fio' || x.id === 'ib' || x.id === 'iin')) && !(AI.deid && x.id === 'dob') && has(d[x.id]) && (!x.show || x.show(d)); }).map(function (x) { return '  ' + lab(x) + ': ' + fmtVal(x, d[x.id]); });
       MODULES.forEach(function (m) { if (m.sec === s.id && m.when(d)) m.fields.forEach(function (x) { if (has(d[x.id]) && (!x.show || x.show(d))) rows.push('  ' + lab(x) + ': ' + fmtVal(x, d[x.id])); }); });
       if (rows.length) out.push('[' + L(s.title) + ']\n' + rows.join('\n'));
     });
@@ -3658,6 +3745,7 @@ function viewTitle() {
   if (v === 'home') return LL('Главная', 'Home');
   if (v === 'users') return LL('Пользователи', 'Users');
   if (v === 'fu') return t('nav.followup');
+  if (v === 'retro') return LL('Ретро-загрузка документов', 'Retrospective import');
   if (v === 'studies') return t('nav.studies');
   if (v === 'q') return LL('Анкеты', 'Questionnaires');
   if (v === 'appr') return LL('На одобрении', 'Awaiting approval');
@@ -3765,6 +3853,7 @@ function renderMain() {
   if (v === 'users') return renderUsers();
   if (v === 'appr') return renderAppr();
   if (v === 'fu') return renderFu();
+  if (v === 'retro') return renderRetro();
   if (v === 'studies') return renderStudies();
   if (v === 'q') return renderQPage();
   if (v.indexOf('col:') === 0) { var k = v.slice(4); if (COLS[k]) return renderCol(k); }
@@ -3809,7 +3898,7 @@ function cmdGo(k) {
 /* students see anonymised data only */
 function maskForStudent() {
   function m(s, id) { return id ? LL('Пациент ', 'Patient ') + id : LL('Пациент', 'Patient'); }
-  DB.patients.forEach(function (p) { p.d.fio = m(p.d.fio, p.id); delete p.d.ib; });
+  DB.patients.forEach(function (p) { p.d.fio = m(p.d.fio, p.id); ['ib', 'iin', 'phone', 'address', 'nation'].forEach(function (k) { delete p.d[k]; }); });
   Object.keys(DB.cols).forEach(function (k) { DB.cols[k].forEach(function (r) { if (r.fio) r.fio = m(r.fio, r.pid); if (k === 'mm' && r.title) r.title = m(r.title, r.pid); if (r.mp) { ['fam', 'nam', 'otc', 'iin', 'dob', 'addr'].forEach(function (x) { delete r.mp[x]; }); } }); });
 }
 
@@ -3883,6 +3972,12 @@ document.addEventListener('click', function (ev) {
     case 'fileDel': { var td2 = target(g('path')); var fd = (getPath(td2[0], td2[1]) || []).slice(); if (fd[+g('i')] && fd[+g('i')].fid) fileDelBlob(fd[+g('i')].fid); fd.splice(+g('i'), 1); bind(g('path'), fd.length ? fd : ''); render(); break; }
     case 'savep': savePatient(); break;
     case 'dxopen': dxOpen(); break;
+    case 'retrostart': { var rk = root.querySelector('#retrokeep'), ra = root.querySelector('#retroagree'); RETRO.keep = rk ? rk.checked : true; RETRO.agree = ra ? ra.checked : false; retroStart(); break; }
+    case 'retrostop': RETRO.run = false; render(); break;
+    case 'retroclear': RETRO.items = []; render(); break;
+    case 'retrodel': RETRO.items = RETRO.items.filter(function (x) { return x.id !== g('id'); }); render(); break;
+    case 'retroretry': { var ri = RETRO.items.filter(function (x) { return x.id === g('id'); })[0]; if (ri) { ri.st = 'wait'; ri.err = ''; ri.retried = false; } retroStart(); break; }
+    case 'retroopen': retroOpen(g('id')); break;
     case 'dxclose': if (S.dx && S.dx.step === 'run') break; S.dx = null; render(); break;
     case 'dxrun': { var kp = root.querySelector('#dxkeep'), ag = root.querySelector('#dxagree'); S.dx.keep = kp ? kp.checked : true; S.dx.agree = ag ? ag.checked : false; dxRun(); break; }
     case 'dxback': S.dx.step = 'pick'; render(); break;
@@ -4102,6 +4197,8 @@ document.addEventListener('input', function (ev) {
 });
 document.addEventListener('change', function (ev) {
   var tg = ev.target, b = tg.getAttribute('data-bind');
+  if (tg.id === 'retrofiles') { retroAdd(tg.files); tg.value = ''; return; }
+  if (tg.getAttribute('data-act') === 'retropick') { var rp = RETRO.items.filter(function (x) { return x.id === tg.getAttribute('data-id'); })[0]; if (rp) rp.pid = tg.value || null; render(); return; }
   if (tg.id === 'dxfile' && S.dx) { var kp0 = root.querySelector('#dxkeep'), ag0 = root.querySelector('#dxagree'); if (kp0) S.dx.keep = kp0.checked; if (ag0) S.dx.agree = ag0.checked; S.dx.file = tg.files && tg.files[0] || null; render(); return; }
   if (tg.getAttribute('data-act') === 'dflt') { UI.dflt = UI.dflt || {}; if (tg.value) UI.dflt[tg.getAttribute('data-id')] = tg.value; else delete UI.dflt[tg.getAttribute('data-id')]; saveUI(); render(); return; }
   if (tg.getAttribute('data-act') === 'flt') { UI.flt = UI.flt || {}; if (tg.value) UI.flt[tg.getAttribute('data-id')] = tg.value; else delete UI.flt[tg.getAttribute('data-id')]; saveUI(); render(); return; }
@@ -4128,9 +4225,9 @@ document.addEventListener('drop', function (ev) {
   else { if (v) r[c.statusField] = v; else delete r[c.statusField]; toast(t('toast.status', { s: v ? ov(v) : t('board.none') })); }
   dragId = null; save(); render();
 });
-document.addEventListener('dragover', function (ev) { if (S.dx && S.dx.step === 'pick') { ev.preventDefault(); var z = root.querySelector('.dxdrop'); if (z) z.classList.add('over'); } });
+document.addEventListener('dragover', function (ev) { if ((S.dx && S.dx.step === 'pick') || (S.view === 'retro' && !S.drawer)) { ev.preventDefault(); var z = root.querySelector('.dxdrop'); if (z) z.classList.add('over'); } });
 document.addEventListener('dragleave', function (ev) { var z = root.querySelector('.dxdrop'); if (z && !ev.relatedTarget) z.classList.remove('over'); });
-document.addEventListener('drop', function (ev) { if (!S.dx || S.dx.step !== 'pick') return; ev.preventDefault(); var f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0]; if (f) { var kp1 = root.querySelector('#dxkeep'), ag1 = root.querySelector('#dxagree'); if (kp1) S.dx.keep = kp1.checked; if (ag1) S.dx.agree = ag1.checked; S.dx.file = f; render(); } });
+document.addEventListener('drop', function (ev) { if (S.view === 'retro' && !S.drawer && !S.dx) { ev.preventDefault(); retroAdd(ev.dataTransfer && ev.dataTransfer.files); return; } if (!S.dx || S.dx.step !== 'pick') return; ev.preventDefault(); var f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0]; if (f) { var kp1 = root.querySelector('#dxkeep'), ag1 = root.querySelector('#dxagree'); if (kp1) S.dx.keep = kp1.checked; if (ag1) S.dx.agree = ag1.checked; S.dx.file = f; render(); } });
 document.getElementById('importFile').addEventListener('change', function (ev) {
   var fl = ev.target.files[0]; if (!fl) return; var rd = new FileReader();
   rd.onload = function () {
@@ -4596,7 +4693,7 @@ function dxFields() {
     s.fields.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = 1; list.push({ x: x, sec: L(s.title) }); } });
     MODULES.forEach(function (m) { if (m.sec !== s.id) return; m.fields.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = 1; list.push({ x: x, sec: L(s.title) + ' / ' + L(m.title) }); } }); });
   });
-  return list.filter(function (o) { return ['files', 'nodes'].indexOf(o.x.type) < 0 && ['ib', 'studyNo'].indexOf(o.x.id) < 0; });
+  return list.filter(function (o) { return ['files', 'nodes'].indexOf(o.x.type) < 0 && o.x.id !== 'studyNo' && (AI.prov === 'local' || !PII[o.x.id] || o.x.id === 'fio'); });
 }
 function dxSchemaText() {
   var TY = { text: 'строка', long: 'текст', num: 'число', date: 'дата YYYY-MM-DD', sel: 'один вариант из списка', seg: 'один вариант из списка', multi: 'массив вариантов из списка' };
@@ -4614,7 +4711,7 @@ var DX_SYS = 'Ты модуль извлечения данных колорек
   '4. Для каждого значения дай quote: дословную короткую цитату из документа (до 150 символов), на которой оно основано, и confidence от 0 до 1.\n' +
   '5. issues: всё, что мешало: неразборчиво (unreadable), двусмысленно (ambiguous), противоречия внутри документа (conflict), нет варианта в списке (not_in_options), клинически несогласованно (inconsistent: например стадия не соответствует TNM, возраст не соответствует дате рождения).\n' +
   '6. questions: конкретные вопросы врачу, ответ на которые позволит заполнить или уточнить поля.\n' +
-  '7. Не включай в ответ ИИН, адрес и номера документов.\n' +
+  '7. {PII}\n' +
   'Формат ответа:\n{"doc":{"type":"вид документа","date":"YYYY-MM-DD или пусто","summary":"2-3 предложения о содержании"},' +
   '"fields":[{"id":"id поля","value":<значение>,"confidence":0.0,"quote":"цитата","note":"пояснение при необходимости"}],' +
   '"issues":[{"id":"id поля или пусто","kind":"ambiguous|conflict|unreadable|not_in_options|inconsistent","text":"что именно не так"}],' +
@@ -4624,6 +4721,7 @@ function dxParseJSON(s) {
   var a = s.indexOf('{'), b = s.lastIndexOf('}'); if (a < 0 || b < a) throw new Error(LL('ИИ вернул ответ не в формате JSON', 'AI did not return JSON'));
   return JSON.parse(s.slice(a, b + 1));
 }
+function dxSys() { return DX_SYS.replace('{PII}', AI.prov === 'local' ? 'Персональные данные (ИИН, адрес, телефон, номер истории болезни) заполняй, если они есть: обработка идёт на сервере центра.' : 'Не возвращай ИИН, адрес, телефон и номер истории болезни: обработка идёт во внешнем сервисе. Эти поля пропусти без issue.'); }
 function dxCall(doc, schema) {
   var pv = AI.prov, prompt = 'СХЕМА КАРТОЧКИ (id | название | тип | варианты):\n' + schema + '\n\nДОКУМЕНТ «' + doc.name + '»' + (doc.text && !doc.scanned ? ' (текстовый слой):\n' + doc.text.slice(0, 60000) : (doc.text ? ' (текстовый слой почти пуст, смотри изображения страниц)' : ' (см. приложенный файл)')) + '\n\nВерни JSON по формату.';
   if (AI.coolUntil && Date.now() < AI.coolUntil) return Promise.reject(new Error(aiQuotaMsg()));
@@ -4633,7 +4731,7 @@ function dxCall(doc, schema) {
     if (doc.kind === 'pdf') parts.push({ inline_data: { mime_type: 'application/pdf', data: doc.b64 } });
     else if (doc.kind === 'image') parts.push({ inline_data: { mime_type: doc.imgType, data: doc.images[0] } });
     parts.push({ text: prompt });
-    var body = { systemInstruction: { parts: [{ text: DX_SYS }] }, contents: [{ role: 'user', parts: parts }], generationConfig: { temperature: 0.1, maxOutputTokens: 16384, responseMimeType: 'application/json' } };
+    var body = { systemInstruction: { parts: [{ text: dxSys() }] }, contents: [{ role: 'user', parts: parts }], generationConfig: { temperature: 0.1, maxOutputTokens: 16384, responseMimeType: 'application/json' } };
     return fetch(AI_BASE + '/models/' + AI.model + ':generateContent?key=' + encodeURIComponent(AI.key), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
       .then(function (j) { var c = (j.candidates || [])[0] || {}; return ((c.content || {}).parts || []).filter(function (p) { return p.text && !p.thought; }).map(function (p) { return p.text; }).join(''); });
@@ -4643,7 +4741,7 @@ function dxCall(doc, schema) {
     if (doc.kind === 'pdf') content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: doc.b64 } });
     else if (doc.kind === 'image') content.push({ type: 'image', source: { type: 'base64', media_type: doc.imgType, data: doc.images[0] } });
     content.push({ type: 'text', text: prompt });
-    return fetch(AI_URL.anthropic + '/messages', { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify({ model: AI.model, max_tokens: 8192, temperature: 0.1, system: DX_SYS, messages: [{ role: 'user', content: content }] }) })
+    return fetch(AI_URL.anthropic + '/messages', { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify({ model: AI.model, max_tokens: 8192, temperature: 0.1, system: dxSys(), messages: [{ role: 'user', content: content }] }) })
       .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
       .then(function (j) { return (j.content || []).map(function (c) { return c.text || ''; }).join(''); });
   }
@@ -4651,7 +4749,7 @@ function dxCall(doc, schema) {
   var visual = pv !== 'deepseek' && doc.images.length && (doc.scanned || doc.kind === 'image');
   var uc = visual ? [{ type: 'text', text: prompt }].concat(doc.images.map(function (b) { return { type: 'image_url', image_url: { url: 'data:' + (doc.imgType || 'image/jpeg') + ';base64,' + b } }; })) : prompt;
   if (!visual && doc.scanned) return Promise.reject(new Error(LL('Документ отсканирован (нет текстового слоя), а выбранная модель не читает изображения. Нужна модель с распознаванием изображений или OCR.', 'Scanned document without text layer; the selected model cannot read images. Use a vision model or OCR.')));
-  var ob = { model: AI.model, messages: [{ role: 'system', content: DX_SYS }, { role: 'user', content: uc }], response_format: { type: 'json_object' } };
+  var ob = { model: AI.model, messages: [{ role: 'system', content: dxSys() }, { role: 'user', content: uc }], response_format: { type: 'json_object' } };
   if (!/^o\d|gpt-5/.test(AI.model)) ob.temperature = 0.1;
   return fetch(aiUrl(pv) + '/chat/completions', { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify(ob) })
     .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
@@ -4693,6 +4791,7 @@ function dxApply(res, keep) {
   dr.aiFilled = dr.aiFilled || {};
   (res.fields || []).forEach(function (r) {
     var x = FIELD[r.id]; if (!x || ['files', 'nodes'].indexOf(x.type) >= 0) { if (r.id) rep.rejected.push({ id: r.id, label: r.id, why: LL('такого поля нет в карточке', 'no such field'), quote: r.quote, raw: r.value }); return; }
+    if (PII[x.id] && x.id !== 'fio' && AI.prov !== 'local' && aiReady()) return;
     var nv = dxNorm(x, r.value), row = { id: x.id, label: L(x.label), quote: r.quote || '', conf: typeof r.confidence === 'number' ? r.confidence : 0.5, note: r.note || '', raw: r.value };
     if (nv.err) { if (nv.err !== 'empty') rep.rejected.push(Object.assign(row, { why: nv.err })); return; }
     row.v = nv.v; if (nv.warn) row.note = (row.note ? row.note + '. ' : '') + nv.warn;
@@ -4703,6 +4802,7 @@ function dxApply(res, keep) {
     }
     row.prev = old; d[x.id] = nv.v; dr.aiFilled[x.id] = { q: row.quote, c: row.conf }; rep.filled.push(row);
   });
+  if ((dr.aiFilled.height || dr.aiFilled.weight) && !has(d.bmi)) bmiAuto(d);
   var vis = dxVisible(d); rep.filled.forEach(function (r) { if (!vis[r.id]) { r.hidden = true; r.note = (r.note ? r.note + '. ' : '') + LL('Поле скрыто при текущих данных карточки и при сохранении не останется. Проверьте связанные поля.', 'Field hidden with current data; will not be kept on save.'); } });
   rep.issues = (res.issues || []).map(function (i) { var x = FIELD[i.id]; return { id: i.id || '', label: x ? L(x.label) : '', kind: i.kind || 'ambiguous', text: i.text || '' }; });
   var issueIds = {}; rep.issues.concat(rep.rejected).forEach(function (i) { if (i.id) issueIds[i.id] = 1; });
@@ -4710,7 +4810,7 @@ function dxApply(res, keep) {
     if (!secOn(s, d)) return;
     var fl = s.fields.filter(function (x) { return !x.show || x.show(d); });
     MODULES.forEach(function (m) { if (m.sec === s.id && m.when(d)) fl = fl.concat(m.fields.filter(function (x) { return !x.show || x.show(d); })); });
-    var miss = fl.filter(function (x) { var v = d[x.id]; return ['files', 'nodes'].indexOf(x.type) < 0 && ['ib', 'studyNo'].indexOf(x.id) < 0 && (!has(v) || (Array.isArray(v) && !v.length)); });
+    var miss = fl.filter(function (x) { var v = d[x.id]; return ['files', 'nodes'].indexOf(x.type) < 0 && x.id !== 'studyNo' && !(PII[x.id] && AI.prov !== 'local') && (!has(v) || (Array.isArray(v) && !v.length)); });
     if (miss.length) rep.missing.push({ sec: L(s.title), items: miss.map(function (x) { return { id: x.id, label: L(x.label), flagged: !!issueIds[x.id] }; }) });
   });
   return rep;
@@ -4768,6 +4868,7 @@ function renderDx() {
   var r = dx.rep, nMiss = r.missing.reduce(function (a, s) { return a + s.items.length; }, 0), low = r.filled.filter(function (x) { return !x.undone && x.conf < 0.7; });
   var probs = r.issues.length + r.rejected.length;
   h += '<section class="modal dxrep" role="dialog" aria-modal="true"><div class="dhead"><div><div class="dh-title">' + ico('sparkle', 18) + LL('Сводка заполнения из документа', 'Document extraction summary') + '</div><div class="hint">' + esc(r.file) + ' · ' + esc(r.src) + '</div></div><button type="button" class="iconbtn" data-act="dxclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
+  if (r.match) h += '<div class="dxprov ok" style="margin-bottom:12px">' + ico('users', 16) + '<div><b>' + esc(r.match) + '</b></div></div>';
   if (r.doc && (r.doc.type || r.doc.summary)) h += '<div class="dxdoc"><b>' + esc(r.doc.type || '') + (r.doc.date ? ' · ' + fmtDate(r.doc.date) : '') + '</b><p>' + esc(r.doc.summary || '') + '</p></div>';
   h += '<div class="dxtiles">' + [[r.filled.filter(function (x) { return !x.undone; }).length, LL('заполнено', 'filled'), 'ok'], [low.length, LL('проверить: низкая уверенность', 'check: low confidence'), 'warn'], [r.conflict.length, LL('расходятся с карточкой', 'differ from record'), 'warn'], [probs, LL('трудности и неточности', 'difficulties'), 'bad'], [r.questions.length, LL('вопросы врачу', 'questions'), 'q'], [nMiss, LL('пусто: нет в документе', 'empty: not in document'), 'mut']].map(function (x) { return '<div class="dxt ' + x[2] + '"><b>' + x[0] + '</b><span>' + x[1] + '</span></div>'; }).join('') + '</div>';
   function conf(c) { var p = Math.round(c * 100); return '<span class="dxc ' + (c >= 0.85 ? 'hi' : c >= 0.7 ? 'mid' : 'lo') + '">' + p + '%</span>'; }
@@ -4781,11 +4882,91 @@ function renderDx() {
   return h;
 }
 
+/* ======================= Retro batch: many documents → cards ======================= */
+var RETRO = { items: [], run: false, keep: true, agree: false };
+function retroMatch(res) {
+  var F = {}; (res.fields || []).forEach(function (r) { F[r.id] = r.value; });
+  var fio = F.fio ? String(F.fio) : '', dob = F.dob ? (dxNorm(FIELD.dob, F.dob).v || '') : '', ib = F.ib ? String(F.ib).trim() : '';
+  var who = { fio: fio, dob: dob, ib: ib };
+  if (ib) { var byIb = DB.patients.filter(function (p) { return p.d.ib && String(p.d.ib).trim() === ib; }); if (byIb.length === 1) return { who: who, p: byIb[0], how: LL('по № ИБ', 'by case no.') }; }
+  var tk = nameTokens(fio); if (!tk.length) return { who: who, p: null, how: LL('ФИО не найдено в документе', 'no name in document') };
+  var c = DB.patients.filter(function (p) { var pt = nameTokens(p.d.fio); if (!pt.length || pt[0] !== tk[0]) return false; if (tk[1] && pt[1] && pt[1][0] !== tk[1][0]) return false; if (dob && p.d.dob && p.d.dob !== dob) return false; return true; });
+  if (c.length === 1) return { who: who, p: c[0], how: dob && c[0].d.dob === dob ? LL('по ФИО и дате рождения', 'by name and DOB') : LL('по ФИО', 'by name') };
+  if (c.length > 1) return { who: who, p: null, cand: c, how: LL('несколько похожих карточек: выберите вручную', 'several similar records: choose manually') };
+  return { who: who, p: null, how: LL('совпадений нет: будет создана новая карточка', 'no match: a new record will be created') };
+}
+function retroAdd(files) { [].slice.call(files || []).forEach(function (f) { RETRO.items.push({ id: uid('rt'), file: f, st: 'wait' }); }); render(); }
+function retroStart() {
+  if (RETRO.run) return;
+  if (aiReady() && AI.prov !== 'local' && !RETRO.agree) { toast(LL('Подтвердите отправку документов во внешний сервис ИИ', 'Confirm sending documents to the external AI service')); return; }
+  RETRO.run = true; render(); retroNext();
+}
+function retroNext() {
+  var it = RETRO.items.filter(function (x) { return x.st === 'wait'; })[0];
+  if (!it || !RETRO.run) { RETRO.run = false; render(); return; }
+  it.st = 'read'; render();
+  dxReadFile(it.file).then(function (doc) {
+    it.doc = { kind: doc.kind, pages: doc.pages, scanned: doc.scanned };
+    if (!aiReady()) { if (doc.scanned) throw new Error(LL('Скан без текста: нужен ИИ', 'Scan without text: AI needed')); return dxRules(doc); }
+    it.st = 'ai'; render();
+    return dxCall(doc, dxSchemaText()).then(dxParseJSON);
+  }).then(function (res) {
+    it.res = res; it.m = retroMatch(res); it.st = 'done'; it.src = aiReady() ? AI_PROV[AI.prov].name + ' · ' + AI.model : LL('шаблоны без ИИ', 'rules, no AI');
+    it.nF = (res.fields || []).length; it.nI = (res.issues || []).length + (res.questions || []).length;
+    it.pid = it.m.p ? it.m.p.id : null; render(); setTimeout(retroNext, 1500);
+  }).catch(function (e) {
+    var msg = (e && e.message) || String(e);
+    if (/лимит|quota|rate|429/i.test(msg) && !it.retried) { it.retried = true; it.st = 'wait'; it.note = LL('Лимит ИИ: жду минуту и повторяю', 'AI rate limit: retrying in a minute'); render(); setTimeout(retroNext, 65000); return; }
+    it.st = 'err'; it.err = msg; render(); setTimeout(retroNext, 1500);
+  });
+}
+function retroOpen(id) {
+  var it = RETRO.items.filter(function (x) { return x.id === id; })[0]; if (!it || !it.res) return;
+  var pid = it.pid && DB.patients.some(function (p) { return p.id === it.pid; }) ? it.pid : null;
+  openPatient(pid, pid ? null : {});
+  S.drawer.retroItem = it.id;
+  S.dx = { step: 'rep', keep: RETRO.keep, file: it.file };
+  S.dx.rep = dxApply(it.res, RETRO.keep); S.dx.rep.src = it.src; S.dx.rep.file = it.file.name; S.dx.rep.at = nowIso();
+  S.dx.rep.match = it.m ? (pid ? LL('Документ отнесён к карточке ', 'Matched to record ') + pid + ' (' + it.m.how + ')' : it.m.how) : '';
+  S.drawer.p.docsAI = (S.drawer.p.docsAI || []).concat([{ name: it.file.name, at: S.dx.rep.at, by: me(), src: it.src, n: S.dx.rep.filled.length }]);
+  it.opened = true; render();
+}
+function renderRetro() {
+  var st = { wait: [LL('В очереди', 'Queued'), ''], read: [LL('Читаю файл', 'Reading'), 'prog'], ai: [LL('ИИ извлекает данные', 'AI extracting'), 'prog'], done: [LL('Готово', 'Done'), 'done'], err: [LL('Ошибка', 'Error'), 'cancel'] };
+  var h = pageHead(LL('Пациенты', 'Patients'), LL('Ретро-загрузка документов', 'Retrospective document import'), LL('Загрузите пачку выписок, протоколов операций, гистологий, консультативных листов. ИИ по очереди извлечёт данные, найдёт карточку пациента по ФИО, дате рождения или № ИБ (или предложит новую), а вы откроете каждую, проверите сводку и сохраните.', 'Upload a batch of documents; AI extracts data, matches patients, you review and save each.'), '');
+  h += '<div class="retro"><label class="dxdrop"><input type="file" id="retrofiles" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,application/pdf,image/*,text/plain" hidden>' + ico('upload', 28) + '<b>' + LL('Выберите или перетащите файлы', 'Choose or drop files') + '</b><span>' + LL('Можно сразу много: PDF, сканы, фото, текст', 'Many at once: PDF, scans, photos, text') + '</span></label>';
+  h += '<div class="retro-opts"><label class="chk"><input type="checkbox" id="retrokeep"' + (RETRO.keep ? ' checked' : '') + '><span>' + LL('Не перезаписывать уже заполненные поля', 'Keep fields already filled') + '</span></label>';
+  if (aiReady()) { var loc = AI.prov === 'local'; h += '<div class="dxprov ' + (loc ? 'ok' : 'warn') + '">' + ico(loc ? 'lock' : 'alert', 16) + '<div><b>' + LL('Обработка: ', 'Processing: ') + esc(AI_PROV[AI.prov].name) + ' · ' + esc(AI.model) + '</b><span>' + (loc ? LL('Документы не покидают сеть центра.', 'Documents stay inside the centre network.') : LL('Документы целиком уходят во внешний облачный сервис. ИИН, адрес, телефон и № ИБ ИИ не возвращает, но в самом файле они есть. Для реальных документов используйте локальную модель центра.', 'Documents go to an external cloud service. Use the centre\'s local model for real records.')) + '</span></div></div>' + (loc ? '' : '<label class="chk"><input type="checkbox" id="retroagree"' + (RETRO.agree ? ' checked' : '') + '><span>' + LL('Понимаю и подтверждаю отправку этих документов', 'I confirm sending these documents') + '</span></label>'); }
+  else h += '<div class="dxprov warn">' + ico('alert', 16) + '<div><b>' + LL('ИИ не подключён', 'AI not connected') + '</b><span>' + LL('Сработает только простое распознавание текстовых PDF. Подключите ИИ для полного заполнения.', 'Rule-based parsing only. Connect AI for full extraction.') + '</span></div></div>';
+  var nW = RETRO.items.filter(function (x) { return x.st === 'wait'; }).length;
+  h += '<div class="actions"><button type="button" class="btn primary" data-act="retrostart"' + (nW && !RETRO.run ? '' : ' disabled') + '>' + ico('sparkle', 16) + (RETRO.run ? LL('Идёт обработка…', 'Processing…') : LL('Обработать', 'Process') + (nW ? ' (' + nW + ')' : '')) + '</button>' + (RETRO.run ? '<button type="button" class="btn ghost" data-act="retrostop">' + LL('Остановить после текущего', 'Stop after current') + '</button>' : '') + (RETRO.items.length && !RETRO.run ? '<button type="button" class="btn ghost" data-act="retroclear">' + LL('Очистить список', 'Clear list') + '</button>' : '') + '</div></div>';
+  if (RETRO.items.length) {
+    h += '<div class="tablewrap"><table class="grid retrotab"><thead><tr><th>' + LL('Файл', 'File') + '</th><th>' + LL('Статус', 'Status') + '</th><th>' + LL('Документ', 'Document') + '</th><th>' + LL('Пациент в документе', 'Patient in document') + '</th><th>' + LL('Карточка', 'Record') + '</th><th>' + LL('Найдено', 'Found') + '</th><th></th></tr></thead><tbody>';
+    RETRO.items.forEach(function (it) {
+      var s = st[it.st], d = it.res && it.res.doc || {}, w = it.m ? it.m.who : {};
+      var card = '';
+      if (it.m) {
+        if (it.m.cand) card = '<select data-act="retropick" data-id="' + it.id + '"><option value="">' + LL('Новая карточка', 'New record') + '</option>' + it.m.cand.map(function (p) { return '<option value="' + p.id + '"' + (it.pid === p.id ? ' selected' : '') + '>' + p.id + ' · ' + esc(pName(p)) + (p.d.dob ? ' · ' + fmtDate(p.d.dob) : '') + '</option>'; }).join('') + '</select>';
+        else card = it.pid ? '<b class="mono">' + it.pid + '</b> ' + esc(pName(DB.patients.filter(function (p) { return p.id === it.pid; })[0] || { d: {} })) : '<span class="tag">' + LL('новая', 'new') + '</span>';
+        card += '<div class="muted small">' + esc(it.m.how) + '</div>';
+      }
+      h += '<tr><td class="strong">' + esc(it.file.name) + (it.doc ? '<div class="muted small">' + (it.doc.kind === 'pdf' ? it.doc.pages + LL(' стр.', ' p.') + (it.doc.scanned ? LL(', скан', ', scan') : '') : it.doc.kind) + '</div>' : '') + '</td>';
+      h += '<td><span class="st st-' + s[1] + '">' + s[0] + '</span>' + (it.note && it.st === 'wait' ? '<div class="muted small">' + esc(it.note) + '</div>' : '') + (it.err ? '<div class="aerr small">' + esc(it.err) + '</div>' : '') + '</td>';
+      h += '<td>' + esc(d.type || '') + (d.date ? '<div class="muted small">' + fmtDate(d.date) + '</div>' : '') + '</td><td>' + esc(w.fio || '') + (w.dob ? '<div class="muted small">' + fmtDate(w.dob) + '</div>' : '') + '</td><td>' + card + '</td>';
+      h += '<td>' + (it.st === 'done' ? it.nF + LL(' полей', ' fields') + (it.nI ? '<div class="muted small">' + it.nI + LL(' замечаний и вопросов', ' notes') + '</div>' : '') : '') + '</td>';
+      h += '<td class="nowrap">' + (it.st === 'done' ? '<button type="button" class="btn small ' + (it.opened ? '' : 'primary') + '" data-act="retroopen" data-id="' + it.id + '">' + (it.opened ? LL('Открыть снова', 'Open again') : LL('Открыть и проверить', 'Open and review')) + '</button>' : it.st === 'err' ? '<button type="button" class="btn small" data-act="retroretry" data-id="' + it.id + '">' + LL('Повторить', 'Retry') + '</button>' : '') + (!RETRO.run || it.st !== 'read' && it.st !== 'ai' ? '<button type="button" class="iconbtn sm" data-act="retrodel" data-id="' + it.id + '" aria-label="' + LL('Убрать', 'Remove') + '">' + ico('x', 14) + '</button>' : '') + '</td></tr>';
+    });
+    h += '</tbody></table></div><p class="muted small retro-note">' + LL('Ничего не сохраняется автоматически: откройте каждый документ, проверьте подсвеченные поля и сводку, затем нажмите «Сохранить» в карточке. Несколько документов одного пациента открывайте по очереди: каждый дополнит карточку.', 'Nothing is saved automatically: open each document, review, then Save.') + '</p>';
+  }
+  return h;
+}
+
 /* ======================= v12: top navigation (no sidebar) ======================= */
 function navGroups() {
   var g = [{ id: 'home', label: LL('Главная', 'Home'), v: 'home', icon: 'home' }];
   g.push({ id: 'work', label: LL('Работа', 'Work'), icon: 'cal', items: ['planner', 'mdt', 'mm'].map(function (k) { return { v: 'col:' + k, icon: COLS[k].icon, label: L(COLS[k].title), cnt: DB.cols[k].length }; }) });
   var pts = [{ v: 'reg:all', icon: 'users', label: t('nav.allPatients'), cnt: DB.patients.length }, { v: 'fu', icon: 'clock', label: t('nav.followup'), badge: fuDueAll().length || null }];
+  if (can('edit') && !isStudent()) pts.push({ v: 'retro', icon: 'upload', label: LL('Ретро-загрузка документов', 'Retrospective import'), cnt: RETRO.items.length || undefined });
   g.push({ id: 'pts', label: LL('Пациенты', 'Patients'), icon: 'users', items: pts });
   var regs = [];
   (function walk(list, d) { list.forEach(function (r) { regs.push({ v: 'reg:' + r.id, icon: d ? 'dot' : (r.id === 'g_endo' ? 'scope' : r.id === 'g_surg' ? 'knife' : 'tag'), label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, false), d + 1); }); })(kids(null, false), 0);
