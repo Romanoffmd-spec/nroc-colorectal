@@ -1514,6 +1514,39 @@ html[data-theme="dark"] .l-nav button{color:#C7CBD4}
 .fdate:has(.fdate-i.on){border-color:var(--accent-line);background:var(--accent-soft)}
 html[data-theme="dark"] .fdate-i{color-scheme:dark}
 @media (max-width:760px){.fdate{width:100%;flex-wrap:nowrap}.fdate b{flex:1}.fdate-i{width:118px}}
+
+/* v12.2: fluid width on any screen, scale up on large monitors */
+.app.v12 .content{padding-left:clamp(0px,1.2vw,40px);padding-right:clamp(0px,1.2vw,40px)}
+.t2-row{padding:0 clamp(16px,2vw,56px)}
+.mnav-in{padding:0 clamp(8px,1.6vw,48px)}
+#root{height:100%}.app.v12,.app.v12 .main{height:100%}
+.board{padding-left:28px;padding-right:28px}
+.bcol{flex:1 1 264px;width:auto;min-width:240px;max-width:520px}
+.drawer.full .pbody{max-width:1800px}
+.l-wrap{max-width:1560px}.l-top .l-wrap{max-width:none;padding:0 clamp(16px,2vw,56px)}
+@media (min-width:1900px){body{zoom:1.12}}
+@media (min-width:2300px){body{zoom:1.28}}
+@media (min-width:2800px){body{zoom:1.45}}
+@media (min-width:3400px){body{zoom:1.75}}
+
+.lp-sub{margin:22px 0 10px;font-size:14px;font-weight:600;color:#151515}
+.lp-qr{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.lqr{display:flex;align-items:center;gap:14px;padding:12px;border:1px solid var(--line);border-radius:var(--r);text-decoration:none;color:inherit;background:#fff}
+.lqr:hover{border-color:var(--navy);box-shadow:var(--sh2)}
+.lqr img{width:96px;height:96px;flex:none;image-rendering:pixelated;background:#fff;border-radius:4px}
+.lqr span{display:flex;flex-direction:column;gap:4px;min-width:0}.lqr b{font-size:14px;font-weight:600;color:#151515;line-height:1.35}
+.lqr em{font-style:normal;font-size:12px;color:var(--navy);display:inline-flex;align-items:center;gap:4px}
+.lp-src{margin:18px 0 0;font-size:12px;color:#6b7280;line-height:1.5}
+.l2-qr{margin-top:28px;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:22px}
+.l2-qr header{margin-bottom:14px}.l2-qr h2{margin:0;font-size:18px;font-weight:600;color:#151515}.l2-qr header p{margin:4px 0 0;color:#6b7280;font-size:14px}
+.l2-qr .lp-qr{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.l2-qr+.l2-urg{margin-top:28px}
+html[data-theme="dark"] .lqr,html[data-theme="dark"] .l2-qr{background:#0A0A0C}
+html[data-theme="dark"] .lqr b,html[data-theme="dark"] .l2-qr h2,html[data-theme="dark"] .lp-sub{color:#F4F5F7}
+html[data-theme="dark"] .lqr em{color:#AEB8FF}
+html[data-theme="dark"] .lp-src,html[data-theme="dark"] .l2-qr header p{color:#9CA3AF}
+@media (max-width:760px){.lqr img{width:84px;height:84px}.l2-qr{padding:16px}}
+@media (min-width:1500px){.l2-grid{gap:24px}}
 /*V12-END*/
 
 </style>
@@ -1521,9 +1554,9 @@ html[data-theme="dark"] .fdate-i{color-scheme:dark}
 <body>
 <div id="root"></div>
 <input type="file" id="importFile" accept=".json,.js,application/json,text/javascript" hidden>
-<script src="firebase-config.js?v=ed0dfe81"></script>
-<script src="i18n.js?v=ed0dfe81"></script>
-<script src="ai-corpus.js?v=ed0dfe81"></script>
-<script src="app.js?v=ed0dfe81"></script>
+<script src="firebase-config.js?v=d6cfe99e"></script>
+<script src="i18n.js?v=d6cfe99e"></script>
+<script src="ai-corpus.js?v=d6cfe99e"></script>
+<script src="app.js?v=d6cfe99e"></script>
 </body>
 </html>
