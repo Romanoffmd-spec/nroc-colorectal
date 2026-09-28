@@ -796,7 +796,7 @@ function pName(p) { return p.d.fio || p.id; }
 
 /* ======================= UI state ======================= */
 var S = { view: UI.view || 'home', q: '', drawer: null, edit: null, rec: null, menu: null, inline: null, expand: null, sort: {} };
-function setView(v) { S.view = v; S.q = ''; S.expand = null; S.inline = null; UI.view = v; saveUI(); S.sideMob = false; render(); var m = root.querySelector('.content'); if (m) m.scrollTop = 0; }
+function setView(v) { S.menu = null; S.view = v; S.q = ''; S.expand = null; S.inline = null; UI.view = v; saveUI(); S.sideMob = false; render(); var m = root.querySelector('.content'); if (m) m.scrollTop = 0; }
 
 /* ======================= Render: shell ======================= */
 var root = document.getElementById('root');
@@ -2898,10 +2898,10 @@ function renderUsers() {
 }
 
 /* portal (public page) and auth forms */
-function renderPortal() {
+function renderAuthCard() {
   var a = S.auth || (S.auth = { mode: 'login', role: 'resident' });
-  var h = '<div class="portal"><section class="pt-media"><div class="pt-img" style="background-image:url(media/nroc-hero-hd.webp)"></div><div class="pt-over"><div class="pt-top"><img src="media/nroc-logo-white.png" alt="NROC"><span>' + LL('Национальный научный онкологический центр', 'National Research Oncology Center') + '</span></div><div class="pt-copy"><div class="pt-kick">' + LL('Колоректальный сектор', 'Colorectal unit') + '</div><h1>' + LL('Клинический регистр и исследовательская платформа', 'Clinical registry and research platform') + '</h1><p>' + LL('Пациенты, операции, МДГ и M&M, исследования и публикации сектора в одном рабочем пространстве с ИИ-ассистентом.', 'Patients, operations, MDT and M&M, studies and publications in one workspace with an AI assistant.') + '</p></div><ul class="pt-feat"><li>' + ico('users', 16) + LL('Единая карточка: до, во время и после операции', 'One record: before, during and after surgery') + '</li><li>' + ico('flask', 16) + LL('Протоколы исследований, рандомизация, анкеты', 'Study protocols, randomisation, PROMs') + '</li><li>' + ico('sparkle', 16) + LL('ИИ-ассистент: анализ, доказательства, черновики', 'AI assistant: analysis, evidence, drafts') + '</li></ul><div class="pt-foot">Astana · ' + new Date().getFullYear() + '</div></div></section>';
-  h += '<section class="pt-form"><div class="pt-lang">' + themeBtn() + langSeg() + '</div><div class="pt-card">';
+  var h = '';
+  h += '<div class="pt-card">';
   if (a.mode === 'wait') {
     h += '<div class="pt-icon">' + ico('clock', 26) + '</div><h2>' + LL('Заявка отправлена', 'Request sent') + '</h2><p class="muted">' + LL('Администратор сектора подтвердит учётную запись и роль. После этого войдите с той же почтой и паролем.', 'The unit administrator will approve your account and role. Then sign in with the same email and password.') + '</p><button type="button" class="btn primary wide" data-act="amode" data-v="login">' + LL('Ко входу', 'Back to sign-in') + '</button>';
   } else {
@@ -2919,7 +2919,7 @@ function renderPortal() {
     h += '<button type="button" class="btn primary wide" data-act="' + (reg ? 'aregister' : 'alogin') + '"' + (a.busy ? ' disabled' : '') + '>' + (a.busy ? LL('Подождите…', 'Please wait…') : reg ? LL('Отправить заявку', 'Request access') : LL('Войти', 'Sign in')) + '</button>';
     if (!CLOUD.on && !localUsers().length) h += '<p class="pt-note">' + LL('Первый зарегистрированный пользователь становится администратором.', 'The first registered user becomes the administrator.') + '</p>';
   }
-  h += '</div><div class="pt-mode">' + (CLOUD.on ? '<span class="dot ok"></span>' + LL('Общая база · ', 'Shared database · ') + esc(CLOUD.cfg.projectId) + (CLOUD.err ? ' · <span class="due">' + esc(CLOUD.err) + '</span>' : !CLOUD.ready ? LL(' · подключение…', ' · connecting…') : '') : '<span class="dot"></span>' + LL('Локальный режим: данные в этом браузере', 'Local mode: data in this browser')) + ' · <button type="button" class="linkbtn" data-act="cloudsetup">' + LL('Облако', 'Cloud') + '</button></div></section></div>';
+  h += '</div><div class="pt-mode">' + (CLOUD.on ? '<span class="dot ok"></span>' + LL('Общая база · ', 'Shared database · ') + esc(CLOUD.cfg.projectId) + (CLOUD.err ? ' · <span class="due">' + esc(CLOUD.err) + '</span>' : !CLOUD.ready ? LL(' · подключение…', ' · connecting…') : '') : '<span class="dot"></span>' + LL('Локальный режим: данные в этом браузере', 'Local mode: data in this browser')) + ' · <button type="button" class="linkbtn" data-act="cloudsetup">' + LL('Облако', 'Cloud') + '</button></div>';
   return h;
 }
 function themeCur() { return UI.theme || (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); }
@@ -3643,8 +3643,8 @@ function render() {
   var h;
   if (!SESSION) { h = renderPortal(); if (S.cs) h += renderCloudSetup(); root.innerHTML = h; return; }
   var sideOn = window.innerWidth < 900 ? !!S.sideMob : UI.side;
-  h = '<div class="app' + (sideOn ? '' : ' side-closed') + (UI.aip ? ' aip-open' : '') + '">' + renderSide() + '<div class="main">' + renderTop() + '<main class="content" id="main">' + renderMain() + '<footer class="foot"><img src="media/nroc-logo.png" alt="NROC"><span>' + LL('Колоректальный сектор · ННОЦ, Астана', 'Colorectal unit · NROC, Astana') + '</span><span class="muted">' + '' + '</span></footer></main></div>' + renderTabbar() + '</div>';
-  if (sideOn) h += '<div class="side-dim" data-act="side"></div>';
+  h = '<div class="app v12 side-closed' + (UI.aip ? ' aip-open' : '') + '">' + '<div class="main">' + renderTop2() + '<main class="content" id="main">' + renderMain() + '<footer class="foot"><img src="media/nroc-logo.png" alt="NROC"><span>' + LL('Колоректальный сектор · ННОЦ, Астана', 'Colorectal unit · NROC, Astana') + '</span><span class="muted">' + '' + '</span></footer></main></div>' + renderTabbar() + '</div>';
+  if (S.sideMob) h += renderNavSheet();
   if (S.drawer) h += renderPatient();
   if (S.rec) h += renderRecord();
   if (S.qlink) h += renderQLink();
@@ -3782,7 +3782,9 @@ document.addEventListener('click', function (ev) {
   var NEED = { qlnew: 'edit', qllink: 'edit', qldel: 'edit', savep: 'edit', saverec: 'edit', delp: 'delete', delrec: 'delete', esave: 'edit', edelete: 'delete', enrgo: 'edit', enroll: 'edit', rand: 'rand', unlockf: 'unlock', impgo: 'edit', imp: 'edit', newp: 'edit', newrec: 'edit', newreg: 'edit', newstudy: 'edit', qbsave: 'edit', qbnew: 'edit', fillsave: 'edit', cmtadd: 'edit', labsdone: 'edit', reset: 'admin', restore: 'admin', tplsave: 'edit', qsched: 'edit', qnow: 'edit', toreg: 'edit', addlinked: 'edit' };
   if (NEED[a] && !can(NEED[a])) { toast(LL('Недостаточно прав для роли «', 'Not allowed for role "') + (SESSION ? roleName(SESSION.role) : '') + LL('»', '"')); return; }
   switch (a) {
-    case 'side': if (window.innerWidth < 900) S.sideMob = !S.sideMob; else { UI.side = !UI.side; saveUI(); } render(); break;
+    case 'side': S.sideMob = !S.sideMob; S.menu = null; render(); break;
+    case 'authshow': S.auth = S.auth || { mode: 'login', role: 'resident' }; S.auth.show = true; render(); break;
+    case 'authhide': if (S.auth) { S.auth.show = false; if (S.auth.mode === 'wait') S.auth.mode = 'login'; } render(); break;
     case 'lang': LANG = g('v'); UI.lang = LANG; saveUI(); render(); break;
     case 'menu': S.menu = S.menu === g('id') ? null : g('id'); render(); break;
     case 'view': { S.cmd = null; if (g('v') === 'users') S.users = null; var vv = g('v'), rg = vv.indexOf('reg:') === 0 ? regOf(vv.slice(4)) : null; if (rg) { UI.open = UI.open || {}; ancestors(rg).concat([rg]).forEach(function (a) { if (kids(a.id, a.kind === 'study').length) UI.open[a.id] = true; }); if (rg.kind === 'study') UI.open.studies = true; } setView(vv); break; }
@@ -4354,6 +4356,119 @@ function qStatsHTML() {
     }).join('') + '</div>';
     return '<div class="card qst' + (open ? ' open' : '') + '"><div class="qst-h"><b>' + esc(qShort(q)) + '</b><button type="button" class="linkbtn" data-act="qsopen" data-id="' + tid + '">' + (open ? LL('Скрыть разбор по вопросам', 'Hide per-question') : LL('Разбор по вопросам', 'Per-question breakdown')) + '</button></div><div class="qst-n"><span><i>' + xs.length + '</i>' + LL('анкет', 'forms') + '</span><span><i>' + Object.keys(pts).length + '</i>' + LL('пациентов', 'patients') + '</span>' + (inbox ? '<span><i>' + inbox + '</i>' + LL('во входящих', 'in inbox') + '</span>' : '') + (mean !== null ? '<span><i>' + mean + '</i>' + LL('средний балл', 'mean') + '</span><span><i>' + med + '</i>' + LL('медиана', 'median') + '</span><span><i>' + mn + '..' + mx + '</i>' + LL('разброс', 'range') + '</span>' : '') + '</div>' + (bands ? '<div class="qst-b">' + bands + '</div>' : '') + qh + '</div>';
   }).join('') + '</div>';
+}
+
+/* ======================= v12: public landing (patients) ======================= */
+var LAND = [
+  { id: 'prep', ic: 'clipboard', t: 'Подготовка к операции', s: 'Что сделать заранее, чтобы операция и восстановление прошли легче.', b: [
+    ['Обследования', ['Пройдите обследования, которые назначил врач: анализы крови, ЭКГ, при необходимости консультации терапевта и других специалистов.', 'Возьмите на консультацию все результаты КТ, МРТ, колоноскопии и гистологии, включая диски и стёкла, если они есть.']],
+    ['Лекарства', ['Составьте список всех лекарств, которые вы принимаете, с дозами.', 'Препараты, разжижающие кровь, сахароснижающие и гормональные средства отменяйте или меняйте только по указанию врача, самостоятельно не прекращайте.']],
+    ['Образ жизни', ['Откажитесь от курения как можно раньше, лучше за 4 недели до операции: это снижает риск осложнений со стороны лёгких и заживления.', 'Не употребляйте алкоголь.', 'Ходите пешком каждый день и делайте дыхательные упражнения, если врач не запретил.', 'Питайтесь полноценно: достаточно белка (мясо, рыба, яйца, творог). Если вы похудели, скажите об этом врачу.']],
+    ['Перед самой операцией', ['Подготовку кишечника и ограничения в еде и питье выполняйте строго по памятке, которую выдаст отделение.', 'Если вам может понадобиться стома, до операции с вами встретится врач или медсестра, чтобы выбрать и отметить удобное место на животе.', 'Вечером накануне примите душ.']]
+  ] },
+  { id: 'bag', ic: 'folder', t: 'Что взять в стационар', s: 'Список вещей и документов для госпитализации.', b: [
+    ['Документы', ['Удостоверение личности.', 'Направление на госпитализацию.', 'Результаты обследований и выписки из других больниц.', 'Список принимаемых лекарств и аллергий.']],
+    ['Лекарства', ['Лекарства, которые вы принимаете постоянно, в оригинальных упаковках, на несколько дней.']],
+    ['Личные вещи', ['Удобная одежда и сменная обувь с закрытой пяткой.', 'Средства личной гигиены, полотенце.', 'Компрессионные чулки, если их рекомендовал врач.', 'Телефон и зарядное устройство, очки, слуховой аппарат.', 'Питьевая вода.']],
+    ['Если у вас уже есть стома', ['Запас калоприёмников и средств ухода на 5-7 дней.']]
+  ] },
+  { id: 'after', ic: 'stethoscope', t: 'После операции', s: 'Восстановление в отделении и дома.', b: [
+    ['В отделении', ['Вставать и ходить начинают уже в первые сутки: это помогает кишечнику заработать и защищает от тромбов и пневмонии.', 'Пить и есть начинают рано, по разрешению врача.', 'Делайте дыхательные упражнения несколько раз в день.', 'Сообщайте о боли: её нужно и можно контролировать.']],
+    ['Дома', ['Ходите пешком каждый день, постепенно увеличивая расстояние.', 'Не поднимайте тяжести больше 5 кг примерно 6-8 недель, чтобы не образовалась грыжа. Точный срок уточните у хирурга.', 'Принимать душ можно, рану не трите и промокните полотенцем. Ванну, баню и бассейн отложите, пока рана полностью не заживёт.', 'За руль садитесь, когда сможете резко затормозить без боли и не принимаете сильные обезболивающие.']],
+    ['Контроль', ['Приходите на контрольные визиты и сдавайте анализы в сроки, которые назначил врач.', 'Гистологическое заключение обсуждается на мультидисциплинарной группе, и вам скажут, нужно ли дополнительное лечение.']]
+  ] },
+  { id: 'stoma', ic: 'shield', t: 'Уход за стомой', s: 'Как ухаживать за стомой и кожей вокруг неё.', b: [
+    ['Как выглядит здоровая стома', ['Розовая или красная, влажная, блестящая, похожа на слизистую рта. Она не болит при прикосновении.', 'Первые недели стома отёчная и постепенно уменьшается, поэтому размер отверстия пластины нужно периодически перемерять.']],
+    ['Смена калоприёмника', ['Опорожняйте мешок, когда он заполнен на треть или наполовину.', 'Меняйте пластину по инструкции к вашей системе, обычно раз в 1-3 дня, и сразу при подтекании.', 'Кожу вокруг промойте тёплой водой, промокните насухо. Спиртом и агрессивными средствами кожу не обрабатывайте.', 'Вырезайте отверстие пластины по размеру стомы с зазором 1-2 мм.']],
+    ['Кожа', ['Кожа под пластиной должна оставаться здоровой. Покраснение, мокнутие или боль означают подтекание: покажите кожу медсестре или врачу.']],
+    ['Калоприёмники', ['Обеспечение средствами ухода за стомой уточните в поликлинике по месту прикрепления.']]
+  ] },
+  { id: 'diet', ic: 'book', t: 'Питание', s: 'Как питаться после операции на кишечнике.', b: [
+    ['Общие правила', ['Ешьте небольшими порциями 5-6 раз в день, тщательно пережёвывайте.', 'Пейте достаточно жидкости, обычно 1,5-2 литра в день, если врач не назначил иначе.', 'Новые продукты вводите по одному и наблюдайте за реакцией кишечника.', 'В первые недели ограничьте грубую клетчатку, жирное, жареное, острое и газированные напитки.']],
+    ['Если у вас илеостома', ['Пейте больше: потеря жидкости и солей через илеостому выше. Врач может порекомендовать солевые растворы.', 'Осторожно с продуктами, которые плохо перевариваются и могут закупорить стому: кожура фруктов и овощей, орехи, семечки, кукуруза, грибы, сухофрукты. Хорошо пережёвывайте.']],
+    ['Если стул частый или жидкий', ['Помогают рис, бананы, картофельное пюре, белый хлеб, овсянка. Сообщите врачу, если стул очень частый больше 1-2 дней.']],
+    ['Газы и запах', ['Их усиливают бобовые, капуста, лук, газированные напитки и пиво.']]
+  ] },
+  { id: 'urgent', ic: 'alert', t: 'Когда срочно к врачу', s: 'Признаки, при которых нельзя ждать планового визита.', b: [
+    ['Обратитесь в отделение или вызовите скорую, если', ['Температура 38 °C и выше.', 'Боль в животе нарастает или не снимается обезболивающими.', 'Тошнота и рвота, живот вздут, не отходят газы и стул.', 'Рана покраснела, отекла, из неё идёт гной или жидкость.', 'Кровотечение из раны, прямой кишки или стомы.', 'Стома потемнела (фиолетовая, чёрная), сильно отекла или втянулась.', 'По илеостоме выделяется очень много жидкости, сильная жажда, мало мочи, слабость, головокружение.', 'Боль и отёк в голени, одышка, боль в груди.']]
+  ] }
+];
+var LAND_OPS = [
+  ['knife', 'Лапароскопические и роботические операции', 'Резекции ободочной и прямой кишки через небольшие разрезы: меньше боли, быстрее восстановление.'],
+  ['shield', 'Сохранение сфинктера', 'Тотальная мезоректумэктомия, интерсфинктерная резекция и другие операции, которые при низком раке прямой кишки позволяют по возможности обойтись без постоянной стомы.'],
+  ['flask', 'Тотальная неоадъювантная терапия', 'Химио- и лучевая терапия до операции. При полном ответе опухоли возможна тактика активного наблюдения Watch & wait.'],
+  ['users', 'Мультидисциплинарный подход', 'Тактику лечения каждого пациента обсуждают хирурги, онкологи, радиологи, лучевые терапевты и морфологи.'],
+  ['scope', 'Эндоскопические вмешательства', 'Удаление полипов и ранних опухолей без разрезов (EMR, ESD), стентирование при непроходимости.'],
+  ['tag', 'Сложные случаи', 'Латеральная тазовая лимфодиссекция, операции при местных рецидивах, трансанальные вмешательства, реконструктивные операции и закрытие стом.']
+];
+function renderPortal() {
+  var a = S.auth || (S.auth = { mode: 'login', role: 'resident' }), open = a.show || a.mode === 'wait';
+  var h = '<div class="land">';
+  h += '<header class="l-top"><div class="l-wrap l-top-in"><a class="l-brand" href="#top"><img src="media/nroc-logo.png" alt="NROC"><span><b>' + LL('Колоректальный сектор', 'Colorectal unit') + '</b><em>' + LL('Национальный научный онкологический центр', 'National Research Oncology Center') + '</em></span></a>';
+  h += '<nav class="l-nav">' + [['prep', 'Подготовка'], ['bag', 'В стационар'], ['after', 'После операции'], ['stoma', 'Стома'], ['diet', 'Питание'], ['ops', 'Лечение'], ['contacts', 'Контакты']].map(function (x) { return '<a href="#' + x[0] + '">' + x[1] + '</a>'; }).join('') + '</nav>';
+  h += '<div class="l-tools">' + themeBtn() + langSeg() + '<button type="button" class="btn primary" data-act="authshow">' + ico('user', 16) + LL('Вход', 'Sign in') + '<span class="l-long">' + LL(' для сотрудников', ' for staff') + '</span></button></div></div></header>';
+  h += '<section class="l-hero" id="top"><div class="l-hero-img" style="background-image:url(media/nroc-hero-hd.webp)"></div><div class="l-wrap l-hero-in"><div class="l-kick">' + LL('Национальный научный онкологический центр · Астана', 'National Research Oncology Center · Astana') + '</div><h1>Колоректальная хирургия</h1><p>Лечение рака ободочной и прямой кишки: от диагностики и подготовки к операции до восстановления и наблюдения. Здесь собраны памятки для пациентов и их близких.</p><div class="l-cta"><a class="btn l-btn-w" href="tel:+77750076442">' + ico('bell', 16) + 'Записаться на приём</a><a class="btn l-btn-o" href="#prep">Памятки пациенту</a></div></div></section>';
+  h += '<section class="l-sec l-alt"><div class="l-wrap"><div class="l-head"><h2>Памятки пациенту</h2><p>Коротко о главном на каждом этапе лечения. Выберите тему.</p></div><div class="l-cards">' + LAND.map(function (c) { return '<a class="l-card" href="#' + c.id + '"><span class="l-ic">' + ico(c.ic, 22) + '</span><b>' + c.t + '</b><span>' + c.s + '</span><em>Подробнее ' + ico('right', 14) + '</em></a>'; }).join('') + '</div></div></section>';
+  LAND.forEach(function (c, i) {
+    h += '<section class="l-sec' + (i % 2 ? ' l-alt' : '') + (c.id === 'urgent' ? ' l-urgent' : '') + '" id="' + c.id + '"><div class="l-wrap"><div class="l-head"><span class="l-ic big">' + ico(c.ic, 26) + '</span><h2>' + c.t + '</h2><p>' + c.s + '</p></div><div class="l-blocks">' + c.b.map(function (b) { return '<div class="l-block"><h3>' + b[0] + '</h3><ul>' + b[1].map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul></div>'; }).join('') + '</div></div></section>';
+  });
+  h += '<section class="l-sec" id="ops"><div class="l-wrap"><div class="l-head"><h2>Как мы лечим</h2><p>Колоректальный сектор выполняет полный объём хирургического лечения опухолей толстой и прямой кишки.</p></div><div class="l-ops">' + LAND_OPS.map(function (o) { return '<div class="l-op"><span class="l-ic">' + ico(o[0], 22) + '</span><b>' + o[1] + '</b><p>' + o[2] + '</p></div>'; }).join('') + '</div></div></section>';
+  h += '<section class="l-sec l-alt" id="q"><div class="l-wrap l-qband"><div><h2>Анкеты о самочувствии</h2><p>После лечения врач может прислать вам ссылку на короткую анкету о работе кишечника (например, LARS или Wexner). Она заполняется с телефона за несколько минут и без регистрации. Ваши ответы видит только лечащая команда: они помогают вовремя заметить проблемы и подобрать лечение.</p></div></div></section>';
+  h += '<section class="l-sec l-contacts" id="contacts"><div class="l-wrap"><div class="l-head"><h2>Контакты</h2><p>г. Астана, ул. Керей и Жанибек ханов, 3/2</p></div><div class="l-cgrid">' + [
+    ['Call-центр, запись на приём', ['+7 (775) 007-64-42', '+7 708 425 07 11 (Telegram)', '+7 702 004 03 29 (WhatsApp)']],
+    ['Плановая госпитализация', ['+7 (7172) 57-08-23, вн. 2107']],
+    ['Служба поддержки пациентов', ['+7 (7172) 57-08-36']],
+    ['Справочная служба', ['+7 (7172) 57-08-19, вн. 2518', 'Пн-пт: 08:00-17:00']]
+  ].map(function (c) { return '<div class="l-contact"><b>' + c[0] + '</b>' + c[1].map(function (x) { var tel = /^\+?[\d\s()-]+/.exec(x); return tel && /\d{6}/.test(x.replace(/\D/g, '')) ? '<a href="tel:' + tel[0].replace(/[^\d+]/g, '') + '">' + esc(x) + '</a>' : '<span>' + esc(x) + '</span>'; }).join('') + '</div>'; }).join('') + '</div><p class="l-more"><a href="https://cancercenter.edu.kz/ru" target="_blank" rel="noopener">Официальный сайт центра: cancercenter.edu.kz ' + ico('ext', 14) + '</a></p></div></section>';
+  h += '<footer class="l-foot"><div class="l-wrap l-foot-in"><img src="media/nroc-logo.png" alt="NROC"><p>Информация на странице носит справочный характер и не заменяет консультацию лечащего врача. Все назначения выполняйте по рекомендациям вашей лечащей команды.</p><span>© ' + new Date().getFullYear() + ' ' + LL('Колоректальный сектор ННОЦ', 'NROC Colorectal unit') + '</span></div></footer>';
+  h += '</div>';
+  if (open) h += '<div class="dim" data-act="authhide"></div><section class="modal authm" role="dialog" aria-modal="true"><button type="button" class="iconbtn authx" data-act="authhide" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button><div class="authm-b"><img src="media/nroc-logo.png" alt="NROC" class="authm-logo">' + renderAuthCard() + '</div></section>';
+  return h;
+}
+
+/* ======================= v12: top navigation (no sidebar) ======================= */
+function navGroups() {
+  var g = [{ id: 'home', label: LL('Главная', 'Home'), v: 'home', icon: 'home' }];
+  g.push({ id: 'work', label: LL('Работа', 'Work'), icon: 'cal', items: ['planner', 'mdt', 'mm'].map(function (k) { return { v: 'col:' + k, icon: COLS[k].icon, label: L(COLS[k].title), cnt: DB.cols[k].length }; }) });
+  var pts = [{ v: 'reg:all', icon: 'users', label: t('nav.allPatients'), cnt: DB.patients.length }, { v: 'fu', icon: 'clock', label: t('nav.followup'), badge: fuDueAll().length || null }, { sep: LL('Разделы по тегам', 'Sections by tag') }];
+  (function walk(list, d) { list.forEach(function (r) { pts.push({ v: 'reg:' + r.id, icon: d ? 'dot' : (r.id === 'g_endo' ? 'scope' : r.id === 'g_surg' ? 'knife' : 'tag'), label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, false), d + 1); }); })(kids(null, false), 0);
+  if (can('edit')) pts.push({ act: 'newreg', icon: 'plus', label: t('nav.newRegistry') });
+  g.push({ id: 'pts', label: LL('Пациенты', 'Patients'), icon: 'users', items: pts, wide: true });
+  var sci = [{ v: 'studies', icon: 'flask', label: t('nav.studies') }];
+  (function walk(list, d) { list.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'dot', label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, true), d + 1); }); })(kids(null, true), 1);
+  if ((DB.pending || []).length) sci.push({ v: 'appr', icon: 'check', label: LL('На одобрении', 'Awaiting approval'), badge: apprMine().length || null });
+  if (can('edit')) sci.push({ act: 'newstudy', icon: 'plus', label: t('nav.newStudy') });
+  sci.push({ sep: LL('Материалы', 'Materials') });
+  sci.push({ v: 'q', icon: 'clipboard', label: LL('Анкеты', 'Questionnaires'), badge: qDueAll(0).length || null });
+  ['pubs', 'redcap', 'goals'].forEach(function (k) { sci.push({ v: 'col:' + k, icon: COLS[k].icon, label: L(COLS[k].title), cnt: DB.cols[k].length }); });
+  g.push({ id: 'sci', label: LL('Наука', 'Research'), icon: 'flask', items: sci, wide: true });
+  if (isAdmin()) g.push({ id: 'adm', label: LL('Администрирование', 'Admin'), v: 'users', icon: 'shield' });
+  return g;
+}
+function navItemHTML(x) {
+  if (x.sep) return '<div class="mn-sep">' + esc(x.sep) + '</div>';
+  var on = x.v && S.view === x.v;
+  return '<button type="button" class="mn-it' + (on ? ' on' : '') + (x.act ? ' add' : '') + '" style="--d:' + (x.depth || 0) + '" data-act="' + (x.act || 'view') + '"' + (x.v ? ' data-v="' + x.v + '"' : '') + '>' + ico(x.icon, 16) + '<span>' + esc(x.label) + '</span>' + (x.badge ? '<i class="badge">' + x.badge + '</i>' : x.cnt !== undefined ? '<i class="cnt">' + x.cnt + '</i>' : '') + '</button>';
+}
+function renderMainNav() {
+  return '<nav class="mnav" aria-label="' + t('a11y.sections') + '"><div class="mnav-in">' + navGroups().map(function (g) {
+    if (g.v) return '<button type="button" class="mn-g' + (S.view === g.v ? ' on' : '') + '" data-act="view" data-v="' + g.v + '">' + esc(g.label) + '</button>';
+    var act = g.items.some(function (x) { return x.v && x.v === S.view; }), open = S.menu === 'nav:' + g.id, badge = g.items.reduce(function (a, x) { return a + (+x.badge || 0); }, 0);
+    return '<div class="dd"><button type="button" class="mn-g' + (act ? ' on' : '') + (open ? ' open' : '') + '" data-act="menu" data-id="nav:' + g.id + '" aria-expanded="' + open + '">' + esc(g.label) + (badge ? '<i class="badge">' + badge + '</i>' : '') + ico('down', 14) + '</button>' + (open ? '<div class="pop mn-pop' + (g.wide ? ' wide' : '') + '" role="menu">' + g.items.map(navItemHTML).join('') + '</div>' : '') + '</div>';
+  }).join('') + '</div></nav>';
+}
+function renderNavSheet() {
+  return '<div class="dim" data-act="side"></div><aside class="nsheet" aria-label="' + t('a11y.sections') + '"><div class="ns-h"><img src="media/nroc-logo.png" alt="NROC"><b>' + LL('Колоректальный сектор', 'Colorectal unit') + '</b><button type="button" class="iconbtn" data-act="side" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="ns-b">' + navGroups().map(function (g) {
+    if (g.v) return navItemHTML({ v: g.v, icon: g.icon, label: g.label });
+    return '<div class="ns-g"><div class="mn-sep">' + esc(g.label) + '</div>' + g.items.filter(function (x) { return !x.sep; }).map(navItemHTML).join('') + '</div>';
+  }).join('') + '</div></aside>';
+}
+function renderTop2() {
+  var h = '<header class="top2"><div class="t2-row"><button type="button" class="t2-brand" data-act="view" data-v="home"><img src="media/nroc-logo.png" alt="NROC"><span><b>' + LL('Колоректальный сектор', 'Colorectal unit') + '</b><em>' + LL('Регистр и наука', 'Registry and research') + '</em></span></button>';
+  h += '<button type="button" class="cmdk" data-act="cmd">' + ico('search', 15) + '<span>' + LL('Поиск пациентов и разделов', 'Search patients and sections') + '</span><kbd>Ctrl K</kbd></button><div class="top-r">';
+  var t0 = renderTop(); var ri = t0.indexOf('<div class="top-r">'); h += t0.slice(ri + '<div class="top-r">'.length).replace(/<\/header>$/, '');
+  h += '</div>' + renderMainNav() + '</header>';
+  return h;
 }
 
 window.__CRR = { SECTIONS: SECTIONS, MODULES: MODULES, MEDIA: MEDIA, COLS: COLS, DICT: DICT, OPT: OPT };
