@@ -171,7 +171,7 @@ var SECTIONS = [
   ]},
   { id: 'hx', phase: 'pre', title: ['Коморбидность и анамнез', 'Comorbidity and history'], fields: [
     f('comorb', 'Сопутствующие заболевания', 'Comorbidities', 'seg', { options: YN }),
-    f('dm', 'Сахарный диабет', 'Diabetes', 'seg', { options: YN }),
+    f('diab', 'Сахарный диабет', 'Diabetes', 'seg', { options: YN }),
     f('htn', 'Артериальная гипертензия', 'Hypertension', 'seg', { options: YN }),
     f('cvd', 'Заболевания сердечно-сосудистой системы', 'Cardiovascular disease', 'seg', { options: YN }),
     f('lung', 'Заболевания лёгких', 'Lung disease', 'seg', { options: YN }),
@@ -229,7 +229,6 @@ var SECTIONS = [
     f('simult', 'Симультанная операция', 'Simultaneous procedure', 'seg', { options: YN, show: hasSurg }),
     f('simultType', 'Симультанно: на каких органах', 'Simultaneous: organs', 'multi', { options: ['Печень', 'Мочевой пузырь', 'Гинекологические', 'Лимфодиссекция тазовая', 'Лимфодиссекция паховая', 'ЖКТ', 'Другое'], dd: true, show: function (d) { return d.simult === 'Да'; } }),
     f('simultNote', 'Симультанная операция: описание', 'Simultaneous: details', 'text', { wide: true, show: function (d) { return d.simult === 'Да'; } }),
-    f('intraCx', 'Интраоперационные осложнения', 'Intraoperative complications', 'text', { wide: true, show: hasProc }),
     f('revDev', 'Находки при ревизии: отличия от нормы', 'Exploration: findings that differ from normal', 'multi', { options: REV_DEV, dd: true, wide: true, none: 'f.revStd', show: function (d) { return hasSurg(d) && P_TEO.concat(P_STCLOSE).indexOf(d.proc) < 0; } }),
     f('revision', 'Другие находки при ревизии (свободный текст)', 'Other findings (free text)', 'long', { wide: true, rows: 2, ph: 'f.revisionPh', show: function (d) { return hasSurg(d) && P_TEO.concat(P_STCLOSE).indexOf(d.proc) < 0; } }),
     f('anast', 'Анастомоз', 'Anastomosis', 'seg', { options: YN, show: function (d) { return hasSurg(d) && P_TEO.concat(P_APR, P_HART, P_STFORM).indexOf(d.proc) < 0; } }),
@@ -3972,6 +3971,8 @@ document.addEventListener('click', function (ev) {
     case 'fileDel': { var td2 = target(g('path')); var fd = (getPath(td2[0], td2[1]) || []).slice(); if (fd[+g('i')] && fd[+g('i')].fid) fileDelBlob(fd[+g('i')].fid); fd.splice(+g('i'), 1); bind(g('path'), fd.length ? fd : ''); render(); break; }
     case 'savep': savePatient(); break;
     case 'dxopen': dxOpen(); break;
+    case 'dxmode': { var kq = root.querySelector('#dxkeep'), aq = root.querySelector('#dxagree'); if (kq) S.dx.keep = kq.checked; if (aq) S.dx.agree = aq.checked; S.dx.mode = g('v'); render(); break; }
+    case 'retromode': { var kr = root.querySelector('#retrokeep'), ar = root.querySelector('#retroagree'); if (kr) RETRO.keep = kr.checked; if (ar) RETRO.agree = ar.checked; RETRO.mode = g('v'); render(); break; }
     case 'retrostart': { var rk = root.querySelector('#retrokeep'), ra = root.querySelector('#retroagree'); RETRO.keep = rk ? rk.checked : true; RETRO.agree = ra ? ra.checked : false; retroStart(); break; }
     case 'retrostop': RETRO.run = false; render(); break;
     case 'retroclear': RETRO.items = []; render(); break;
@@ -4755,26 +4756,162 @@ function dxCall(doc, schema) {
     .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
     .then(function (j) { var ch = (j.choices || [])[0]; return ch && ch.message ? ch.message.content || '' : ''; });
 }
-/* offline fallback: simple pattern matching, to show the flow without AI */
-function dxRules(doc) {
-  var tx = String(doc.text || '').replace(/ /g, ' '), F = [], I = [], m;
-  function add(id, v, q, c, note) { if (has(v)) F.push({ id: id, value: v, confidence: c || 0.6, quote: String(q || '').trim().slice(0, 150), note: note || '' }); }
-  if ((m = /(?:Пациент|ФИО)\s*[:：]\s*([А-ЯЁӘІҢҒҮҰҚӨҺ][^\n,]{3,60})/.exec(tx))) add('fio', m[1].replace(/\s+/g, ' ').trim(), m[0], 0.8);
-  if ((m = /Дата\s+рождения\s*[:：]?\s*(\d{2})\.(\d{2})\.(\d{4})/i.exec(tx))) { add('dob', m[3] + '-' + m[2] + '-' + m[1], m[0], 0.85); var ag = Math.floor((Date.now() - new Date(m[3] + '-' + m[2] + '-' + m[1])) / 31557600000); add('age', ag, m[0], 0.7, LL('Возраст рассчитан по дате рождения на сегодня', 'Age computed from DOB')); }
-  if ((m = /\b(?:[cу]?)T\s?([0-4x][ab]?)\s?N\s?([0-3x][abc]?)\s?M\s?([01x])/i.exec(tx))) {
-    var T = 'cT' + m[1].toLowerCase(), N = 'cN' + m[2].toLowerCase().replace(/[abc]$/, ''), M = 'cM' + m[3].toLowerCase();
-    if (FIELD.cT.options.indexOf(T) >= 0) add('cT', T, m[0], 0.75); else I.push({ id: 'cT', kind: 'not_in_options', text: 'T: ' + m[0] });
-    if (FIELD.cN.options.indexOf(N) >= 0) add('cN', N, m[0], 0.7); else I.push({ id: 'cN', kind: 'ambiguous', text: LL('N указан как ', 'N given as ') + m[2] + LL(': в карточке нет варианта Nx, уточните по МРТ', ': no Nx option in the card') });
-    if (FIELD.cM.options.indexOf(M) >= 0) add('cM', M, m[0], 0.75);
-  }
-  if ((m = /\bSt\.?\s*(IV|III|II|I)\b/.exec(tx)) || (m = /стади[ия]\s*(IV|III|II|I)\b/i.exec(tx))) add('stage', m[1], m[0], 0.7);
-  if ((m = /ECOG\s*[:：]?\s*([0-4])/i.exec(tx))) add('ecog', m[1], m[0], 0.8);
-  if (/прямой\s+кишки/i.test(tx)) add('loc', 'Прямая кишка', (/[^\n]{0,40}прямой\s+кишки[^\n]{0,20}/i.exec(tx) || [''])[0], 0.6);
-  if ((m = /(нижне|средне|верхне)ампулярн/i.exec(tx))) add('rLevel', { 'нижне': 'Нижнеампулярный', 'средне': 'Среднеампулярный', 'верхне': 'Верхнеампулярный' }[m[1].toLowerCase()], m[0], 0.75);
-  if ((m = /Диагноз\s*[:：]\s*([\s\S]{10,600}?)(?:\n\s*(?:Сопутствующ|Рекомендовано|Код)|$)/i.exec(tx))) add('dxText', m[1].replace(/\s+/g, ' ').trim(), m[1].slice(0, 120), 0.8);
-  if (/лучев[а-я]+\s+терап/i.test(tx) && /неоадъювантн/i.test(tx)) I.push({ id: 'tactic', kind: 'ambiguous', text: LL('Упоминается неоадъювантная лучевая терапия, но схема (короткий курс или ХЛТ) не ясна без ИИ', 'Neoadjuvant RT mentioned but regimen unclear') });
-  return { doc: { type: LL('Документ (простое распознавание без ИИ)', 'Document (rule-based, no AI)'), summary: LL('ИИ не подключён, поэтому использовано простое распознавание по шаблонам: только ФИО, дата рождения, TNM, стадия, ECOG, локализация и текст диагноза. Подключите ИИ для полного заполнения.', 'AI not connected: rule-based parsing only.') }, fields: F, issues: I, questions: [] };
+/* ---------- extraction without AI: OCR in the browser + medical text patterns ---------- */
+function dxAbs(p) { return new URL(p, location.href).href; }
+function dxOCR(doc, onProg) {
+  var imgs = doc.images || []; if (!imgs.length) return Promise.resolve('');
+  if (location.protocol === 'file:') return Promise.reject(new Error(LL('Распознавание сканов без ИИ работает на сайте, а не в локальном файле offline.html. Откройте онлайн-версию.', 'Offline OCR works on the website, not in the local file.')));
+  var load = window.Tesseract ? Promise.resolve() : dxLoadScript('lib/ocr/tesseract.min.js');
+  return load.then(function () {
+    return Tesseract.createWorker('rus+eng', 1, { workerPath: dxAbs('lib/ocr/worker.min.js'), corePath: dxAbs('lib/ocr/core'), langPath: dxAbs('lib/ocr/lang'), gzip: true, logger: function (m) { if (onProg && m.status === 'recognizing text') onProg(m.progress); } });
+  }).then(function (w) {
+    var out = [], seq = Promise.resolve();
+    imgs.forEach(function (b, i) { seq = seq.then(function () { if (onProg) onProg(0, i + 1, imgs.length); return w.recognize('data:' + (doc.imgType || 'image/jpeg') + ';base64,' + b).then(function (r) { out.push('--- Страница ' + (i + 1) + ' (OCR) ---\n' + r.data.text); }); }); });
+    return seq.then(function () { w.terminate(); return out.join('\n\n'); });
+  });
 }
+function dxRules(doc) {
+  var raw = String(doc.text || '').replace(/ /g, ' ').replace(/[ \t]+/g, ' '), tx = raw, F = {}, I = [], Q = [];
+  function add(id, v, q, c, note) { if (!has(v) || F[id] || !FIELD[id]) return; F[id] = { id: id, value: v, confidence: c || 0.65, quote: String(q || '').replace(/\s+/g, ' ').trim().slice(0, 150), note: note || '' }; }
+  function m1(re) { return re.exec(tx); }
+  function ctx(re) { var m = re.exec(tx); if (!m) return ''; var s = Math.max(0, m.index - 30); return tx.slice(s, m.index + m[0].length + 30); }
+  function dt(s) { var m = /(\d{1,2})[.\/](\d{1,2})[.\/](\d{2,4})/.exec(s); if (!m) return ''; var y = m[3].length === 2 ? '20' + m[3] : m[3]; return y + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2); }
+  function numv(s) { return parseFloat(String(s).replace(',', '.')); }
+  var m, low = tx.toLowerCase();
+  /* identity */
+  if ((m = m1(/(?:Пациент(?:ка)?|Ф\.?\s?И\.?\s?О\.?(?:\s+пациента)?|Больн(?:ой|ая))\s*[:：]?\s*([А-ЯЁӘІҢҒҮҰҚӨҺ][а-яёәіңғүұқөһ\-]+(?:\s+[А-ЯЁӘІҢҒҮҰҚӨҺ][а-яёәіңғүұқөһ\-]+){1,2})/))) add('fio', m[1], m[0], 0.8);
+  if ((m = m1(/(?:Дата\s+рождения|Д\.?\s?р\.?|г\.?\s?р\.?)\s*[:：]?\s*(\d{1,2}[.\/]\d{1,2}[.\/]\d{4})/i)) || (m = m1(/(\d{2}\.\d{2}\.\d{4})\s*г\.?\s*р\.?/i))) add('dob', dt(m[1]), m[0], 0.85);
+  if ((m = m1(/Возраст\s*[:：]?\s*(\d{2,3})/i)) || (m = m1(/\b(\d{2,3})\s*(?:лет|года|год)(?![а-яё])/))) { var ag = +m[1]; if (ag > 14 && ag < 105) add('age', String(ag), m[0], 0.75); }
+  if (!F.age && F.dob) add('age', String(Math.floor((Date.now() - new Date(F.dob.value)) / 31557600000)), F.dob.quote, 0.7, LL('рассчитан по дате рождения на сегодня', 'from DOB'));
+  if ((m = m1(/Пол\s*[:：]?\s*(муж|жен|м(?![А-Яа-яЁёA-Za-z0-9])|ж(?![А-Яа-яЁёA-Za-z0-9]))/i))) add('sex', /^м/i.test(m[1]) ? 'М' : 'Ж', m[0], 0.9);
+  else if (F.fio && (m = /\s([А-ЯЁ][а-яё]+(?:вич|вна|ұлы|қызы|кызы|улы))\b/.exec(' ' + F.fio.value))) add('sex', /(вич|ұлы|улы)$/.test(m[1]) ? 'М' : 'Ж', F.fio.value, 0.7, LL('по отчеству', 'from patronymic'));
+  if ((m = m1(/ИИН\s*[:：]?\s*(\d{12})/))) add('iin', m[1], 'ИИН: ***', 0.95);
+  if ((m = m1(/(?:№\s*(?:ИБ|истории\s+болезни|и\/б|медицинской\s+карты)|(?:ИБ|История\s+болезни|Медицинская\s+карта)\s*№?)\s*[:：]?\s*([0-9][0-9\/\-]{2,15})/i))) add('ib', m[1], m[0], 0.8);
+  if ((m = m1(/(?:тел(?:ефон)?\.?|моб\.?)\s*[:：]?\s*(\+?[78][\s\-()]*\d{3}[\s\-()]*\d{3}[\s\-]*\d{2}[\s\-]*\d{2})/i))) add('phone', m[1].replace(/\s+/g, ' '), m[0], 0.85);
+  if ((m = m1(/(?:Адрес(?:\s+проживания|\s+места\s+жительства)?)\s*[:：]\s*([^\n]{5,120})/i))) add('address', m[1].trim(), m[0], 0.7);
+  /* hospital stay */
+  if ((m = m1(/(?:Дата\s+(?:поступления|госпитализации)|Поступил[аи]?|Госпитализирован[аы]?)\s*[:：]?\s*(?:в\s+стационар\s*)?(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i))) add('admDate', dt(m[1]), m[0], 0.85);
+  if ((m = m1(/(?:Дата\s+выписки|Выписан[аы]?)\s*[:：]?\s*(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i))) add('disDate', dt(m[1]), m[0], 0.85);
+  if ((m = m1(/(?:Находил(?:ся|ась)\s+(?:на\s+(?:стационарном\s+)?лечении\s+)?)?с\s+(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})\s*(?:г\.?)?\s*по\s+(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i))) { add('admDate', dt(m[1]), m[0], 0.75); add('disDate', dt(m[2]), m[0], 0.75); }
+  if ((m = m1(/(?:койко[-\s]?дн(?:ей|я|и)|к\/д)\s*[:：]?\s*(\d{1,3})/i)) || (m = m1(/(\d{1,3})\s*койко[-\s]?дн/i))) add('los', m[1], m[0], 0.8);
+  if ((m = m1(/(?:в\s+)?(?:ОАРИТ|реанимаци[ии])\s*[:：]?\s*(\d{1,2})\s*(?:сут|дн|к\/д|койко)/i))) add('icuDays', m[1], m[0], 0.6);
+  /* anthropometry */
+  if ((m = m1(/Рост\s*[:：]?\s*(\d{3})\s*см/i))) add('height', m[1], m[0], 0.9);
+  if ((m = m1(/Вес\s*[:：]?\s*(\d{2,3}(?:[.,]\d)?)\s*кг/i)) || (m = m1(/Масса\s+тела\s*[:：]?\s*(\d{2,3}(?:[.,]\d)?)/i))) add('weight', String(numv(m[1])), m[0], 0.9);
+  if ((m = m1(/ИМТ\s*[:：=]?\s*(\d{2}(?:[.,]\d+)?)/i))) add('bmi', String(numv(m[1])), m[0], 0.9);
+  if ((m = m1(/ECOG\s*[:：\-]?\s*([0-4])\b/i))) add('ecog', m[1], m[0], 0.85);
+  if ((m = m1(/ASA\s*[:：\-]?\s*(IV|III|II|I|[1-4])\b/))) add('asa', { 1: 'I', 2: 'II', 3: 'III', 4: 'IV' }[m[1]] || m[1], m[0], 0.85);
+  /* comorbidity and history */
+  function yn(id, re, neg) { var mm = re.exec(tx); if (!mm) return; var around = tx.slice(Math.max(0, mm.index - 25), mm.index); add(id, (neg && neg.test(around)) || /(?<![А-Яа-яЁёA-Za-z0-9])не\s*$|(?<![А-Яа-яЁёA-Za-z0-9])нет\s*$|отрицает\s*$/i.test(around) ? 'Нет' : 'Да', ctx(re), 0.7); }
+  yn('diab', /сахарн[\wА-Яа-яЁё]+\s+диабет|(?<![А-Яа-яЁёA-Za-z0-9])СД\s*(?:2|II|1|I)?\s*тип/i);
+  yn('htn', /артериальн[\wА-Яа-яЁё]+\s+гипертенз|гипертоническ[\wА-Яа-яЁё]+\s+болезн|(?<![А-Яа-яЁёA-Za-z0-9])АГ\s*(?:\d|I{1,3})?\s*ст/i);
+  yn('cvd', /(?<![А-Яа-яЁёA-Za-z0-9])ИБС(?![А-Яа-яЁёA-Za-z0-9])|ишемическ[\wА-Яа-яЁё]+\s+болезн[\wА-Яа-яЁё]+\s+сердца|инфаркт\s+миокарда|(?<![А-Яа-яЁёA-Za-z0-9])ХСН(?![А-Яа-яЁёA-Za-z0-9])|фибрилляц[\wА-Яа-яЁё]+\s+предсерд|стентирован[\wА-Яа-яЁё]+\s+(?:LAD|коронар|ПНА|ОА|ПКА)/i);
+  yn('lung', /(?<![А-Яа-яЁёA-Za-z0-9])ХОБЛ(?![А-Яа-яЁёA-Za-z0-9])|бронхиальн[\wА-Яа-яЁё]+\s+астм|хроническ[\wА-Яа-яЁё]+\s+бронхит/i);
+  yn('cvb', /(?<![А-Яа-яЁёA-Za-z0-9])ОНМК(?![А-Яа-яЁёA-Za-z0-9])|инсульт|(?<![А-Яа-яЁёA-Za-z0-9])ЦВБ(?![А-Яа-яЁёA-Za-z0-9])|цереброваскул/i);
+  yn('liverDz', /цирроз|гепатит\s*[BCВС]|жировой\s+гепатоз|стеатоз/i);
+  if (F.diab || F.htn || F.cvd || F.lung || F.cvb || F.liverDz) add('comorb', [F.diab, F.htn, F.cvd, F.lung, F.cvb, F.liverDz].some(function (x) { return x && x.value === 'Да'; }) ? 'Да' : 'Нет', LL('по списку сопутствующих', 'from comorbidities'), 0.6);
+  if ((m = m1(/(?:Сопутствующ[\wА-Яа-яЁё]+(?:\s+заболевани[\wА-Яа-яЁё]+)?|Сопут\.)\s*[:：]\s*([^\n]{5,400})/i))) add('comorbOther', m[1].trim(), m[0].slice(0, 150), 0.55, LL('полный текст сопутствующих, разнесите по полям при необходимости', 'full comorbidity text'));
+  if (/не\s+кури|курени[\wА-Яа-яЁё]+\s+отрица|некурящ/i.test(tx)) add('smoke', 'Нет', ctx(/не\s+кури|курени[\wА-Яа-яЁё]+\s+отрица|некурящ/i), 0.75);
+  else if (/бросил[\wА-Яа-яЁё]*\s+курить|бывш[\wА-Яа-яЁё]+\s+курильщ|курил[\wА-Яа-яЁё]*\s+(?:ранее|до)/i.test(tx)) add('smoke', 'Бросил', ctx(/бросил[\wА-Яа-яЁё]*\s+курить|бывш[\wА-Яа-яЁё]+\s+курильщ|курил[\wА-Яа-яЁё]*\s+(?:ранее|до)/i), 0.7);
+  else if (/(?<![А-Яа-яЁёA-Za-z0-9])курит(?![А-Яа-яЁёA-Za-z0-9])|курильщик/i.test(tx)) add('smoke', 'Курит', ctx(/(?<![А-Яа-яЁёA-Za-z0-9])курит(?![А-Яа-яЁёA-Za-z0-9])|курильщик/i), 0.7);
+  if ((m = m1(/стаж\s+курения\s*[:：]?\s*(\d{1,2})/i))) add('smokeYrs', m[1], m[0], 0.8);
+  if (/алкоголь[\wА-Яа-яЁё]*\s+(?:не\s+употребля|отрица)|не\s+употребля[\wА-Яа-яЁё]+\s+алкогол/i.test(tx)) add('alcohol', 'Нет', ctx(/алкоголь[\wА-Яа-яЁё]*\s+(?:не\s+употребля|отрица)|не\s+употребля[\wА-Яа-яЁё]+\s+алкогол/i), 0.75);
+  if ((m = m1(/Наследственност[\wА-Яа-яЁё]*\s*[:：]?\s*(не\s+отягощен[\wА-Яа-яЁё]*|отягощен[\wА-Яа-яЁё]*[^\n]{0,80})/i))) add('famCa', /не\s+отягощ/i.test(m[1]) ? 'Нет' : 'Да', m[0], 0.65);
+  /* tumour */
+  var LOCRE = [[/слеп[\wА-Яа-яЁё]+\s+кишк/i, 'Слепая кишка'], [/восходящ[\wА-Яа-яЁё]+\s+(?:отдел[\wА-Яа-яЁё]*\s+)?(?:ободочн|толст)/i, 'Восходящая ободочная'], [/печ[её]ночн[\wА-Яа-яЁё]+\s+изгиб/i, 'Печёночный изгиб'], [/поперечн[\wА-Яа-яЁё]+[\s-]*ободочн/i, 'Поперечная ободочная'], [/сел[её]з[её]ночн[\wА-Яа-яЁё]+\s+изгиб/i, 'Селезёночный изгиб'], [/нисходящ[\wА-Яа-яЁё]+\s+(?:отдел[\wА-Яа-яЁё]*\s+)?(?:ободочн|толст)/i, 'Нисходящая ободочная'], [/ректосигм/i, 'Ректосигмоидный отдел'], [/сигмовидн[\wА-Яа-яЁё]+\s+кишк|сигмы(?![А-Яа-яЁёA-Za-z0-9])/i, 'Сигмовидная кишка'], [/анальн[\wА-Яа-яЁё]+\s+канал/i, 'Анальный канал'], [/прям[\wА-Яа-яЁё]+\s+кишк|ампул[\wА-Яа-яЁё]+\s+отдел/i, 'Прямая кишка']];
+  var dxm = /(?:Заключительный\s+(?:клинический\s+)?диагноз|Клинический\s+диагноз|Основной\s+диагноз|Диагноз)\s*[:：]\s*([\s\S]{10,700}?)(?=\n\s*(?:Сопутствующ|Осложнени|Код|Рекоменд|Жалобы|Анамнез|Проведен|Операци|Результат)|\n\s*\n|$)/i.exec(tx);
+  var dxs = dxm ? dxm[1] : tx;
+  if (dxm) add('dxText', dxm[1].replace(/\s+/g, ' ').trim(), dxm[0].slice(0, 150), 0.85);
+  for (var li = 0; li < LOCRE.length; li++) { if (LOCRE[li][0].test(dxs)) { add('loc', LOCRE[li][1], (LOCRE[li][0].exec(dxs) || [''])[0], dxm ? 0.8 : 0.55); break; } }
+  if ((m = /(нижне|средне|верхне)[\s-]*ампулярн/i.exec(dxs))) add('rLevel', { 'нижне': 'Нижнеампулярный', 'средне': 'Среднеампулярный', 'верхне': 'Верхнеампулярный' }[m[1].toLowerCase()], m[0], 0.8);
+  if (/рецидив/i.test(dxs)) add('primary', 'Рецидивная', ctx(/рецидив/i), 0.55); 
+  if (/первично[\s-]*множествен|ПМЗО|ПМР(?![А-Яа-яЁёA-Za-z0-9])/i.test(tx)) add('multiPrim', 'Да', ctx(/первично[\s-]*множествен|ПМЗО|ПМР(?![А-Яа-яЁёA-Za-z0-9])/i), 0.75);
+  if ((m = /\b(y?[cp]?)\s?T\s?(is|[0-4x][abc]?)\s?N\s?([0-3x][abc]?)\s?M\s?([01x][abc]?)/i.exec(dxs)) || (m = /\b(y?[cp]?)\s?T\s?(is|[0-4x][abc]?)\s?N\s?([0-3x][abc]?)\s?M\s?([01x][abc]?)/i.exec(tx))) {
+    var pre = (m[1] || '').toLowerCase(), isP = /p/.test(pre), T = m[2].toLowerCase(), N = m[3].toLowerCase(), M = m[4].toLowerCase();
+    if (isP) { if (FIELD.pT.options.indexOf('pT' + T) >= 0) add('pT', 'pT' + T, m[0], 0.8); if (FIELD.pN.options.indexOf('pN' + N) >= 0) add('pN', 'pN' + N, m[0], 0.8); else if (N === '1' || N === '2') I.push({ id: 'pN', kind: 'ambiguous', text: 'pN' + N + LL(' без подгруппы (a/b/c): укажите по числу поражённых узлов', ' without subgroup') }); if (/^y/.test(pre)) add('y', 'Да', m[0], 0.8); if (M === '1' || /^1/.test(M)) add('pM', FIELD.pM.options.indexOf('pM' + M) >= 0 ? 'pM' + M : 'pM1a', m[0], 0.6); else if (M === '0') add('pM', 'pM0', m[0], 0.7); }
+    else {
+      if (FIELD.cT.options.indexOf('cT' + T) >= 0) add('cT', 'cT' + T, m[0], 0.8); else I.push({ id: 'cT', kind: 'not_in_options', text: 'T' + T + ' (' + m[0] + ')' });
+      var cN = 'cN' + N.replace(/[abc]$/, ''); if (FIELD.cN.options.indexOf(cN) >= 0) add('cN', cN, m[0], 0.8); else I.push({ id: 'cN', kind: 'ambiguous', text: LL('N указан как «', 'N given as «') + m[3] + LL('»: в карточке нет варианта Nx, уточните по МРТ или КТ', '»: no Nx option') });
+      var cM = 'cM' + M.replace(/[abc]$/, ''); if (FIELD.cM.options.indexOf(cM) >= 0) add('cM', cM, m[0], 0.8); else I.push({ id: 'cM', kind: 'ambiguous', text: 'M' + M + ' (' + m[0] + ')' });
+    }
+  }
+  if (!F.pT && (m = /(?:^|[^A-Za-z])(y?p)\s?T\s?(is|[0-4][abc]?)\s?N\s?([0-2][abc]?)(?:\s?M\s?([01][abc]?))?/i.exec(tx))) {
+    var pT2 = 'pT' + m[2].toLowerCase(); if (FIELD.pT.options.indexOf(pT2) >= 0) add('pT', pT2, m[0], 0.8);
+    var pN2 = 'pN' + m[3].toLowerCase(); if (FIELD.pN.options.indexOf(pN2) >= 0) add('pN', pN2, m[0], 0.8); else if (pN2 !== 'pN0') I.push({ id: 'pN', kind: 'ambiguous', text: pN2 + LL(' без подгруппы (a/b/c): укажите по числу поражённых узлов', ' without subgroup') });
+    if (/^y/i.test(m[1])) add('y', 'Да', m[0], 0.8);
+    if (m[4]) add('pM', m[4] === '0' ? 'pM0' : (FIELD.pM.options.indexOf('pM' + m[4].toLowerCase()) >= 0 ? 'pM' + m[4].toLowerCase() : 'pM1a'), m[0], 0.6);
+  }
+  if ((m = /\b(?:St\.?|ст\.|стадия|стадии)\s*(IV|III|II|I)\s*([ABCАВС])?\b/i.exec(dxs)) || (m = /\b(IV|III|II|I)\s*(?:ст\.|стадия|стадии)/i.exec(dxs))) { add('stage', m[1].toUpperCase(), m[0], 0.8); if (m[2] && FIELD.pStage.options.indexOf(m[1].toUpperCase() + m[2].replace('А', 'A').replace('В', 'B').replace('С', 'C').toUpperCase()) >= 0 && F.pT) add('pStage', m[1].toUpperCase() + m[2].replace('А', 'A').replace('В', 'B').replace('С', 'C').toUpperCase(), m[0], 0.6); }
+  if ((m = m1(/метастаз[\wА-Яа-яЁё]*\s+в\s+(печен|л[её]гк|брюшин|кост|яичник)/i))) { var MS = { печен: 'Печень', л: 'Лёгкие', брюшин: 'Брюшина', кост: 'Кости', яичник: 'Яичники' }; var k0 = /^л/.test(m[1]) ? 'л' : m[1].toLowerCase(); if (MS[k0]) add('metsSite', [MS[k0]], m[0], 0.65); }
+  /* histology */
+  var hre = /(муцинозн[\wА-Яа-яЁё]+\s+аденокарцином|перстневидн[\wА-Яа-яЁё]*|нейроэндокрин[\wА-Яа-яЁё]+|аденокарцином[\wА-Яа-яЁё]*)/i;
+  if ((m = hre.exec(tx))) { var hv = /муциноз/i.test(m[1]) ? 'Муцинозная аденокарцинома' : /перстнев/i.test(m[1]) ? 'Перстневидноклеточный рак' : /нейроэндок/i.test(m[1]) ? 'Нейроэндокринная опухоль' : 'Аденокарцинома'; add('hist', hv, ctx(hre), 0.7, LL('проверьте: из биопсии или операционного материала', 'biopsy or specimen?')); }
+  if ((m = m1(/\b(?:G|степен[\wА-Яа-яЁё]+\s+дифференцировки\s*[:：]?\s*G?)\s?([1-3x])\b/i))) add('grade', 'G' + m[1].toLowerCase().replace('x', 'x'), m[0], 0.65);
+  else if ((m = m1(/(высоко|умеренно|низко)\s*дифференцирован/i))) add('grade', { высоко: 'G1', умеренно: 'G2', низко: 'G3' }[m[1].toLowerCase()], m[0], 0.75);
+  /* MRI */
+  if ((m = m1(/(?:на\s+(?:расстоянии\s+)?|нижн[\wА-Яа-яЁё]+\s+(?:полюс|край)[\wА-Яа-яЁё]*\s+(?:опухоли\s+)?(?:на\s+)?)(\d{1,2}(?:[.,]\d)?)\s*см\s+от\s+(?:анального\s+края|ануса|АК|зубчатой)/i)) || (m = m1(/(\d{1,2}(?:[.,]\d)?)\s*см\s+от\s+(?:анального\s+края|ануса)/i))) { var hh = String(numv(m[1])); if (/МРТ|MRI/i.test(ctx(/(\d{1,2}(?:[.,]\d)?)\s*см\s+от\s+(?:анального\s+края|ануса)/i))) add('rHeight', hh, m[0], 0.75); else add('anusDist', hh, m[0], 0.7); }
+  if ((m = m1(/(?:протяж[её]нност[\wА-Яа-яЁё]+|продольн[\wА-Яа-яЁё]+\s+размер|длин[\wА-Яа-яЁё]+)\s+(?:опухоли\s+)?(?:до\s+)?(\d{1,2}(?:[.,]\d)?)\s*см/i))) add('mrLen', String(numv(m[1])), m[0], 0.65);
+  if ((m = m1(/CRM\s*([+\-])|CRM\s*[:：]?\s*(положит|отрицат|позитив|негатив)/i))) add('mrCRM', m[1] === '+' || /полож|позит/i.test(m[2] || '') ? 'Положительный' : 'Отрицательный', m[0], 0.8);
+  if ((m = m1(/EMVI\s*([+\-])|EMVI\s*[:：]?\s*(положит|отрицат|позитив|негатив)/i))) add('emvi', m[1] === '+' || /полож|позит/i.test(m[2] || '') ? 'Положительный' : 'Отрицательный', m[0], 0.8);
+  if ((m = m1(/\bmrT\s?([1-4][a-d]?)/i))) { var mr = 'mrT' + m[1].toLowerCase(); if (FIELD.mrT.options.indexOf(mr) >= 0) add('mrT', mr, m[0], 0.8); }
+  /* neoadjuvant */
+  if ((m = m1(/(?:СОД|суммарн[\wА-Яа-яЁё]+\s+очагов[\wА-Яа-яЁё]+\s+доз[\wА-Яа-яЁё]*)\s*[:：=]?\s*(\d{1,2}(?:[.,]\d)?)\s*Гр/i))) add('sod', String(numv(m[1])), m[0], 0.85);
+  if (/(?:неоадъювантн|предоперационн)[\wА-Яа-яЁё]*\s+химиолучев/i.test(tx)) add('tactic', ['Неоадъювантная химиолучевая терапия (НАХЛТ)'], ctx(/(?:неоадъювантн|предоперационн)[\wА-Яа-яЁё]*\s+химиолучев/i), 0.6);
+  else if (/(?:неоадъювантн|предоперационн)[\wА-Яа-яЁё]*\s+лучев/i.test(tx)) add('tactic', ['Неоадъювантная лучевая терапия (НАЛТ)'], ctx(/(?:неоадъювантн|предоперационн)[\wА-Яа-яЁё]*\s+лучев/i), 0.6);
+  if (/\bTNT\b|тотальн[\wА-Яа-яЁё]+\s+неоадъювант/i.test(tx)) { if (F.tactic) F.tactic.value = ['Тотальная неоадъювантная терапия (TNT)']; else add('tactic', ['Тотальная неоадъювантная терапия (TNT)'], ctx(/\bTNT\b|тотальн[\wА-Яа-яЁё]+\s+неоадъювант/i), 0.65); }
+  if ((m = m1(/(?:ЛТ|лучев[\wА-Яа-яЁё]+\s+терапи[\wА-Яа-яЁё]+)[^\n]{0,60}?с\s+(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})\s*(?:г\.?)?\s*по\s+(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i))) { add('rtStart', dt(m[1]), m[0], 0.7); add('rtEnd', dt(m[2]), m[0], 0.7); }
+  else if ((m = m1(/(?:лучев[\wА-Яа-яЁё]+\s+терапи[\wА-Яа-яЁё]+|ЛТ)[^\n]{0,80}?(?<![А-Яа-яЁёA-Za-z0-9])от\s+(\d{1,2}[.\/]\d{1,2}[.\/]\d{4})/i))) { add('rtEnd', dt(m[1]), m[0], 0.5, LL('дата «от» обычно означает окончание курса, проверьте', 'check: start or end?')); }
+  /* labs */
+  function lab2(id, re, c) { var mm = re.exec(tx); if (mm) add(id, String(numv(mm[1])), mm[0], c || 0.75); }
+  lab2('cea0', /(?:РЭА|CEA)\s*[:：=\-]?\s*(\d{1,4}(?:[.,]\d+)?)/i);
+  lab2('ca199_0', /(?:СА|CA)\s*19[\-\s.]?9\s*[:：=\-]?\s*(\d{1,5}(?:[.,]\d+)?)/i);
+  lab2('hb0', /(?:Гемоглобин|Hb|HGB)\s*[:：=\-]?\s*(\d{2,3}(?:[.,]\d)?)\s*(?:г\/л)?/i, 0.6);
+  /* operation */
+  if ((m = m1(/(?:Дата\s+операции|Операция\s+от|Оперирован[аы]?)\s*[:：]?\s*(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i))) add('date', dt(m[1]), m[0], 0.85);
+  var PRE = [[/брюшно[\s-]*промежностн[\wА-Яа-яЁё]+\s+экстирпац/i, 'Брюшно-промежностная экстирпация прямой кишки'], [/интерсфинктерн[\wА-Яа-яЁё]+\s+резекц/i, 'Интерсфинктерная резекция прямой кишки'], [/низк[\wА-Яа-яЁё]+\s+передн[\wА-Яа-яЁё]+\s+резекц|(?<![А-Яа-яЁёA-Za-z0-9])НПР(?![А-Яа-яЁёA-Za-z0-9])/i, 'Низкая передняя резекция прямой кишки'], [/передн[\wА-Яа-яЁё]+\s+резекц/i, 'Передняя резекция прямой кишки'], [/операци[\wА-Яа-яЁё]+\s+Гартмана|обструктивн[\wА-Яа-яЁё]+\s+резекц/i, 'Обструктивная резекция (операция Гартмана)'], [/расширенн[\wА-Яа-яЁё]+\s+правосторонн[\wА-Яа-яЁё]+\s+гемиколэктом/i, 'Расширенная правосторонняя гемиколэктомия'], [/правосторонн[\wА-Яа-яЁё]+\s+гемиколэктом/i, 'Правосторонняя гемиколэктомия'], [/левосторонн[\wА-Яа-яЁё]+\s+гемиколэктом/i, 'Левосторонняя гемиколэктомия'], [/илеоцекальн[\wА-Яа-яЁё]+\s+резекц/i, 'Илеоцекальная резекция'], [/резекци[\wА-Яа-яЁё]+\s+поперечн/i, 'Резекция поперечной ободочной кишки'], [/резекци[\wА-Яа-яЁё]+\s+сигмовидн/i, 'Резекция сигмовидной кишки'], [/резекци[\wА-Яа-яЁё]+\s+сел[её]з[её]ночн[\wА-Яа-яЁё]+\s+изгиб/i, 'Резекция селезёночного изгиба'], [/колпроктэктом/i, 'Колпроктэктомия'], [/субтотальн[\wА-Яа-яЁё]+\s+колэктом/i, 'Субтотальная колэктомия'], [/тотальн[\wА-Яа-яЁё]+\s+колэктом/i, 'Тотальная колэктомия'], [/трансанальн[\wА-Яа-яЁё]+\s+эндоскопическ|(?<![А-Яа-яЁёA-Za-z0-9])ТЭО(?![А-Яа-яЁёA-Za-z0-9])|\bTEM\b|\bTAMIS\b/i, 'Трансанальная эндоскопическая операция (ТЭО)'], [/тазов[\wА-Яа-яЁё]+\s+эвисцерац/i, 'Тазовая эвисцерация'], [/закрыти[\wА-Яа-яЁё]+\s+(?:петлев[\wА-Яа-яЁё]+\s+)?(?:илео|коло|транс)?стом/i, 'Закрытие петлевой стомы'], [/восстановлени[\wА-Яа-яЁё]+\s+непрерывност/i, 'Восстановление непрерывности после операции Гартмана'], [/циторедуктив/i, 'Циторедуктивная операция']];
+  for (var pi = 0; pi < PRE.length; pi++) { if (PRE[pi][0].test(tx)) { add('kind', 'Хирургическое', ctx(PRE[pi][0]), 0.7); add('proc', PRE[pi][1], ctx(PRE[pi][0]), 0.7); break; } }
+  if (!F.proc && /\b(?:ESD|EMR|эндоскопическ[\wА-Яа-яЁё]+\s+(?:подслизист|резекц|полипэктом)|полипэктоми)/i.test(tx)) { add('kind', 'Эндоскопическое', ctx(/\b(?:ESD|EMR|полипэктоми)/i), 0.6); var en = /\bESD\b|подслизист[\wА-Яа-яЁё]+\s+диссекц/i.test(tx) ? 'ESD' : /\bEMR\b|эндоскопическ[\wА-Яа-яЁё]+\s+резекц[\wА-Яа-яЁё]+\s+слизист/i.test(tx) ? 'EMR' : 'Полипэктомия'; add('endo', en, ctx(/\b(?:ESD|EMR|полипэктоми)/i), 0.6); }
+  if (/робот/i.test(tx) && F.proc) add('access', 'Робот-ассистированный', ctx(/робот/i), 0.7);
+  else if (/TaTME|трансанальн[\wА-Яа-яЁё]+\s+(?:тотальн[\wА-Яа-яЁё]+\s+)?мезоректум/i.test(tx)) add('access', /лапароскоп/i.test(tx) ? 'Гибридный (лапароскопия + TaTME)' : 'Трансанальный (TaTME)', ctx(/TaTME|трансанальн[\wА-Яа-яЁё]+\s+мезоректум/i), 0.65);
+  else if (/лапароскоп/i.test(tx) && F.proc) add('access', 'Лапароскопический', ctx(/лапароскоп/i), 0.7);
+  else if (/лапаротоми/i.test(tx) && F.proc) add('access', 'Открытый', ctx(/лапаротоми/i), 0.6);
+  if (/конверси/i.test(tx)) add('conv', /без\s+конверси|конверси[\wА-Яа-яЁё]+\s+не\s/i.test(tx) ? 'Нет' : 'Да', ctx(/конверси/i), 0.65);
+  if ((m = m1(/(?:длительност[\wА-Яа-яЁё]+\s+операции|продолжительност[\wА-Яа-яЁё]+\s+операции)\s*[:：\-]?\s*(\d{2,3})\s*мин/i))) add('opTime', m[1], m[0], 0.85);
+  else if ((m = m1(/(?:длительност[\wА-Яа-яЁё]+\s+операции|продолжительност[\wА-Яа-яЁё]+\s+операции)\s*[:：\-]?\s*(\d{1,2})\s*ч[\wА-Яа-яЁё]*\.?\s*(\d{1,2})?\s*(?:мин)?/i))) add('opTime', String(+m[1] * 60 + (+m[2] || 0)), m[0], 0.75);
+  if ((m = m1(/кровопотер[\wА-Яа-яЁё]+\s*[:：\-]?\s*(?:около\s+|до\s+)?(\d{1,4})\s*мл/i))) add('ebl', m[1], m[0], 0.85);
+  if (/гемотрансфуз|трансфузи[\wА-Яа-яЁё]+\s+(?:эритро|СЗП|крови)/i.test(tx)) add('transf', /без\s+гемотрансфуз|гемотрансфуз[\wА-Яа-яЁё]+\s+не\s/i.test(tx) ? 'Нет' : 'Да', ctx(/гемотрансфуз|трансфузи/i), 0.6);
+  if ((m = m1(/(петлев[\wА-Яа-яЁё]+|концев[\wА-Яа-яЁё]+|двуствольн[\wА-Яа-яЁё]+)?\s*(илеостом|трансверзостом|сигмостом|колостом)/i))) { var typ = (m[1] || '').toLowerCase(), org = m[2].toLowerCase(), sv = /илео/.test(org) ? (/концев/.test(typ) ? 'Концевая илеостома' : 'Петлевая илеостома') : /трансв/.test(org) ? 'Петлевая трансверзостома' : /сигмо/.test(org) ? 'Петлевая сигмостома' : /концев/.test(typ) ? 'Концевая колостома' : /двустволь/.test(typ) ? 'Раздельная двуствольная колостома' : 'Петлевая колостома'; if (!/закрыти/i.test(ctx(/(илеостом|трансверзостом|сигмостом|колостом)/i))) add('stoma', sv, m[0], typ ? 0.7 : 0.5, typ ? '' : LL('тип (петлевая или концевая) не указан', 'type not stated')); }
+  if (/анастомоз/i.test(tx) && F.proc) add('anast', /без\s+(?:формирования\s+)?анастомоз/i.test(tx) ? 'Нет' : 'Да', ctx(/анастомоз/i), 0.6);
+  if (/латеральн[\wА-Яа-яЁё]+\s+(?:тазов[\wА-Яа-яЁё]+\s+)?лимфодиссекц|\bLLND\b|(?<![А-Яа-яЁёA-Za-z0-9])ЛЛД(?![А-Яа-яЁёA-Za-z0-9])/i.test(tx)) add('llnd', 'Да', ctx(/латеральн[\wА-Яа-яЁё]+\s+(?:тазов[\wА-Яа-яЁё]+\s+)?лимфодиссекц|\bLLND\b|(?<![А-Яа-яЁёA-Za-z0-9])ЛЛД(?![А-Яа-яЁёA-Za-z0-9])/i), 0.75);
+  if ((m = m1(/\b(D[23])\b[\s-]*лимфодиссекц|лимфодиссекци[\wА-Яа-яЁё]+\s+(D[23])/i))) add('lnd', (m[1] || m[2]).toUpperCase(), m[0], 0.8);
+  if ((m = m1(/(высок|низк)[\wА-Яа-яЁё]+\s+перевязк[\wА-Яа-яЁё]+\s+(?:НБА|нижн[\wА-Яа-яЁё]+\s+брыжеечн)/i)) || (m = m1(/(?:НБА|нижн[\wА-Яа-яЁё]+\s+брыжеечн[\wА-Яа-яЁё]+\s+артери[\wА-Яа-яЁё]+)[^\n]{0,30}(у\s+устья|у\s+аорты|ниже\s+отхождения)/i))) add('ima', /высок|аорт|устья/i.test(m[1]) ? FIELD.ima.options[0] : FIELD.ima.options[1], m[0], 0.6);
+  var surgRe = new RegExp('(?:Хирург|Оперировал[\\wА-Яа-яЁё]*|Оператор)\\s*[:：]?\\s*(?:[^\\n]{0,40}?)(' + SURGEONS.join('|') + ')', 'i');
+  if ((m = surgRe.exec(tx))) add('surgeon', SURGEONS.filter(function (s) { return s.toLowerCase() === m[1].toLowerCase(); })[0], m[0], 0.8);
+  /* pathology */
+  if ((m = m1(/(?:исследовано|удалено|выделено|обнаружено)\s+(\d{1,3})\s+лимф[\wА-Яа-яЁё]*\s*узл[\wА-Яа-яЁё]*[^\n]{0,80}?(?:из\s+них\s+)?(?:метастаз[\wА-Яа-яЁё]*\s+(?:в|обнаружен[\wА-Яа-яЁё]*\s+в)\s+)?(\d{1,2}|нет|ни\s+в\s+одном)?/i))) { add('lnT', m[1], m[0], 0.75); if (m[2]) add('lnP', /нет|ни/.test(m[2]) ? '0' : m[2], m[0], 0.65); }
+  else if ((m = m1(/\b(\d{1,2})\s*\/\s*(\d{1,3})\s*(?:ЛУ|лимф)/i))) { add('lnP', m[1], m[0], 0.7); add('lnT', m[2], m[0], 0.7); }
+  if ((m = m1(/\bR\s?([012])\b(?![\s-]*(?:TRG))/))) add('r', 'R' + m[1], m[0], 0.7);
+  if ((m = m1(/(?:лимфоваскулярн[\wА-Яа-яЁё]+|сосудист[\wА-Яа-яЁё]+)\s+инвази[\wА-Яа-яЁё]*\s*[:：]?\s*(не\s+(?:обнаруж|выявл)|отсутств|нет|обнаруж|выявл|есть|присутств)|\bLVI\s*([+\-])/i))) add('lvi', /не\s|отсутств|нет|-/.test(m[1] || m[2]) ? 'Нет' : 'Да', m[0], 0.75);
+  if ((m = m1(/периневральн[\wА-Яа-яЁё]+\s+инвази[\wА-Яа-яЁё]*\s*[:：]?\s*(не\s+(?:обнаруж|выявл)|отсутств|нет|обнаруж|выявл|есть|присутств)|\bPNI\s*([+\-])/i))) add('pni', /не\s|отсутств|нет|-/.test(m[1] || m[2]) ? 'Нет' : 'Да', m[0], 0.75);
+  if ((m = m1(/\bTRG\s*[:：\-]?\s*([0-3])\b/i))) add('pTRG', m[1], m[0], 0.7, LL('проверьте шкалу: в карточке AJCC 0-3', 'check scale: AJCC 0-3'));
+  if ((m = m1(/(?:размер[\wА-Яа-яЁё]*\s+опухоли|опухоль\s+размер[\wА-Яа-яЁё]*)\s*[:：]?\s*(\d{1,2}(?:[.,]\d)?)\s*(?:x|х|×)?/i))) add('tumSize', String(numv(m[1])), m[0], 0.55, LL('наибольший размер, проверьте единицы', 'largest size'));
+  if ((m = m1(/(?:качеств[\wА-Яа-яЁё]+\s+(?:ТМЭ|мезоректум[\wА-Яа-яЁё]*)|мезоректум[\wА-Яа-яЁё]*\s+(?:удал[\wА-Яа-яЁё]+\s+)?)\s*[:：]?\s*(полн|почти\s+полн|неполн|интрамезоректальн|мезоректальн|мышечн)/i))) add('tmeQ', /почти|интрамез/i.test(m[1]) ? FIELD.tmeQ.options[1] : /неполн|мышечн/i.test(m[1]) ? FIELD.tmeQ.options[2] : FIELD.tmeQ.options[0], m[0], 0.7);
+  /* molecular */
+  function mol(id, name) { var re = new RegExp(name + '[^\\n]{0,40}?(дик[\\wА-Яа-яЁё]+\\s+тип|wild|wt\\b|мутац[\\wА-Яа-яЁё]*\\s+не\\s|не\\s+обнаруж|мутац|mut|V600E)', 'i'), mm = re.exec(tx); if (!mm) return; var v = /дик|wild|wt|не\s/i.test(mm[1]) ? 'Дикий тип' : id === 'braf' ? (/V600E/i.test(mm[0]) ? 'Мутация V600E' : 'Мутация (другая)') : 'Мутация'; add(id, v, mm[0], 0.75); }
+  mol('kras', 'KRAS'); mol('nras', 'NRAS'); mol('braf', 'BRAF');
+  if ((m = m1(/\b(MSI[\s-]?H|MSI[\s-]?L|MSS|dMMR|pMMR)\b/i))) { var ms = m[1].toUpperCase().replace(/\s|-/g, ''); add('msi', ms === 'MSIH' || ms === 'DMMR' ? 'MSI-H / dMMR' : ms === 'MSIL' ? 'MSI-L' : 'MSS / pMMR', m[0], 0.8); }
+  /* complications */
+  if ((m = m1(/Clavien[\s-]*Dindo\s*[:：]?\s*(IV[ab]?|III[ab]?|II|I|V)\b/i))) { var cv = m[1].replace(/^III$/, 'IIIa').replace(/^IV$/, 'IVa'); if (FIELD.cd.options.indexOf(cv) >= 0) add('cd', cv, m[0], 0.8); }
+  if ((m = m1(/несостоятельност[\wА-Яа-яЁё]+\s+(?:швов\s+)?анастомоз[\wА-Яа-яЁё]*/i))) { var around2 = tx.slice(Math.max(0, m.index - 20), m.index); if (!/без|нет|не\s+было/i.test(around2)) I.push({ id: 'leak', kind: 'ambiguous', text: LL('Упоминается несостоятельность анастомоза: степень ISREC (A/B/C) определите по тактике лечения', 'Anastomotic leak mentioned: grade by ISREC') }); }
+  if (/релапаротоми|повторн[\wА-Яа-яЁё]+\s+операци/i.test(tx)) add('reop30', 'Да', ctx(/релапаротоми|повторн[\wА-Яа-яЁё]+\s+операци/i), 0.5, LL('проверьте, что в течение 30 дней', 'check: within 30 days?'));
+  /* recommendations and gaps */
+  if (!F.fio) Q.push(LL('ФИО пациента в документе не найдено: проверьте, тот ли это документ и к какой карточке он относится.', 'Patient name not found.'));
+  if (F.proc && !F.date) Q.push(LL('Операция упомянута, но дата операции не найдена.', 'Operation mentioned but no date found.'));
+  if (F.hist && F.proc) Q.push(LL('Гистология найдена: уточните, это биопсия или операционный материал (для последнего есть отдельное поле).', 'Histology: biopsy or specimen?'));
+  if (doc.ocr) I.push({ id: '', kind: 'unreadable', text: LL('Документ распознан как скан (OCR): возможны ошибки в цифрах и датах, сверяйте с оригиналом.', 'Scanned document (OCR): check digits and dates.') });
+  return { doc: { type: LL('Документ (обработка без ИИ)', 'Document (no AI)'), summary: LL('Данные извлечены на этом компьютере без ИИ: распознавание текста', 'Extracted locally without AI: text recognition') + (doc.ocr ? LL(' со скана (OCR)', ' from a scan (OCR)') : '') + LL(' и поиск по медицинским шаблонам. Такой разбор находит явные формулировки (даты, TNM, стадии, лабораторные показатели, название операции), но хуже понимает контекст, отрицания и сокращения, чем ИИ.', ' and medical pattern matching.') }, fields: Object.keys(F).map(function (k) { return F[k]; }), issues: I, questions: Q };
+}
+
 /* normalise model output against the card schema */
 function dxNorm(x, v) {
   if (v === null || v === undefined || v === '') return { err: 'empty' };
@@ -4786,12 +4923,12 @@ function dxNorm(x, v) {
   return { v: String(v).trim() };
 }
 function dxSame(a, b) { return JSON.stringify(Array.isArray(a) ? a.slice().sort() : String(a)) === JSON.stringify(Array.isArray(b) ? b.slice().sort() : String(b)); }
-function dxApply(res, keep) {
+function dxApply(res, keep, local) {
   var dr = S.drawer, d = dr.p.d, rep = { doc: res.doc || {}, filled: [], same: [], conflict: [], rejected: [], issues: [], questions: (res.questions || []).filter(Boolean), missing: [] };
   dr.aiFilled = dr.aiFilled || {};
   (res.fields || []).forEach(function (r) {
     var x = FIELD[r.id]; if (!x || ['files', 'nodes'].indexOf(x.type) >= 0) { if (r.id) rep.rejected.push({ id: r.id, label: r.id, why: LL('такого поля нет в карточке', 'no such field'), quote: r.quote, raw: r.value }); return; }
-    if (PII[x.id] && x.id !== 'fio' && AI.prov !== 'local' && aiReady()) return;
+    if (PII[x.id] && x.id !== 'fio' && !local) return;
     var nv = dxNorm(x, r.value), row = { id: x.id, label: L(x.label), quote: r.quote || '', conf: typeof r.confidence === 'number' ? r.confidence : 0.5, note: r.note || '', raw: r.value };
     if (nv.err) { if (nv.err !== 'empty') rep.rejected.push(Object.assign(row, { why: nv.err })); return; }
     row.v = nv.v; if (nv.warn) row.note = (row.note ? row.note + '. ' : '') + nv.warn;
@@ -4810,7 +4947,7 @@ function dxApply(res, keep) {
     if (!secOn(s, d)) return;
     var fl = s.fields.filter(function (x) { return !x.show || x.show(d); });
     MODULES.forEach(function (m) { if (m.sec === s.id && m.when(d)) fl = fl.concat(m.fields.filter(function (x) { return !x.show || x.show(d); })); });
-    var miss = fl.filter(function (x) { var v = d[x.id]; return ['files', 'nodes'].indexOf(x.type) < 0 && x.id !== 'studyNo' && !(PII[x.id] && AI.prov !== 'local') && (!has(v) || (Array.isArray(v) && !v.length)); });
+    var miss = fl.filter(function (x) { var v = d[x.id]; return ['files', 'nodes'].indexOf(x.type) < 0 && x.id !== 'studyNo' && !(PII[x.id] && !local) && (!has(v) || (Array.isArray(v) && !v.length)); });
     if (miss.length) rep.missing.push({ sec: L(s.title), items: miss.map(function (x) { return { id: x.id, label: L(x.label), flagged: !!issueIds[x.id] }; }) });
   });
   return rep;
@@ -4821,22 +4958,30 @@ function dxVisible(d) {
   MODULES.forEach(function (m) { var sc = SECTIONS.filter(function (z) { return z.id === m.sec; })[0]; if (m.when(d) && (!sc || secOn(sc, d))) m.fields.forEach(function (x) { if (!x.show || x.show(d)) keep[x.id] = 1; }); });
   return keep;
 }
-function dxOpen() { if (!S.drawer) return; S.dx = { step: 'pick', keep: true, agree: false }; render(); }
+function dxExtract(doc, mode, log) {
+  function rules(why) {
+    var p = Promise.resolve();
+    if (doc.scanned || doc.kind === 'image') { log(LL('Распознаю текст со скана на этом компьютере (OCR, 10-40 секунд на страницу)…', 'OCR on this computer…')); p = dxOCR(doc, function (pr, i, n) { if (i) log(LL('OCR: страница ', 'OCR: page ') + i + LL(' из ', ' of ') + n, true); }).then(function (t) { doc.text = t; doc.ocr = true; }); }
+    return p.then(function () { log(LL('Ищу данные по медицинским шаблонам…', 'Pattern matching…')); return { res: dxRules(doc), src: LL('без ИИ: ', 'no AI: ') + (doc.ocr ? 'OCR + ' : '') + LL('шаблоны', 'patterns'), local: true, fallback: why || '' }; });
+  }
+  if (mode !== 'ai' || !aiReady()) return rules(mode === 'ai' ? LL('ИИ не подключён, использована обработка без ИИ.', 'AI not connected; processed without AI.') : '');
+  log(LL('Отправляю в ', 'Sending to ') + AI_PROV[AI.prov].name + ' · ' + AI.model + LL(' и жду ответ (обычно 20-60 секунд)…', ' (20-60 s)…'));
+  return dxCall(doc, dxSchemaText()).then(dxParseJSON).then(function (res) { return { res: res, src: AI_PROV[AI.prov].name + ' · ' + AI.model, local: AI.prov === 'local' }; })
+    .catch(function (e) { var em = (e && e.message) || String(e); log(LL('ИИ не ответил: ', 'AI failed: ') + em + LL('. Перехожу к обработке без ИИ.', '. Falling back to no-AI processing.')); return rules(LL('ИИ не ответил (', 'AI failed (') + em + LL('), поэтому документ обработан без ИИ. Можно повторить с ИИ позже.', '); processed without AI.')); });
+}
+function dxOpen() { if (!S.drawer) return; S.dx = { step: 'pick', keep: true, agree: false, mode: aiReady() ? 'ai' : 'rules' }; render(); }
 function dxRun() {
   var dx = S.dx; if (!dx || !dx.file) return;
-  var cloud = aiReady() && AI.prov !== 'local';
-  if (aiReady() && cloud && !dx.agree) { toast(LL('Подтвердите отправку документа во внешний сервис ИИ', 'Confirm sending the document to the external AI service')); return; }
+  if (dx.mode === 'ai' && aiReady() && AI.prov !== 'local' && !dx.agree) { toast(LL('Подтвердите отправку документа во внешний сервис ИИ или выберите обработку без ИИ', 'Confirm sending, or choose no-AI processing')); return; }
   dx.step = 'run'; dx.log = [LL('Читаю файл «', 'Reading «') + dx.file.name + '»']; render();
+  var log = function (l, repl) { if (!S.dx) return; if (repl && dx.log.length && /^OCR/.test(dx.log[dx.log.length - 1])) dx.log[dx.log.length - 1] = l; else dx.log.push(l); render(); };
   dxReadFile(dx.file).then(function (doc) {
-    dx.doc = doc;
-    dx.log.push(doc.kind === 'pdf' ? LL('PDF: страниц ', 'PDF: pages ') + doc.pages + (doc.scanned ? LL(', скан без текстового слоя', ', scanned, no text layer') : LL(', текст извлечён', ', text extracted')) : doc.kind === 'image' ? LL('Изображение', 'Image') : LL('Текстовый файл', 'Text file'));
-    if (!aiReady()) { dx.log.push(LL('ИИ не подключён: простое распознавание по шаблонам', 'AI not connected: rule-based parsing')); render(); if (doc.scanned) throw new Error(LL('Документ отсканирован, без ИИ его прочитать нельзя. Подключите ИИ (Gemini, Claude или локальную модель с распознаванием изображений).', 'Scanned document: AI needed.')); return dxRules(doc); }
-    dx.log.push(LL('Отправляю в ', 'Sending to ') + AI_PROV[AI.prov].name + ' · ' + AI.model + LL(' и жду ответ (обычно 20-60 секунд)…', ' (20-60 s)…')); render();
-    return dxCall(doc, dxSchemaText()).then(dxParseJSON);
-  }).then(function (res) {
+    dx.log.push(doc.kind === 'pdf' ? LL('PDF: страниц ', 'PDF: pages ') + doc.pages + (doc.scanned ? LL(', скан без текстового слоя', ', scanned, no text layer') : LL(', текст извлечён', ', text extracted')) : doc.kind === 'image' ? LL('Изображение', 'Image') : LL('Текстовый файл', 'Text file')); render();
+    return dxExtract(doc, dx.mode, log);
+  }).then(function (o) {
     if (!S.dx || !S.drawer) return;
-    dx.rep = dxApply(res, dx.keep); dx.rep.src = aiReady() ? AI_PROV[AI.prov].name + ' · ' + AI.model : LL('шаблоны без ИИ', 'rules, no AI'); dx.rep.file = dx.file.name; dx.rep.at = nowIso();
-    var dr = S.drawer; dr.p.docsAI = (dr.p.docsAI || []).concat([{ name: dx.file.name, at: dx.rep.at, by: me(), src: dx.rep.src, n: dx.rep.filled.length }]);
+    dx.rep = dxApply(o.res, dx.keep, o.local); dx.rep.src = o.src; dx.rep.fallback = o.fallback; dx.rep.file = dx.file.name; dx.rep.at = nowIso();
+    var dr = S.drawer; dr.p.docsAI = (dr.p.docsAI || []).concat([{ name: dx.file.name, at: dx.rep.at, by: me(), src: o.src, n: dx.rep.filled.length }]);
     dx.step = 'rep'; render();
   }).catch(function (e) { if (!S.dx) return; dx.step = 'err'; dx.err = (e && e.message) || String(e); render(); });
 }
@@ -4845,6 +4990,16 @@ function dxTake(id) { var dx = S.dx, dr = S.drawer; if (!dx || !dr) return; var 
 function dxUndoAll() { var dx = S.dx; if (!dx || !dx.rep) return; dx.rep.filled.forEach(function (r) { if (!r.undone) dxUndo(r.id); }); dx.rep.conflict.forEach(function (r) { if (r.taken) { S.drawer.p.d[r.id] = r.old; delete S.drawer.aiFilled[r.id]; r.taken = false; } }); S.dx = null; toast(LL('Изменения из документа отменены', 'Changes from the document reverted')); render(); }
 function dxVal(r, v) { var x = FIELD[r.id]; return esc(fmtVal(x, v)); }
 var DX_KIND = { ambiguous: ['Двусмысленно', 'Ambiguous'], conflict: ['Противоречие в документе', 'Conflict in document'], unreadable: ['Неразборчиво', 'Unreadable'], not_in_options: ['Нет подходящего варианта', 'No matching option'], inconsistent: ['Клиническая несогласованность', 'Clinically inconsistent'] };
+function dxModeHTML(o, pfx) {
+  var h = '<div class="dxmode" role="radiogroup"><button type="button" class="dxmo' + (o.mode === 'ai' ? ' on' : '') + '" data-act="' + pfx + 'mode" data-v="ai"' + (aiReady() ? '' : ' disabled') + '>' + ico('sparkle', 18) + '<b>' + LL('С помощью ИИ', 'With AI') + '</b><span>' + (aiReady() ? esc(AI_PROV[AI.prov].name) + ' · ' + esc(AI.model) + LL(': понимает контекст, сокращения, отрицания', ': understands context') : LL('ИИ не подключён', 'AI not connected')) + '</span></button>';
+  h += '<button type="button" class="dxmo' + (o.mode !== 'ai' ? ' on' : '') + '" data-act="' + pfx + 'mode" data-v="rules">' + ico('lock', 18) + '<b>' + LL('Без ИИ, на этом компьютере', 'Without AI, on this computer') + '</b><span>' + LL('Распознавание текста и сканов (OCR) и медицинские шаблоны. Документ никуда не отправляется. Точность ниже.', 'Text and scan recognition (OCR) plus medical patterns. Nothing leaves the computer. Less accurate.') + '</span></button></div>';
+  if (o.mode === 'ai' && aiReady()) {
+    var loc = AI.prov === 'local';
+    h += '<div class="dxprov ' + (loc ? 'ok' : 'warn') + '">' + ico(loc ? 'lock' : 'alert', 16) + '<div><b>' + (loc ? LL('Локальная модель центра', 'Centre local model') : LL('Внешний облачный сервис', 'External cloud service')) + '</b><span>' + (loc ? LL('Документ не покидает сеть центра.', 'Stays inside the centre network.') : LL('Документ целиком уйдёт во внешний сервис, обезличить PDF нельзя. ИИН, адрес, телефон и № ИБ ИИ не возвращает. Для реальных документов лучше локальная модель или обработка без ИИ. Если ИИ не ответит, документ автоматически обработается без ИИ.', 'The whole document goes to an external service. If AI fails, the document is processed without AI automatically.')) + '</span></div></div>';
+    if (!loc) h += '<label class="chk"><input type="checkbox" id="' + pfx + 'agree"' + (o.agree ? ' checked' : '') + '><span>' + LL('Понимаю и подтверждаю отправку', 'I confirm sending') + '</span></label>';
+  }
+  return h;
+}
 function renderDx() {
   var dx = S.dx, h = '<div class="dim top" data-act="dxclose"></div>';
   if (dx.step !== 'rep') {
@@ -4852,11 +5007,7 @@ function renderDx() {
     if (dx.step === 'pick') {
       h += '<label class="dxdrop' + (dx.file ? ' on' : '') + '"><input type="file" id="dxfile" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,application/pdf,image/*,text/plain" hidden>' + ico(dx.file ? 'doc' : 'upload', 28) + '<b>' + (dx.file ? esc(dx.file.name) + ' · ' + Math.max(1, Math.round(dx.file.size / 1024)) + ' КБ' : LL('Выберите или перетащите файл', 'Choose or drop a file')) + '</b><span>' + LL('PDF (в том числе скан), фото документа или текст', 'PDF (incl. scans), photo or text') + '</span></label>';
       h += '<label class="chk"><input type="checkbox" id="dxkeep"' + (dx.keep ? ' checked' : '') + '><span>' + LL('Не перезаписывать уже заполненные поля (расхождения покажу отдельно)', 'Keep fields that are already filled (differences listed separately)') + '</span></label>';
-      if (aiReady()) {
-        var loc = AI.prov === 'local';
-        h += '<div class="dxprov ' + (loc ? 'ok' : 'warn') + '">' + ico(loc ? 'lock' : 'alert', 16) + '<div><b>' + LL('Обработка: ', 'Processing: ') + esc(AI_PROV[AI.prov].name) + ' · ' + esc(AI.model) + '</b><span>' + (loc ? LL('Документ обрабатывается на сервере ИИ центра и не покидает его сеть.', 'Processed on the centre\'s own AI server.') : LL('Документ целиком уйдёт во внешний облачный сервис. Обезличить PDF автоматически нельзя. Для реальных документов используйте локальную модель центра; сейчас лучше пробовать на обезличенных или тестовых файлах.', 'The whole document goes to an external cloud service and cannot be de-identified automatically. Use the centre\'s local model for real records.')) + '</span></div></div>';
-        if (!loc) h += '<label class="chk"><input type="checkbox" id="dxagree"' + (dx.agree ? ' checked' : '') + '><span>' + LL('Понимаю и подтверждаю отправку этого документа', 'I understand and confirm sending this document') + '</span></label>';
-      } else h += '<div class="dxprov warn">' + ico('alert', 16) + '<div><b>' + LL('ИИ не подключён', 'AI not connected') + '</b><span>' + LL('Сработает только простое распознавание по шаблонам для текстовых PDF (ФИО, дата рождения, TNM, стадия, ECOG, диагноз). Для полного заполнения подключите ИИ в правом верхнем углу.', 'Only rule-based parsing of text PDFs will run. Connect AI for full extraction.') + '</span></div></div>';
+      h += dxModeHTML(dx, 'dx');
       h += '<div class="actions"><button type="button" class="btn primary" data-act="dxrun"' + (dx.file ? '' : ' disabled') + '>' + ico('sparkle', 16) + LL('Распознать и заполнить', 'Extract and fill') + '</button><button type="button" class="btn ghost" data-act="dxclose">' + t('b.cancel') + '</button></div>';
     } else if (dx.step === 'run') {
       h += '<div class="dxrun"><span class="spin"></span><ul>' + dx.log.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul></div>';
@@ -4868,6 +5019,7 @@ function renderDx() {
   var r = dx.rep, nMiss = r.missing.reduce(function (a, s) { return a + s.items.length; }, 0), low = r.filled.filter(function (x) { return !x.undone && x.conf < 0.7; });
   var probs = r.issues.length + r.rejected.length;
   h += '<section class="modal dxrep" role="dialog" aria-modal="true"><div class="dhead"><div><div class="dh-title">' + ico('sparkle', 18) + LL('Сводка заполнения из документа', 'Document extraction summary') + '</div><div class="hint">' + esc(r.file) + ' · ' + esc(r.src) + '</div></div><button type="button" class="iconbtn" data-act="dxclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
+  if (r.fallback) h += '<div class="dxprov warn" style="margin-bottom:12px">' + ico('alert', 16) + '<div><b>' + LL('Обработано без ИИ', 'Processed without AI') + '</b><span>' + esc(r.fallback) + '</span></div></div>';
   if (r.match) h += '<div class="dxprov ok" style="margin-bottom:12px">' + ico('users', 16) + '<div><b>' + esc(r.match) + '</b></div></div>';
   if (r.doc && (r.doc.type || r.doc.summary)) h += '<div class="dxdoc"><b>' + esc(r.doc.type || '') + (r.doc.date ? ' · ' + fmtDate(r.doc.date) : '') + '</b><p>' + esc(r.doc.summary || '') + '</p></div>';
   h += '<div class="dxtiles">' + [[r.filled.filter(function (x) { return !x.undone; }).length, LL('заполнено', 'filled'), 'ok'], [low.length, LL('проверить: низкая уверенность', 'check: low confidence'), 'warn'], [r.conflict.length, LL('расходятся с карточкой', 'differ from record'), 'warn'], [probs, LL('трудности и неточности', 'difficulties'), 'bad'], [r.questions.length, LL('вопросы врачу', 'questions'), 'q'], [nMiss, LL('пусто: нет в документе', 'empty: not in document'), 'mut']].map(function (x) { return '<div class="dxt ' + x[2] + '"><b>' + x[0] + '</b><span>' + x[1] + '</span></div>'; }).join('') + '</div>';
@@ -4883,7 +5035,7 @@ function renderDx() {
 }
 
 /* ======================= Retro batch: many documents → cards ======================= */
-var RETRO = { items: [], run: false, keep: true, agree: false };
+var RETRO = { items: [], run: false, keep: true, agree: false, mode: null };
 function retroMatch(res) {
   var F = {}; (res.fields || []).forEach(function (r) { F[r.id] = r.value; });
   var fio = F.fio ? String(F.fio) : '', dob = F.dob ? (dxNorm(FIELD.dob, F.dob).v || '') : '', ib = F.ib ? String(F.ib).trim() : '';
@@ -4898,26 +5050,24 @@ function retroMatch(res) {
 function retroAdd(files) { [].slice.call(files || []).forEach(function (f) { RETRO.items.push({ id: uid('rt'), file: f, st: 'wait' }); }); render(); }
 function retroStart() {
   if (RETRO.run) return;
-  if (aiReady() && AI.prov !== 'local' && !RETRO.agree) { toast(LL('Подтвердите отправку документов во внешний сервис ИИ', 'Confirm sending documents to the external AI service')); return; }
+  if (RETRO.mode === 'ai' && aiReady() && AI.prov !== 'local' && !RETRO.agree) { toast(LL('Подтвердите отправку во внешний сервис ИИ или выберите обработку без ИИ', 'Confirm sending, or choose no-AI')); return; }
   RETRO.run = true; render(); retroNext();
 }
 function retroNext() {
   var it = RETRO.items.filter(function (x) { return x.st === 'wait'; })[0];
   if (!it || !RETRO.run) { RETRO.run = false; render(); return; }
   it.st = 'read'; render();
+  var log = function (l) { it.note = l; render(); };
   dxReadFile(it.file).then(function (doc) {
     it.doc = { kind: doc.kind, pages: doc.pages, scanned: doc.scanned };
-    if (!aiReady()) { if (doc.scanned) throw new Error(LL('Скан без текста: нужен ИИ', 'Scan without text: AI needed')); return dxRules(doc); }
-    it.st = 'ai'; render();
-    return dxCall(doc, dxSchemaText()).then(dxParseJSON);
-  }).then(function (res) {
-    it.res = res; it.m = retroMatch(res); it.st = 'done'; it.src = aiReady() ? AI_PROV[AI.prov].name + ' · ' + AI.model : LL('шаблоны без ИИ', 'rules, no AI');
+    it.st = RETRO.mode === 'ai' && aiReady() ? 'ai' : 'rules'; render();
+    return dxExtract(doc, RETRO.mode, log);
+  }).then(function (o) {
+    var res = o.res; it.res = res; it.m = retroMatch(res); it.st = 'done'; it.src = o.src; it.local = o.local; it.fallback = o.fallback; it.note = '';
     it.nF = (res.fields || []).length; it.nI = (res.issues || []).length + (res.questions || []).length;
-    it.pid = it.m.p ? it.m.p.id : null; render(); setTimeout(retroNext, 1500);
+    it.pid = it.m.p ? it.m.p.id : null; render(); setTimeout(retroNext, 800);
   }).catch(function (e) {
-    var msg = (e && e.message) || String(e);
-    if (/лимит|quota|rate|429/i.test(msg) && !it.retried) { it.retried = true; it.st = 'wait'; it.note = LL('Лимит ИИ: жду минуту и повторяю', 'AI rate limit: retrying in a minute'); render(); setTimeout(retroNext, 65000); return; }
-    it.st = 'err'; it.err = msg; render(); setTimeout(retroNext, 1500);
+    it.st = 'err'; it.err = (e && e.message) || String(e); render(); setTimeout(retroNext, 800);
   });
 }
 function retroOpen(id) {
@@ -4926,18 +5076,18 @@ function retroOpen(id) {
   openPatient(pid, pid ? null : {});
   S.drawer.retroItem = it.id;
   S.dx = { step: 'rep', keep: RETRO.keep, file: it.file };
-  S.dx.rep = dxApply(it.res, RETRO.keep); S.dx.rep.src = it.src; S.dx.rep.file = it.file.name; S.dx.rep.at = nowIso();
+  S.dx.rep = dxApply(it.res, RETRO.keep, it.local); S.dx.rep.src = it.src; S.dx.rep.fallback = it.fallback; S.dx.rep.file = it.file.name; S.dx.rep.at = nowIso();
   S.dx.rep.match = it.m ? (pid ? LL('Документ отнесён к карточке ', 'Matched to record ') + pid + ' (' + it.m.how + ')' : it.m.how) : '';
   S.drawer.p.docsAI = (S.drawer.p.docsAI || []).concat([{ name: it.file.name, at: S.dx.rep.at, by: me(), src: it.src, n: S.dx.rep.filled.length }]);
   it.opened = true; render();
 }
 function renderRetro() {
-  var st = { wait: [LL('В очереди', 'Queued'), ''], read: [LL('Читаю файл', 'Reading'), 'prog'], ai: [LL('ИИ извлекает данные', 'AI extracting'), 'prog'], done: [LL('Готово', 'Done'), 'done'], err: [LL('Ошибка', 'Error'), 'cancel'] };
+  var st = { wait: [LL('В очереди', 'Queued'), ''], read: [LL('Читаю файл', 'Reading'), 'prog'], ai: [LL('ИИ извлекает данные', 'AI extracting'), 'prog'], rules: [LL('Обработка без ИИ', 'Processing without AI'), 'prog'], done: [LL('Готово', 'Done'), 'done'], err: [LL('Ошибка', 'Error'), 'cancel'] };
   var h = pageHead(LL('Пациенты', 'Patients'), LL('Ретро-загрузка документов', 'Retrospective document import'), LL('Загрузите пачку выписок, протоколов операций, гистологий, консультативных листов. ИИ по очереди извлечёт данные, найдёт карточку пациента по ФИО, дате рождения или № ИБ (или предложит новую), а вы откроете каждую, проверите сводку и сохраните.', 'Upload a batch of documents; AI extracts data, matches patients, you review and save each.'), '');
   h += '<div class="retro"><label class="dxdrop"><input type="file" id="retrofiles" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,application/pdf,image/*,text/plain" hidden>' + ico('upload', 28) + '<b>' + LL('Выберите или перетащите файлы', 'Choose or drop files') + '</b><span>' + LL('Можно сразу много: PDF, сканы, фото, текст', 'Many at once: PDF, scans, photos, text') + '</span></label>';
   h += '<div class="retro-opts"><label class="chk"><input type="checkbox" id="retrokeep"' + (RETRO.keep ? ' checked' : '') + '><span>' + LL('Не перезаписывать уже заполненные поля', 'Keep fields already filled') + '</span></label>';
-  if (aiReady()) { var loc = AI.prov === 'local'; h += '<div class="dxprov ' + (loc ? 'ok' : 'warn') + '">' + ico(loc ? 'lock' : 'alert', 16) + '<div><b>' + LL('Обработка: ', 'Processing: ') + esc(AI_PROV[AI.prov].name) + ' · ' + esc(AI.model) + '</b><span>' + (loc ? LL('Документы не покидают сеть центра.', 'Documents stay inside the centre network.') : LL('Документы целиком уходят во внешний облачный сервис. ИИН, адрес, телефон и № ИБ ИИ не возвращает, но в самом файле они есть. Для реальных документов используйте локальную модель центра.', 'Documents go to an external cloud service. Use the centre\'s local model for real records.')) + '</span></div></div>' + (loc ? '' : '<label class="chk"><input type="checkbox" id="retroagree"' + (RETRO.agree ? ' checked' : '') + '><span>' + LL('Понимаю и подтверждаю отправку этих документов', 'I confirm sending these documents') + '</span></label>'); }
-  else h += '<div class="dxprov warn">' + ico('alert', 16) + '<div><b>' + LL('ИИ не подключён', 'AI not connected') + '</b><span>' + LL('Сработает только простое распознавание текстовых PDF. Подключите ИИ для полного заполнения.', 'Rule-based parsing only. Connect AI for full extraction.') + '</span></div></div>';
+  if (!RETRO.mode) RETRO.mode = aiReady() ? 'ai' : 'rules';
+  h += dxModeHTML(RETRO, 'retro');
   var nW = RETRO.items.filter(function (x) { return x.st === 'wait'; }).length;
   h += '<div class="actions"><button type="button" class="btn primary" data-act="retrostart"' + (nW && !RETRO.run ? '' : ' disabled') + '>' + ico('sparkle', 16) + (RETRO.run ? LL('Идёт обработка…', 'Processing…') : LL('Обработать', 'Process') + (nW ? ' (' + nW + ')' : '')) + '</button>' + (RETRO.run ? '<button type="button" class="btn ghost" data-act="retrostop">' + LL('Остановить после текущего', 'Stop after current') + '</button>' : '') + (RETRO.items.length && !RETRO.run ? '<button type="button" class="btn ghost" data-act="retroclear">' + LL('Очистить список', 'Clear list') + '</button>' : '') + '</div></div>';
   if (RETRO.items.length) {
@@ -4951,7 +5101,7 @@ function renderRetro() {
         card += '<div class="muted small">' + esc(it.m.how) + '</div>';
       }
       h += '<tr><td class="strong">' + esc(it.file.name) + (it.doc ? '<div class="muted small">' + (it.doc.kind === 'pdf' ? it.doc.pages + LL(' стр.', ' p.') + (it.doc.scanned ? LL(', скан', ', scan') : '') : it.doc.kind) + '</div>' : '') + '</td>';
-      h += '<td><span class="st st-' + s[1] + '">' + s[0] + '</span>' + (it.note && it.st === 'wait' ? '<div class="muted small">' + esc(it.note) + '</div>' : '') + (it.err ? '<div class="aerr small">' + esc(it.err) + '</div>' : '') + '</td>';
+      h += '<td><span class="st st-' + s[1] + '">' + s[0] + '</span>' + (it.note && it.st !== 'done' ? '<div class="muted small">' + esc(it.note) + '</div>' : '') + (it.fallback ? '<div class="muted small">' + LL('без ИИ (ИИ не ответил)', 'no AI (AI failed)') + '</div>' : '') + (it.err ? '<div class="aerr small">' + esc(it.err) + '</div>' : '') + '</td>';
       h += '<td>' + esc(d.type || '') + (d.date ? '<div class="muted small">' + fmtDate(d.date) + '</div>' : '') + '</td><td>' + esc(w.fio || '') + (w.dob ? '<div class="muted small">' + fmtDate(w.dob) + '</div>' : '') + '</td><td>' + card + '</td>';
       h += '<td>' + (it.st === 'done' ? it.nF + LL(' полей', ' fields') + (it.nI ? '<div class="muted small">' + it.nI + LL(' замечаний и вопросов', ' notes') + '</div>' : '') : '') + '</td>';
       h += '<td class="nowrap">' + (it.st === 'done' ? '<button type="button" class="btn small ' + (it.opened ? '' : 'primary') + '" data-act="retroopen" data-id="' + it.id + '">' + (it.opened ? LL('Открыть снова', 'Open again') : LL('Открыть и проверить', 'Open and review')) + '</button>' : it.st === 'err' ? '<button type="button" class="btn small" data-act="retroretry" data-id="' + it.id + '">' + LL('Повторить', 'Retry') + '</button>' : '') + (!RETRO.run || it.st !== 'read' && it.st !== 'ai' ? '<button type="button" class="iconbtn sm" data-act="retrodel" data-id="' + it.id + '" aria-label="' + LL('Убрать', 'Remove') + '">' + ico('x', 14) + '</button>' : '') + '</td></tr>';
