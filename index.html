@@ -1441,6 +1441,69 @@ html[data-theme="dark"] #q.l-sec{background:#0F1330}
   .l-wrap{padding:0 16px}
 }
 @media (max-width:760px){.top2 .seg.lang{display:none}.top2 .t2-row:first-child{gap:4px}.top2 .t2-row:first-child>*{min-width:0}}
+
+/* v12.1: structured patient home with popups */
+.l-nav button{white-space:nowrap;background:none;border:0;font:inherit;color:var(--ink2);font-size:14px;font-weight:500;padding:8px 10px;border-radius:var(--r-s);cursor:pointer}
+.l-nav button:hover{color:var(--navy);background:var(--accent-soft)}
+.l-hero.sm{min-height:0}.l-hero.sm .l-hero-in{padding-top:56px;padding-bottom:56px}.l-hero.sm h1{font-size:44px}
+.l2-main{padding:40px 0 56px;background:var(--bg)}
+.l2-urg{display:flex;align-items:center;gap:16px;width:100%;text-align:left;background:#fff;border:1px solid #F3C9C9;border-left:4px solid #CC0000;border-radius:var(--r);padding:16px 20px;margin-bottom:28px;cursor:pointer;font:inherit;color:inherit}
+.l2-urg:hover{box-shadow:var(--sh2)}
+.l2-urg .l-ic{background:#FDECEC;color:#CC0000}
+.l2-urg-t{flex:1;display:flex;flex-direction:column;gap:2px}.l2-urg-t b{color:#CC0000;font-size:16px;font-weight:600}.l2-urg-t span{color:#555;font-size:14px}
+.l2-urg>svg:last-child{color:#CC0000;flex:none}
+.l2-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:start}
+.l2-stage{background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.l2-stage>header{display:flex;gap:14px;align-items:center;padding:20px 22px;border-bottom:1px solid var(--line);background:#FAFBFC}
+.l2-n{width:34px;height:34px;border-radius:50%;background:var(--navy);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:600;flex:none}
+.l2-stage h2{margin:0;font-size:18px;font-weight:600;color:#151515}.l2-stage header p{margin:2px 0 0;color:#6b7280;font-size:13.5px}
+.l2-row{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:16px 22px;cursor:pointer;font:inherit;color:inherit}
+.l2-stage header+.l2-row{border-top:0}
+.l2-row:hover{background:var(--accent-soft)}
+.l2-row .l-ic{width:40px;height:40px}
+.l2-row-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}.l2-row-t b{font-size:15.5px;font-weight:600;color:#151515}.l2-row-t span{font-size:13px;color:#6b7280;line-height:1.4}
+.l2-row>svg:last-child{color:var(--navy);flex:none}
+.l2-contacts{margin-top:28px;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:22px}
+.l2-contacts header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:14px}.l2-contacts h2{margin:0;font-size:18px;font-weight:600;color:#151515}.l2-contacts header p{margin:0;color:#6b7280;font-size:14px}
+.lp-contacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.lp-contact{display:flex;flex-direction:column;gap:4px;font-size:14px}.lp-contact b{font-size:13px;font-weight:600;color:#151515;margin-bottom:2px}
+.lp-contact a{color:var(--navy);text-decoration:none;font-weight:500}.lp-contact span{color:#555}
+.modal.lpop{width:min(880px,calc(100% - 24px));top:50%;transform:translate(-50%,-50%);max-height:calc(100dvh - 40px);background:var(--surface)}
+.lp-h{display:flex;align-items:center;gap:14px;padding:20px 22px;border-bottom:1px solid var(--line)}
+.lp-h>div{flex:1;min-width:0}.lp-h h2{margin:0;font-size:21px;font-weight:600;color:#151515}.lp-h p{margin:2px 0 0;color:#6b7280;font-size:14px}
+.lpop.urg .lp-h .l-ic{background:#FDECEC;color:#CC0000}.lpop.urg .lp-h h2{color:#CC0000}
+.lp-b{padding:22px;overflow-y:auto;flex:1}
+.lp-blocks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.lp-block{border:1px solid var(--line);border-radius:var(--r);padding:18px 20px}
+.lp-block h3{margin:0 0 10px;font-size:16px;font-weight:600;color:#151515}
+.lp-block ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.lp-block li{position:relative;padding-left:18px;color:#3a3a3a;font-size:14.5px;line-height:1.5}
+.lp-block li::before{content:'';position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--navy);border-radius:1px}
+.lp-blocks.urg{grid-template-columns:1fr}.lp-blocks.urg .lp-block{border-left:4px solid #CC0000}.lp-blocks.urg h3{color:#CC0000}.lp-blocks.urg li::before{background:#CC0000}
+.lp-blocks.urg ul{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 24px}
+.lp-ops{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.lp-op{display:flex;gap:14px;border:1px solid var(--line);border-radius:var(--r);padding:16px 18px}.lp-op .l-ic{width:40px;height:40px}
+.lp-op b{font-size:15px;font-weight:600;color:#151515}.lp-op p{margin:4px 0 0;color:#555;font-size:14px}
+.lp-text p{margin:0 0 12px;font-size:15.5px;color:#3a3a3a;line-height:1.6}
+.lpop .lp-contacts{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.lpop .l-more{margin:18px 0 0}
+.lp-f{display:flex;justify-content:space-between;gap:10px;padding:12px 16px;border-top:1px solid var(--line)}
+.lp-f .btn{max-width:48%;min-width:0}.lp-f .btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html[data-theme="dark"] .l2-urg,html[data-theme="dark"] .l2-stage,html[data-theme="dark"] .l2-contacts,html[data-theme="dark"] .modal.lpop{background:#0A0A0C;color:var(--ink)}
+html[data-theme="dark"] .l2-main{background:#000}
+html[data-theme="dark"] .l2-stage>header{background:#111114}
+html[data-theme="dark"] .l2-urg{border-color:#5a1d1d;border-left-color:#E5484D}
+html[data-theme="dark"] .l2-urg .l-ic,html[data-theme="dark"] .lpop.urg .lp-h .l-ic{background:#2a0e0e;color:#FF6B6B}
+html[data-theme="dark"] .l2-urg-t b,html[data-theme="dark"] .lpop.urg .lp-h h2,html[data-theme="dark"] .lp-blocks.urg h3{color:#FF6B6B}
+html[data-theme="dark"] .l2-stage h2,html[data-theme="dark"] .l2-row-t b,html[data-theme="dark"] .l2-contacts h2,html[data-theme="dark"] .lp-h h2,html[data-theme="dark"] .lp-block h3,html[data-theme="dark"] .lp-op b,html[data-theme="dark"] .lp-contact b{color:#F4F5F7}
+html[data-theme="dark"] .l2-urg-t span,html[data-theme="dark"] .l2-row-t span,html[data-theme="dark"] .l2-stage header p,html[data-theme="dark"] .lp-h p,html[data-theme="dark"] .lp-block li,html[data-theme="dark"] .lp-op p,html[data-theme="dark"] .lp-text p,html[data-theme="dark"] .lp-contact span,html[data-theme="dark"] .l2-contacts header p{color:#C7CBD4}
+html[data-theme="dark"] .l2-row>svg:last-child,html[data-theme="dark"] .lp-contact a{color:#AEB8FF}
+html[data-theme="dark"] .l-nav button{color:#C7CBD4}
+@media (max-width:1100px){.l2-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lp-contacts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){.l2-grid{grid-template-columns:1fr}.l2-main{padding:20px 0 32px}.l-hero.sm .l-hero-in{padding-top:32px;padding-bottom:32px}.l-hero.sm h1{font-size:32px}
+  .lp-blocks,.lp-ops,.lp-blocks.urg ul,.lpop .lp-contacts,.lp-contacts{grid-template-columns:1fr}
+  .modal.lpop{top:auto;bottom:0;transform:translateX(-50%);width:100%;max-height:92dvh;border-radius:14px 14px 0 0}
+  .lp-h{padding:16px}.lp-b{padding:16px}.lp-f .btn span{display:none}}
 /*V12-END*/
 
 </style>
@@ -1448,9 +1511,9 @@ html[data-theme="dark"] #q.l-sec{background:#0F1330}
 <body>
 <div id="root"></div>
 <input type="file" id="importFile" accept=".json,.js,application/json,text/javascript" hidden>
-<script src="firebase-config.js?v=54bfa1d7"></script>
-<script src="i18n.js?v=54bfa1d7"></script>
-<script src="ai-corpus.js?v=54bfa1d7"></script>
-<script src="app.js?v=54bfa1d7"></script>
+<script src="firebase-config.js?v=d37e38b0"></script>
+<script src="i18n.js?v=d37e38b0"></script>
+<script src="ai-corpus.js?v=d37e38b0"></script>
+<script src="app.js?v=d37e38b0"></script>
 </body>
 </html>

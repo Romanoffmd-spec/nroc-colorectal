@@ -33,6 +33,7 @@ function monthName(y, m) { var s = new Date(y, m, 1).toLocaleDateString(locale()
 function wdNames() { var base = new Date(2024, 0, 1); var out = []; for (var i = 0; i < 7; i++) { var d = new Date(base); d.setDate(1 + i); var s = d.toLocaleDateString(locale(), { weekday: 'short' }); out.push(s.charAt(0).toUpperCase() + s.slice(1).replace('.', '')); } return out; }
 
 var IC = {
+  phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/>',
   dot: '<circle cx="12" cy="12" r="2.5"/>',
   scope: '<rect x="4" y="3" width="7" height="12" rx="3.5"/><path d="M7.5 15v2a4 4 0 0 0 8 0v-3a3 3 0 0 1 6 0"/>',
   knife: '<path d="M3 21 14.5 9.5M14.5 9.5l5-5a2.1 2.1 0 0 1 0 3L12 15l-2.5-2.5z"/>',
@@ -3783,7 +3784,9 @@ document.addEventListener('click', function (ev) {
   if (NEED[a] && !can(NEED[a])) { toast(LL('Недостаточно прав для роли «', 'Not allowed for role "') + (SESSION ? roleName(SESSION.role) : '') + LL('»', '"')); return; }
   switch (a) {
     case 'side': S.sideMob = !S.sideMob; S.menu = null; render(); break;
-    case 'authshow': S.auth = S.auth || { mode: 'login', role: 'resident' }; S.auth.show = true; render(); break;
+    case 'authshow': S.lpop = null; S.auth = S.auth || { mode: 'login', role: 'resident' }; S.auth.show = true; render(); break;
+    case 'lpop': S.lpop = g('id'); render(); var lb = root.querySelector('.lpop .lp-b'); if (lb) lb.scrollTop = 0; break;
+    case 'lpopx': S.lpop = null; render(); break;
     case 'authhide': if (S.auth) { S.auth.show = false; if (S.auth.mode === 'wait') S.auth.mode = 'login'; } render(); break;
     case 'lang': LANG = g('v'); UI.lang = LANG; saveUI(); render(); break;
     case 'menu': S.menu = S.menu === g('id') ? null : g('id'); render(); break;
@@ -4037,7 +4040,7 @@ document.addEventListener('keydown', function (ev) {
     if (ev.key === 'Escape') { S.inline = null; render(); }
     return;
   }
-  if (ev.key === 'Escape') { if (S.pick) S.pick = null; else if (S.menu) S.menu = null; else if (S.edit) S.edit = null; else if (S.rec) S.rec = null; else if (S.drawer) S.drawer = null; else if (S.inline) S.inline = null; render(); return; }
+  if (ev.key === 'Escape') { if (S.lpop) S.lpop = null; else if (S.pick) S.pick = null; else if (S.menu) S.menu = null; else if (S.edit) S.edit = null; else if (S.rec) S.rec = null; else if (S.drawer) S.drawer = null; else if (S.inline) S.inline = null; render(); return; }
   if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('tr[data-act]')) { ev.preventDefault(); ev.target.click(); }
 });
 document.addEventListener('input', function (ev) {
@@ -4401,27 +4404,64 @@ var LAND_OPS = [
   ['scope', 'Эндоскопические вмешательства', 'Удаление полипов и ранних опухолей без разрезов (EMR, ESD), стентирование при непроходимости.'],
   ['tag', 'Сложные случаи', 'Латеральная тазовая лимфодиссекция, операции при местных рецидивах, трансанальные вмешательства, реконструктивные операции и закрытие стом.']
 ];
+var LPOP_ORDER = ['prep', 'bag', 'after', 'stoma', 'diet', 'urgent', 'ops', 'q', 'contacts'];
+var LAND_CONTACTS = [
+  ['Call-центр, запись на приём', ['+7 (775) 007-64-42', '+7 708 425 07 11 (Telegram)', '+7 702 004 03 29 (WhatsApp)']],
+  ['Плановая госпитализация', ['+7 (7172) 57-08-23, вн. 2107']],
+  ['Служба поддержки пациентов', ['+7 (7172) 57-08-36']],
+  ['Справочная служба', ['+7 (7172) 57-08-19, вн. 2518', 'Пн-пт: 08:00-17:00']]
+];
+function landTel(x) { var tel = /^\+?[\d\s()-]+/.exec(x); return tel && /\d{6}/.test(x.replace(/\D/g, '')) ? '<a href="tel:' + tel[0].replace(/[^\d+]/g, '') + '">' + esc(x) + '</a>' : '<span>' + esc(x) + '</span>'; }
+function landTopic(id) {
+  var c = LAND.filter(function (x) { return x.id === id; })[0];
+  if (c) return c;
+  if (id === 'ops') return { id: 'ops', ic: 'knife', t: 'Как мы лечим', s: 'Хирургическое лечение опухолей толстой и прямой кишки.' };
+  if (id === 'q') return { id: 'q', ic: 'clipboard', t: 'Анкеты о самочувствии', s: 'Короткие опросы после лечения по ссылке от врача.' };
+  if (id === 'contacts') return { id: 'contacts', ic: 'phone', t: 'Контакты', s: 'г. Астана, ул. Керей и Жанибек ханов, 3/2' };
+  return null;
+}
+function landPopBody(c) {
+  if (c.b) return '<div class="lp-blocks' + (c.id === 'urgent' ? ' urg' : '') + '">' + c.b.map(function (b) { return '<div class="lp-block"><h3>' + b[0] + '</h3><ul>' + b[1].map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul></div>'; }).join('') + '</div>';
+  if (c.id === 'ops') return '<div class="lp-ops">' + LAND_OPS.map(function (o) { return '<div class="lp-op"><span class="l-ic">' + ico(o[0], 20) + '</span><div><b>' + o[1] + '</b><p>' + o[2] + '</p></div></div>'; }).join('') + '</div>';
+  if (c.id === 'q') return '<div class="lp-text"><p>После лечения врач может прислать вам ссылку на короткую анкету о работе кишечника (например, LARS или Wexner).</p><p>Анкета заполняется с телефона за несколько минут и без регистрации. Ваши ответы видит только лечащая команда: они помогают вовремя заметить проблемы и подобрать лечение.</p></div>';
+  if (c.id === 'contacts') return '<div class="lp-contacts">' + LAND_CONTACTS.map(function (x) { return '<div class="lp-contact"><b>' + x[0] + '</b>' + x[1].map(landTel).join('') + '</div>'; }).join('') + '</div><p class="l-more"><a href="https://cancercenter.edu.kz/ru" target="_blank" rel="noopener">Официальный сайт центра: cancercenter.edu.kz ' + ico('ext', 14) + '</a></p>';
+  return '';
+}
+function renderLandPop() {
+  var c = landTopic(S.lpop); if (!c) return '';
+  var i = LPOP_ORDER.indexOf(c.id), pv = LPOP_ORDER[i - 1], nx = LPOP_ORDER[i + 1];
+  var h = '<div class="dim" data-act="lpopx"></div><section class="modal lpop' + (c.id === 'urgent' ? ' urg' : '') + '" role="dialog" aria-modal="true">';
+  h += '<header class="lp-h"><span class="l-ic">' + ico(c.ic, 22) + '</span><div><h2>' + c.t + '</h2><p>' + c.s + '</p></div><button type="button" class="iconbtn" data-act="lpopx" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></header>';
+  h += '<div class="lp-b">' + landPopBody(c) + '</div>';
+  h += '<footer class="lp-f">' + (pv ? '<button type="button" class="btn ghost" data-act="lpop" data-id="' + pv + '">' + ico('left', 16) + '<span>' + landTopic(pv).t + '</span></button>' : '<span></span>') + (nx ? '<button type="button" class="btn ghost" data-act="lpop" data-id="' + nx + '"><span>' + landTopic(nx).t + '</span>' + ico('right', 16) + '</button>' : '<span></span>') + '</footer>';
+  return h + '</section>';
+}
 function renderPortal() {
   var a = S.auth || (S.auth = { mode: 'login', role: 'resident' }), open = a.show || a.mode === 'wait';
-  var h = '<div class="land">';
+  var h = '<div class="land l2">';
   h += '<header class="l-top"><div class="l-wrap l-top-in"><a class="l-brand" href="#top"><img src="media/nroc-logo.png" alt="NROC"><span><b>' + LL('Колоректальный сектор', 'Colorectal unit') + '</b><em>' + LL('Национальный научный онкологический центр', 'National Research Oncology Center') + '</em></span></a>';
-  h += '<nav class="l-nav">' + [['prep', 'Подготовка'], ['bag', 'В стационар'], ['after', 'После операции'], ['stoma', 'Стома'], ['diet', 'Питание'], ['ops', 'Лечение'], ['contacts', 'Контакты']].map(function (x) { return '<a href="#' + x[0] + '">' + x[1] + '</a>'; }).join('') + '</nav>';
+  h += '<nav class="l-nav">' + [['prep', 'Подготовка'], ['bag', 'В стационар'], ['after', 'После операции'], ['stoma', 'Стома'], ['diet', 'Питание'], ['ops', 'Лечение'], ['contacts', 'Контакты']].map(function (x) { return '<button type="button" data-act="lpop" data-id="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</nav>';
   h += '<div class="l-tools">' + themeBtn() + langSeg() + '<button type="button" class="btn primary" data-act="authshow">' + ico('user', 16) + LL('Вход', 'Sign in') + '<span class="l-long">' + LL(' для сотрудников', ' for staff') + '</span></button></div></div></header>';
-  h += '<section class="l-hero" id="top"><div class="l-hero-img" style="background-image:url(media/nroc-hero-hd.webp)"></div><div class="l-wrap l-hero-in"><div class="l-kick">' + LL('Национальный научный онкологический центр · Астана', 'National Research Oncology Center · Astana') + '</div><h1>Колоректальная хирургия</h1><p>Лечение рака ободочной и прямой кишки: от диагностики и подготовки к операции до восстановления и наблюдения. Здесь собраны памятки для пациентов и их близких.</p><div class="l-cta"><a class="btn l-btn-w" href="tel:+77750076442">' + ico('bell', 16) + 'Записаться на приём</a><a class="btn l-btn-o" href="#prep">Памятки пациенту</a></div></div></section>';
-  h += '<section class="l-sec l-alt"><div class="l-wrap"><div class="l-head"><h2>Памятки пациенту</h2><p>Коротко о главном на каждом этапе лечения. Выберите тему.</p></div><div class="l-cards">' + LAND.map(function (c) { return '<a class="l-card" href="#' + c.id + '"><span class="l-ic">' + ico(c.ic, 22) + '</span><b>' + c.t + '</b><span>' + c.s + '</span><em>Подробнее ' + ico('right', 14) + '</em></a>'; }).join('') + '</div></div></section>';
-  LAND.forEach(function (c, i) {
-    h += '<section class="l-sec' + (i % 2 ? ' l-alt' : '') + (c.id === 'urgent' ? ' l-urgent' : '') + '" id="' + c.id + '"><div class="l-wrap"><div class="l-head"><span class="l-ic big">' + ico(c.ic, 26) + '</span><h2>' + c.t + '</h2><p>' + c.s + '</p></div><div class="l-blocks">' + c.b.map(function (b) { return '<div class="l-block"><h3>' + b[0] + '</h3><ul>' + b[1].map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul></div>'; }).join('') + '</div></div></section>';
-  });
-  h += '<section class="l-sec" id="ops"><div class="l-wrap"><div class="l-head"><h2>Как мы лечим</h2><p>Колоректальный сектор выполняет полный объём хирургического лечения опухолей толстой и прямой кишки.</p></div><div class="l-ops">' + LAND_OPS.map(function (o) { return '<div class="l-op"><span class="l-ic">' + ico(o[0], 22) + '</span><b>' + o[1] + '</b><p>' + o[2] + '</p></div>'; }).join('') + '</div></div></section>';
-  h += '<section class="l-sec l-alt" id="q"><div class="l-wrap l-qband"><div><h2>Анкеты о самочувствии</h2><p>После лечения врач может прислать вам ссылку на короткую анкету о работе кишечника (например, LARS или Wexner). Она заполняется с телефона за несколько минут и без регистрации. Ваши ответы видит только лечащая команда: они помогают вовремя заметить проблемы и подобрать лечение.</p></div></div></section>';
-  h += '<section class="l-sec l-contacts" id="contacts"><div class="l-wrap"><div class="l-head"><h2>Контакты</h2><p>г. Астана, ул. Керей и Жанибек ханов, 3/2</p></div><div class="l-cgrid">' + [
-    ['Call-центр, запись на приём', ['+7 (775) 007-64-42', '+7 708 425 07 11 (Telegram)', '+7 702 004 03 29 (WhatsApp)']],
-    ['Плановая госпитализация', ['+7 (7172) 57-08-23, вн. 2107']],
-    ['Служба поддержки пациентов', ['+7 (7172) 57-08-36']],
-    ['Справочная служба', ['+7 (7172) 57-08-19, вн. 2518', 'Пн-пт: 08:00-17:00']]
-  ].map(function (c) { return '<div class="l-contact"><b>' + c[0] + '</b>' + c[1].map(function (x) { var tel = /^\+?[\d\s()-]+/.exec(x); return tel && /\d{6}/.test(x.replace(/\D/g, '')) ? '<a href="tel:' + tel[0].replace(/[^\d+]/g, '') + '">' + esc(x) + '</a>' : '<span>' + esc(x) + '</span>'; }).join('') + '</div>'; }).join('') + '</div><p class="l-more"><a href="https://cancercenter.edu.kz/ru" target="_blank" rel="noopener">Официальный сайт центра: cancercenter.edu.kz ' + ico('ext', 14) + '</a></p></div></section>';
+  h += '<section class="l-hero sm" id="top"><div class="l-hero-img" style="background-image:url(media/nroc-hero-hd.webp)"></div><div class="l-wrap l-hero-in"><div class="l-kick">' + LL('Национальный научный онкологический центр · Астана', 'National Research Oncology Center · Astana') + '</div><h1>Колоректальная хирургия</h1><p>Лечение рака ободочной и прямой кишки: от подготовки к операции до восстановления и наблюдения. Ниже памятки для пациентов и их близких.</p><div class="l-cta"><a class="btn l-btn-w" href="tel:+77750076442">' + ico('phone', 16) + 'Записаться на приём</a><button type="button" class="btn l-btn-o" data-act="lpop" data-id="contacts">Все контакты</button></div></div></section>';
+  var U = landTopic('urgent');
+  h += '<main class="l-sec l2-main"><div class="l-wrap">';
+  h += '<button type="button" class="l2-urg" data-act="lpop" data-id="urgent"><span class="l-ic">' + ico('alert', 22) + '</span><span class="l2-urg-t"><b>' + U.t + '</b><span>Температура 38 °C и выше, нарастающая боль в животе, кровотечение, рвота, стома изменила цвет. Нажмите, чтобы увидеть полный список.</span></span>' + ico('right', 18) + '</button>';
+  var stages = [
+    ['1', 'До госпитализации', 'Подготовка и сборы', ['prep', 'bag']],
+    ['2', 'После операции', 'Восстановление и уход', ['after', 'stoma', 'diet']],
+    ['3', 'О лечении', 'Что мы делаем и как следим', ['ops', 'q']]
+  ];
+  h += '<div class="l2-grid">' + stages.map(function (st) {
+    return '<section class="l2-stage"><header><span class="l2-n">' + st[0] + '</span><div><h2>' + st[1] + '</h2><p>' + st[2] + '</p></div></header>' + st[3].map(function (id) {
+      var c = landTopic(id), sub = c.b ? c.b.map(function (b) { return b[0]; }).join(' · ') : c.s;
+      return '<button type="button" class="l2-row" data-act="lpop" data-id="' + id + '"><span class="l-ic">' + ico(c.ic, 20) + '</span><span class="l2-row-t"><b>' + c.t + '</b><span>' + sub + '</span></span>' + ico('right', 16) + '</button>';
+    }).join('') + '</section>';
+  }).join('') + '</div>';
+  h += '<section class="l2-contacts"><header><h2>Контакты</h2><p>г. Астана, ул. Керей и Жанибек ханов, 3/2</p></header><div class="lp-contacts">' + LAND_CONTACTS.map(function (x) { return '<div class="lp-contact"><b>' + x[0] + '</b>' + x[1].map(landTel).join('') + '</div>'; }).join('') + '</div></section>';
+  h += '</div></main>';
   h += '<footer class="l-foot"><div class="l-wrap l-foot-in"><img src="media/nroc-logo.png" alt="NROC"><p>Информация на странице носит справочный характер и не заменяет консультацию лечащего врача. Все назначения выполняйте по рекомендациям вашей лечащей команды.</p><span>© ' + new Date().getFullYear() + ' ' + LL('Колоректальный сектор ННОЦ', 'NROC Colorectal unit') + '</span></div></footer>';
   h += '</div>';
+  if (S.lpop && !open) h += renderLandPop();
   if (open) h += '<div class="dim" data-act="authhide"></div><section class="modal authm" role="dialog" aria-modal="true"><button type="button" class="iconbtn authx" data-act="authhide" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button><div class="authm-b"><img src="media/nroc-logo.png" alt="NROC" class="authm-logo">' + renderAuthCard() + '</div></section>';
   return h;
 }
