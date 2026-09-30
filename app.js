@@ -3504,6 +3504,38 @@ function aiProtocol() {
   });
 }
 
+/* комментарии врача к резюме: запоминаются, правят поля карточки и резюме */
+function locTs(ts) { var z = new Date(ts); if (isNaN(z)) return ''; return ('0' + z.getDate()).slice(-2) + '.' + ('0' + (z.getMonth() + 1)).slice(-2) + '.' + z.getFullYear() + ' ' + ('0' + z.getHours()).slice(-2) + ':' + ('0' + z.getMinutes()).slice(-2); }
+function drNotesHTML(dr) {
+  var p = dr.p, list = p.drNotes || [], busy = !!dr.noteBusy, h = '<div class="drn"><div class="drn-h"><b>' + ico('chat', 15) + LL('Комментарии врача', 'Doctor\'s notes') + '</b><span>' + LL('Напишите уточнение или исправление своими словами. ИИ запомнит его, исправит поля карточки и обновит резюме. Ваши комментарии важнее документов.', 'Write a correction; the AI will remember it, fix the fields and update the summary.') + '</span></div>';
+  if (list.length) h += '<div class="drn-list">' + list.slice(-6).map(function (n) { return '<div class="drn-i"><div class="drn-m">' + esc(n.by || '') + ' · ' + esc(locTs(n.ts)) + '</div><p>' + esc(n.text) + '</p>' + (n.ch && n.ch.length ? '<div class="drn-ch">' + n.ch.map(function (c) { return '<span class="' + (c.undone ? 'undone' : '') + '"><b>' + esc(c.label) + '</b>: ' + (has(c.prev) ? esc(fmtVal(FIELD[c.id], c.prev)) + ' → ' : '') + esc(fmtVal(FIELD[c.id], c.v)) + (c.undone || !dr.noteIds || !dr.noteIds[n.id] ? '' : ' <button type="button" class="linkbtn" data-act="drnundo" data-id="' + n.id + '" data-f="' + c.id + '">' + LL('отменить', 'undo') + '</button>') + '</span>'; }).join('') + '</div>' : '') + '</div>'; }).join('') + '</div>';
+  h += '<div class="drn-in"><textarea id="drn-in" rows="2" data-sb="drawer.noteDraft" placeholder="' + LL('Например: МДГ 01.04 был после операции, латеральные ЛУ слева это рецидив; стадия по препарату ypT3N2bM0; курит 20 лет', 'e.g. corrections…') + '"' + (busy ? ' disabled' : '') + '>' + esc(dr.noteDraft || '') + '</textarea><button type="button" class="btn primary small" data-act="drnote"' + (busy ? ' disabled' : '') + '>' + ico('sparkle', 14) + (busy ? LL('Вношу…', 'Applying…') : LL('Внести', 'Apply')) + '</button></div>' + (dr.noteErr ? '<p class="ferr">' + esc(dr.noteErr) + '</p>' : '') + '</div>';
+  return h;
+}
+function drNoteApply() {
+  var dr = S.drawer; if (!dr || dr.noteBusy) return;
+  var ta = root.querySelector('#drn-in'), text = String(ta ? ta.value : dr.noteDraft || '').trim(); if (!text) { toast(LL('Напишите комментарий', 'Write a note')); return; }
+  var p = dr.p, note = { id: uid('n'), ts: nowIso(), by: me(), text: text, ch: [] };
+  p.drNotes = (p.drNotes || []).concat([note]); dr.noteDraft = ''; dr.noteErr = ''; dr.noteIds = dr.noteIds || {}; dr.noteIds[note.id] = 1;
+  if (!aiReady()) { toast(LL('Комментарий сохранён в карточке. ИИ не подключён, поэтому поля и резюме не изменены.', 'Note saved; AI not connected.')); render(); return; }
+  dr.noteBusy = true; render();
+  var d = p.d, cur = {}; dxFields().forEach(function (o) { var v = d[o.x.id]; if (has(v) && !(Array.isArray(v) && !v.length)) cur[o.x.id] = v; });
+  var doc = { name: LL('комментарий врача', 'doctor note'), kind: 'text', text: text, images: [], scanned: false };
+  var extra = 'ЭТО НЕ ДОКУМЕНТ, А КОММЕНТАРИЙ ЛЕЧАЩЕГО ВРАЧА К КАРТОЧКЕ. Он важнее любых документов и текущих значений. Пойми смысл: врач может исправлять ошибку, уточнять время событий, добавлять новые сведения.\n\nТЕКУЩИЕ ЗНАЧЕНИЯ КАРТОЧКИ (JSON, id: значение):\n' + JSON.stringify(cur) + '\n\nЗАДАЧА: верни JSON только с теми полями, которые по смыслу комментария нужно заполнить или исправить (включая поля, которые логически следуют из сказанного). Не трогай поля, о которых комментарий ничего не говорит. quote: цитата из комментария. questions оставь пустым, если всё понятно.';
+  dxCall(doc, dxSchemaText(), extra).then(dxParseJSON).then(function (res) {
+    if (S.drawer !== dr) return;
+    var r = dxApply(res, false);
+    note.ch = r.filled.map(function (x) { return { id: x.id, label: x.label, v: x.v, prev: x.prev }; });
+    dr.noteBusy = false; render();
+    toast(note.ch.length ? LL('Исправлено полей: ', 'Fields changed: ') + note.ch.length + LL('. Не забудьте сохранить карточку.', '. Remember to save.') : LL('Поля не изменились, комментарий учтён в резюме', 'No field changes; note used in the summary'));
+    aiSummary(dr, LL('НОВЫЙ КОММЕНТАРИЙ ВРАЧА (важнее всего): ', 'NEW DOCTOR NOTE: ') + text, true);
+  }).catch(function (e) { if (S.drawer !== dr) return; dr.noteBusy = false; dr.noteErr = LL('ИИ не ответил: ', 'AI failed: ') + ((e && e.message) || e) + LL('. Комментарий сохранён, можно нажать «Обновить с ИИ».', '. Note kept.'); render(); });
+}
+function drNoteUndo(nid, fid) {
+  var dr = S.drawer; if (!dr) return; var n = (dr.p.drNotes || []).filter(function (x) { return x.id === nid; })[0]; if (!n) return;
+  var c = (n.ch || []).filter(function (x) { return x.id === fid; })[0]; if (!c || c.undone) return;
+  if (has(c.prev)) dr.p.d[fid] = c.prev; else delete dr.p.d[fid]; if (dr.aiFilled) delete dr.aiFilled[fid]; c.undone = true; render();
+}
 /* ======================= Резюме: история болезни ======================= */
 function sumHash(p) { var s0 = JSON.stringify(p.d || {}) + '|' + (p.comments || []).length + '|' + (p.docsAI || []).length, h0 = 0; for (var i = 0; i < s0.length; i++) h0 = (h0 * 31 + s0.charCodeAt(i)) | 0; return String(h0); }
 function buildHistory(p) {
@@ -3537,7 +3569,8 @@ function sumCard(dr) {
   var h = '<section class="card proto" id="sec-proto"><h3>' + t('pr.title') + '<span class="h3-r">' + (dxAiAvail() ? '<button type="button" class="btn small ai" data-act="aisum"' + (busy ? ' disabled' : '') + '>' + ico('sparkle', 15) + (busy ? LL('Пишу…', 'Writing…') : LL('Обновить с ИИ', 'Update with AI')) + '</button>' : '') + '<button type="button" class="btn small primary" data-act="copysum">' + ico('file', 15) + LL('Копировать', 'Copy') + '</button></span></h3>';
   h += '<p class="hint">' + (sm ? LL('Обновлено ', 'Updated ') + (function (z) { return ('0' + z.getDate()).slice(-2) + '.' + ('0' + (z.getMonth() + 1)).slice(-2) + '.' + z.getFullYear() + ' ' + ('0' + z.getHours()).slice(-2) + ':' + ('0' + z.getMinutes()).slice(-2); })(new Date(sm.at)) + (sm.ai ? LL(' · ИИ', ' · AI') : LL(' · вручную', ' · manual')) + (stale ? LL(' · в карточке есть новые данные, резюме обновится после сохранения', ' · new data, will update after saving') : '') + '. ' : LL('Черновик собран из полей карточки. ', 'Draft built from the record fields. ')) + LL('Резюме обновляется само после загрузки документа и после сохранения карточки. Текст можно править: ваши правки ИИ сохранит.', 'Updates automatically after a document upload and after saving; your edits are kept.') + '</p>';
   h += '<textarea id="sumText" class="protoText' + (busy ? ' gen' : '') + '" data-sum="1" spellcheck="false">' + esc(txt) + '</textarea>';
-  h += '<div class="actions" style="margin-top:10px">' + (dxAiAvail() ? '<button type="button" class="btn small ai" data-act="aisum"' + (busy ? ' disabled' : '') + '>' + ico('sparkle', 15) + (busy ? LL('Пишу…', 'Writing…') : LL('Обновить с ИИ', 'Update with AI')) + '</button>' : '<span class="muted small">' + LL('Подключите ИИ в шапке, чтобы резюме писал ИИ', 'Connect AI in the header') + '</span>') + '<button type="button" class="btn small" data-act="copysum">' + ico('file', 15) + LL('Копировать', 'Copy') + '</button></div></section>';
+  h += '<div class="actions" style="margin-top:10px">' + (dxAiAvail() ? '<button type="button" class="btn small ai" data-act="aisum"' + (busy ? ' disabled' : '') + '>' + ico('sparkle', 15) + (busy ? LL('Пишу…', 'Writing…') : LL('Обновить с ИИ', 'Update with AI')) + '</button>' : '<span class="muted small">' + LL('Подключите ИИ в шапке, чтобы резюме писал ИИ', 'Connect AI in the header') + '</span>') + '<button type="button" class="btn small" data-act="copysum">' + ico('file', 15) + LL('Копировать', 'Copy') + '</button></div>';
+  h += drNotesHTML(dr) + '</section>';
   return h;
 }
 var SUM_SYS = 'Ты онколог-колопроктолог и ведёшь резюме истории болезни пациента колоректального сектора ННОЦ (Астана). Резюме читает врач, который видит пациента впервые: из него он должен за минуту понять, что с пациентом происходило и в каком порядке, почему, чем закончилось и что сейчас.\n\n' +
@@ -3562,7 +3595,8 @@ function sumOrder(txt) {
 }
 function sumPrompt(p, extra) {
   var sm = p.summary && p.summary.text ? p.summary.text : '';
-  return 'ДАННЫЕ КАРТОЧКИ:\n' + patText(p, true) + (sm ? '\n\nПРЕДЫДУЩАЯ ВЕРСИЯ РЕЗЮМЕ (сохрани правки врача):\n' + sm : '') + (extra ? '\n\nНОВЫЙ ДОКУМЕНТ ИЛИ ИНФОРМАЦИЯ:\n' + String(extra).slice(0, 40000) : '') + '\n\nСначала мысленно датируй каждый документ и каждый факт, затем напиши обновлённое резюме истории болезни.';
+  var nts = (p.drNotes || []).map(function (n) { return locTs(n.ts) + ' (' + (n.by || '') + '): ' + n.text; }).join('\n');
+  return 'ДАННЫЕ КАРТОЧКИ:\n' + patText(p, true) + (nts ? '\n\nКОММЕНТАРИИ ЛЕЧАЩЕГО ВРАЧА (важнее документов и старого резюме, обязательно учти каждый):\n' + nts : '') + (sm ? '\n\nПРЕДЫДУЩАЯ ВЕРСИЯ РЕЗЮМЕ (сохрани правки врача):\n' + sm : '') + (extra ? '\n\nНОВЫЙ ДОКУМЕНТ ИЛИ ИНФОРМАЦИЯ:\n' + String(extra).slice(0, 40000) : '') + '\n\nСначала мысленно датируй каждый документ и каждый факт, затем напиши обновлённое резюме истории болезни.';
 }
 function aiSummary(dr, extra, auto) {
   if (!dr || dr.sumAI) return;
@@ -4249,6 +4283,8 @@ document.addEventListener('click', function (ev) {
     case 'mpai': { UI.aip = true; saveUI(); if (!aiReady()) { render(); break; } var cx1 = aiCtx(); aiRun(cx1, null, LL('Разбор протокола МДГ', 'MDT protocol review'), 'Проанализируй протокол МДГ целиком. Структура ответа:\n1) Резюме случая (3-4 строки).\n2) Недостающие обследования и данные для принятия решения (по стандарту стадирования колоректального рака: колоноскопия с биопсией, МРТ малого таза для рака прямой кишки с CRM/EMVI, КТ ОГК и ОБП, РЭА, MMR/MSI, RAS/BRAF при метастазах и т.д.) с пометкой, почему важно.\n3) Доступные варианты дальнейшего лечения по NCCN/ESMO/протоколам МЗ РК с уровнем доказательности и ссылками.\n4) Подходящие клинические исследования сектора или международные.\n5) Вопросы для обсуждения на МДГ.\n6) Черновик формулировки заключения МДГ (помеченный как черновик).'); break; }
     case 'aiproto': aiProtocol(); break;
     case 'aisum': aiSummary(S.drawer, '', false); break;
+    case 'drnote': drNoteApply(); break;
+    case 'drnundo': drNoteUndo(g('id'), g('f')); break;
     case 'copysum': { var ts = root.querySelector('#sumText'); if (!ts) break; var tx0 = ts.value, dn = function () { toast(LL('Резюме скопировано', 'Summary copied')); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tx0).then(dn, function () { ts.select(); document.execCommand('copy'); dn(); }); else { ts.select(); document.execCommand('copy'); dn(); } break; }
     case 'logout': doLogout(); if (!SESSION) location.reload(); break;
     case 'amode': S.auth = S.auth || {}; S.auth.mode = g('v'); S.auth.err = ''; render(); break;
