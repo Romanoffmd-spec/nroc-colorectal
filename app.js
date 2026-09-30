@@ -4276,7 +4276,7 @@ document.addEventListener('change', function (ev) {
   var tg = ev.target, b = tg.getAttribute('data-bind');
   if (tg.id === 'retrofiles') { retroAdd(tg.files); tg.value = ''; return; }
   if (tg.getAttribute('data-act') === 'retropick') { var rp = RETRO.items.filter(function (x) { return x.id === tg.getAttribute('data-id'); })[0]; if (rp) rp.pid = tg.value || null; render(); return; }
-  if (tg.id === 'dxfile' && S.dx) { var kp0 = root.querySelector('#dxkeep'), ag0 = root.querySelector('#dxagree'); if (kp0) S.dx.keep = kp0.checked; if (ag0) S.dx.agree = ag0.checked; S.dx.file = tg.files && tg.files[0] || null; render(); return; }
+  if (tg.id === 'dxfile' && S.dx) { var kp0 = root.querySelector('#dxkeep'), ag0 = root.querySelector('#dxagree'); if (kp0) S.dx.keep = kp0.checked; if (ag0) S.dx.agree = ag0.checked; S.dx.files = tg.files ? Array.prototype.slice.call(tg.files) : []; S.dx.file = S.dx.files[0] || null; render(); return; }
   if (tg.getAttribute('data-act') === 'dflt') { UI.dflt = UI.dflt || {}; if (tg.value) UI.dflt[tg.getAttribute('data-id')] = tg.value; else delete UI.dflt[tg.getAttribute('data-id')]; saveUI(); render(); return; }
   if (tg.getAttribute('data-act') === 'flt') { UI.flt = UI.flt || {}; if (tg.value) UI.flt[tg.getAttribute('data-id')] = tg.value; else delete UI.flt[tg.getAttribute('data-id')]; saveUI(); render(); return; }
   if (b) { bind(b, tg.type === 'checkbox' ? tg.checked : tg.value); if (tg.tagName === 'SELECT' || tg.type === 'checkbox' || tg.type === 'date') render(); return; }
@@ -4304,7 +4304,7 @@ document.addEventListener('drop', function (ev) {
 });
 document.addEventListener('dragover', function (ev) { if ((S.dx && S.dx.step === 'pick') || (S.view === 'retro' && !S.drawer)) { ev.preventDefault(); var z = root.querySelector('.dxdrop'); if (z) z.classList.add('over'); } });
 document.addEventListener('dragleave', function (ev) { var z = root.querySelector('.dxdrop'); if (z && !ev.relatedTarget) z.classList.remove('over'); });
-document.addEventListener('drop', function (ev) { if (S.view === 'retro' && !S.drawer && !S.dx) { ev.preventDefault(); retroAdd(ev.dataTransfer && ev.dataTransfer.files); return; } if (!S.dx || S.dx.step !== 'pick') return; ev.preventDefault(); var f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0]; if (f) { var kp1 = root.querySelector('#dxkeep'), ag1 = root.querySelector('#dxagree'); if (kp1) S.dx.keep = kp1.checked; if (ag1) S.dx.agree = ag1.checked; S.dx.file = f; render(); } });
+document.addEventListener('drop', function (ev) { if (S.view === 'retro' && !S.drawer && !S.dx) { ev.preventDefault(); retroAdd(ev.dataTransfer && ev.dataTransfer.files); return; } if (!S.dx || S.dx.step !== 'pick') return; ev.preventDefault(); var fl = ev.dataTransfer && ev.dataTransfer.files ? Array.prototype.slice.call(ev.dataTransfer.files) : []; if (fl.length) { var kp1 = root.querySelector('#dxkeep'), ag1 = root.querySelector('#dxagree'); if (kp1) S.dx.keep = kp1.checked; if (ag1) S.dx.agree = ag1.checked; S.dx.files = fl; S.dx.file = fl[0]; render(); } });
 document.getElementById('importFile').addEventListener('change', function (ev) {
   var fl = ev.target.files[0]; if (!fl) return; var rd = new FileReader();
   rd.onload = function () {
@@ -5270,6 +5270,7 @@ function dxAiAvail() { return aiReady() || AI.st === 'check' || (!!AI.key && AI.
 function dxOpen() { if (!S.drawer) return; S.dx = { step: 'pick', keep: true, agree: false, mode: dxAiAvail() ? 'ai' : 'rules' }; render(); }
 function dxRun() {
   var dx = S.dx; if (!dx || !dx.file) return;
+  if ((dx.files || []).length > 1) return dxRunMany();
   if (dx.mode === 'ai' && aiReady() && AI.prov !== 'local' && !dx.agree) { toast(LL('Подтвердите отправку документа во внешний сервис ИИ или выберите обработку без ИИ', 'Confirm sending, or choose no-AI processing')); return; }
   dx.step = 'run'; dx.log = [LL('Читаю файл «', 'Reading «') + dx.file.name + '»']; render();
   var log = function (l, repl) { if (!S.dx) return; if (repl && dx.log.length && /^OCR/.test(dx.log[dx.log.length - 1])) dx.log[dx.log.length - 1] = l; else dx.log.push(l); render(); };
@@ -5286,6 +5287,46 @@ function dxRun() {
     dx.step = 'rep'; render();
     if (dx.usedAI && aiReady()) aiSummary(S.drawer, dx.docText || '', true);
   }).catch(function (e) { if (!S.dx) return; dx.step = 'err'; dx.err = (e && e.message) || String(e); render(); });
+}
+/* пакетная загрузка: документы разбираются по очереди, результат складывается в одну сводку */
+function dxRunMany() {
+  var dx = S.dx, files = dx.files.slice(), n = files.length;
+  if (dx.mode === 'ai' && dxAiAvail() && AI.prov !== 'local' && !dx.agree) { toast(LL('Подтвердите отправку документов во внешний сервис ИИ или выберите обработку без ИИ', 'Confirm sending, or choose no-AI processing')); return; }
+  dx.step = 'run'; dx.log = [LL('Документов в пакете: ', 'Documents: ') + n]; render();
+  var log = function (l, repl) { if (!S.dx) return; if (repl && dx.log.length && /^OCR/.test(dx.log[dx.log.length - 1])) dx.log[dx.log.length - 1] = l; else dx.log.push(l); render(); };
+  var all = { doc: { type: LL('Пакет документов: ', 'Document batch: ') + n, summary: '' }, filled: [], same: [], conflict: [], rejected: [], issues: [], questions: [], missing: [] };
+  var texts = [], types = [], srcs = [], anyAI = false, fails = 0, seq = Promise.resolve();
+  files.forEach(function (file, i) {
+    seq = seq.then(function () {
+      if (!S.dx || S.dx !== dx || !S.drawer) return;
+      log(LL('Документ ', 'Document ') + (i + 1) + LL(' из ', ' of ') + n + ': «' + file.name + '»');
+      return dxReadFile(file).then(function (doc) { return dxExtract(doc, dx.mode, log); }).then(function (o) {
+        if (!S.dx || S.dx !== dx || !S.drawer) return;
+        o.res = dxDefaultNo(o.res, o.text, S.drawer.p.d);
+        var r = dxApply(o.res, dx.keep, o.local), tag = function (x) { x.note = (x.note ? x.note + '. ' : '') + file.name; x.file = file.name; return x; };
+        all.filled = all.filled.concat(r.filled.map(tag)); all.conflict = all.conflict.concat(r.conflict.map(tag)); all.rejected = all.rejected.concat(r.rejected.map(tag));
+        r.same.forEach(function (x) { if (!all.same.some(function (y) { return y.id === x.id; })) all.same.push(x); });
+        all.issues = all.issues.concat(r.issues.map(function (x) { x.text = '[' + file.name + '] ' + x.text; return x; }));
+        all.questions = all.questions.concat(r.questions.map(function (q) { return '[' + file.name + '] ' + q; }));
+        types.push(file.name + ': ' + ((r.doc && r.doc.type) || LL('документ', 'document')) + LL(', заполнено ', ', filled ') + r.filled.length);
+        if (srcs.indexOf(o.src) < 0) srcs.push(o.src); if (o.ai) anyAI = true;
+        texts.push('=== ДОКУМЕНТ «' + file.name + '» ===\n' + (o.text || ''));
+        S.drawer.p.docsAI = (S.drawer.p.docsAI || []).concat([{ name: file.name, at: nowIso(), by: me(), src: o.src, n: r.filled.length }]);
+        log(LL('  готово: заполнено полей ', '  done: fields filled ') + r.filled.length);
+      }).catch(function (e) { fails++; var em = (e && e.message) || String(e); all.issues.push({ id: '', label: '', kind: 'unreadable', text: '[' + file.name + '] ' + LL('не обработан: ', 'failed: ') + em }); types.push(file.name + LL(': ошибка', ': error')); log(LL('  ошибка: ', '  error: ') + em); });
+    });
+  });
+  seq.then(function () {
+    if (!S.dx || S.dx !== dx || !S.drawer) return;
+    var d = S.drawer.p.d, ids = {}; all.filled.concat(all.same, all.conflict).forEach(function (x) { ids[x.id] = 1; });
+    var tail = dxApply({ fields: Object.keys(ids).filter(function (k) { return has(d[k]); }).map(function (k) { return { id: k, value: d[k], confidence: 1, quote: '' }; }) }, true, true);
+    all.missing = tail.missing; all.otherSecs = tail.otherSecs;
+    all.doc.summary = types.join('; ');
+    all.src = srcs.join(' + ') || LL('без ИИ', 'no AI'); all.file = LL('документов: ', 'documents: ') + n; all.at = nowIso(); all.fallback = fails ? LL('Не обработано документов: ', 'Failed documents: ') + fails + LL('. Подробности в «Трудностях».', '. See difficulties.') : '';
+    dx.rep = all; dx.docText = texts.join('\n\n'); dx.doc = { name: LL('пакет из ', 'batch of ') + n, kind: 'text', text: dx.docText.slice(0, 120000), images: [], scanned: false };
+    dx.usedAI = anyAI; dx.ans = ''; dx.qa = []; dx.step = 'rep'; render();
+    if (anyAI && aiReady()) aiSummary(S.drawer, dx.docText, true);
+  });
 }
 /* правило врача: если в документе с анамнезом заболевание или привычка нигде не упоминаются, считаем «Нет» */
 function dxDefaultNo(res, text, d) {
@@ -5354,7 +5395,7 @@ function renderDx() {
   if (dx.step !== 'rep') {
     h += '<section class="modal dxm" role="dialog" aria-modal="true"><div class="dhead"><div><div class="dh-title">' + ico('sparkle', 18) + LL('Заполнить карточку из документа', 'Fill the record from a document') + '</div><div class="hint">' + LL('Выписка, первичный осмотр, консультативный лист, протокол операции, гистология, МРТ/КТ', 'Discharge summary, consultation, operative note, pathology, MRI/CT') + '</div></div><button type="button" class="iconbtn" data-act="dxclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
     if (dx.step === 'pick') {
-      h += '<label class="dxdrop' + (dx.file ? ' on' : '') + '"><input type="file" id="dxfile" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx,.rtf,.odt,application/pdf,image/*,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/rtf,application/vnd.oasis.opendocument.text" hidden>' + ico(dx.file ? 'doc' : 'upload', 28) + '<b>' + (dx.file ? esc(dx.file.name) + ' · ' + Math.max(1, Math.round(dx.file.size / 1024)) + ' КБ' : LL('Выберите или перетащите файл', 'Choose or drop a file')) + '</b><span>' + LL('PDF (в том числе скан), Word, фото документа или текст', 'PDF (incl. scans), Word, photo or text') + '</span></label>';
+      h += '<label class="dxdrop' + (dx.file ? ' on' : '') + '"><input type="file" id="dxfile" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx,.rtf,.odt,application/pdf,image/*,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/rtf,application/vnd.oasis.opendocument.text" hidden>' + ico(dx.file ? 'doc' : 'upload', 28) + '<b>' + ((dx.files || []).length > 1 ? LL('Документов: ', 'Documents: ') + dx.files.length : dx.file ? esc(dx.file.name) + ' · ' + Math.max(1, Math.round(dx.file.size / 1024)) + ' КБ' : LL('Выберите или перетащите файлы', 'Choose or drop files')) + '</b><span>' + ((dx.files || []).length > 1 ? dx.files.map(function (f) { return esc(f.name); }).join(' · ') : LL('Можно сразу несколько: выписки, протоколы, гистология, МДГ. PDF (в том числе скан), Word, фото или текст', 'Several at once: PDF, Word, photo or text')) + '</span></label>';
       h += '<label class="chk"><input type="checkbox" id="dxkeep"' + (dx.keep ? ' checked' : '') + '><span>' + LL('Не перезаписывать уже заполненные поля (расхождения покажу отдельно)', 'Keep fields that are already filled (differences listed separately)') + '</span></label>';
       h += dxModeHTML(dx, 'dx');
       h += '<div class="actions"><button type="button" class="btn primary" data-act="dxrun"' + (dx.file ? '' : ' disabled') + '>' + ico('sparkle', 16) + LL('Распознать и заполнить', 'Extract and fill') + '</button><button type="button" class="btn ghost" data-act="dxclose">' + t('b.cancel') + '</button></div>';
