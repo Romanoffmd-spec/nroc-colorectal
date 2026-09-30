@@ -240,6 +240,7 @@ var SECTIONS = [
     f('r', 'R статус', 'R status', 'seg', { options: ['R0', 'R1', 'R2'] }),
     f('anast', 'Анастомоз', 'Anastomosis', 'seg', { options: YN }),
     f('llnd', 'ЛД', 'Lymph node dissection', 'seg', { options: YN }),
+    f('llSt', 'Удалённые группы лимфоузлов (JSCCR)', 'Node stations removed (JSCCR)', 'nodes', { wide: true, show: function (d) { return d.llnd === 'Да' || d.sLndPelv === 'Да'; } }),
     f('opTime', 'Длительность операции', 'Operative time', 'num', { unit: 'u.min' }),
     f('ebl', 'Объем кровопотери', 'Blood loss', 'num', { unit: 'u.ml' }),
     f('transf', 'Гемотрансфузия', 'Blood transfusion', 'seg', { options: YN }),
@@ -1320,10 +1321,7 @@ function cardTabBody(dr, tab, tags) {
     h += '<section class="card" id="sec-tags"><h3>' + t('pc.tags') + '</h3><div class="tagline">' + (tags.length ? tags.map(function (r) { return '<span class="tag">' + esc(regName(r)) + '</span>'; }).join('') : '<span class="muted">' + t('pc.noTags') + '</span>') + '</div>';
     if (manual.length) { h += '<p class="hint">' + t('pc.manualTags') + '</p>'; manual.forEach(function (r) { h += '<label class="chk"><input type="checkbox" data-bind="m.' + r.id + '"' + (dr.members[r.id] ? ' checked' : '') + '>' + esc(regName(r)) + '</label>'; }); }
     h += '</section>';
-    if (hasProc(d)) {
-      var gen = buildProtocol(p), pe = dr.protoEdit && dr.protoEdit.base === gen ? dr.protoEdit.text : gen;
-      h += '<section class="card proto" id="sec-proto"><h3>' + t('pr.title') + '<span class="h3-r"><button type="button" class="btn small ai" data-act="aiproto"' + (dr.protoAI ? ' disabled' : '') + '>' + ico('sparkle', 15) + (dr.protoAI ? LL('Пишу…', 'Writing…') : LL('Написать с ИИ', 'Write with AI')) + '</button><button type="button" class="btn small primary" data-act="copyproto">' + ico('file', 15) + t('pr.copy') + '</button></span></h3><textarea id="protoText" class="protoText" data-proto="1" spellcheck="false">' + esc(pe) + '</textarea></section>';
-    }
+    h += sumCard(dr);
     h += commentsCard(p.comments, 'p') + historyCard(p.log);
   }
   return h + '</div></div>';
@@ -1347,7 +1345,7 @@ function renderPatient() {
   });
   var protoOn = hasProc(d);
   nav[nav.length - 1][1].push({ id: 'q', title: LL('Анкеты', 'Questionnaires') });
-  nav.push(['more', [{ id: 'media', title: t('pc.media') }, { id: 'tags', title: t('pc.tags') }].concat(protoOn ? [{ id: 'proto', title: t('pr.title') }] : []).concat([{ id: 'cmt', title: LL('Комментарии', 'Comments') }, { id: 'hist', title: LL('История изменений', 'Change history') }])]);
+  nav.push(['more', [{ id: 'media', title: t('pc.media') }, { id: 'tags', title: t('pc.tags') }].concat([{ id: 'proto', title: t('pr.title') }]).concat([{ id: 'cmt', title: LL('Комментарии', 'Comments') }, { id: 'hist', title: LL('История изменений', 'Change history') }])]);
   h += '<div class="pbody"><nav class="pnav" aria-label="' + t('a11y.cardSections') + '">' + nav.map(function (g) {
     var ph = PHASES.filter(function (x) { return x[0] === g[0]; })[0];
     return (ph ? '<div class="pn-h ph-' + g[0] + '"><span class="pn-n">' + (PHASES.indexOf(ph) + 1) + '</span>' + t(ph[1]) + '</div>' : g[0] === 'more' ? '<div class="pn-h">' + t('ph.more') + '</div>' : '') + g[1].map(function (s) { return '<button type="button" data-act="jump" data-id="' + s.id + '">' + esc(s.title) + '</button>'; }).join('');
@@ -1394,10 +1392,7 @@ function renderPatient() {
   var manual = DB.registries.filter(function (r) { return r.mode === 'manual'; });
   if (manual.length) { h += '<p class="hint">' + t('pc.manualTags') + '</p>'; manual.forEach(function (r) { h += '<label class="chk"><input type="checkbox" data-bind="m.' + r.id + '"' + (dr.members[r.id] ? ' checked' : '') + '>' + esc(regName(r)) + '</label>'; }); }
   h += '</section>';
-  if (protoOn) {
-    var gen = buildProtocol(p), pe = dr.protoEdit && dr.protoEdit.base === gen ? dr.protoEdit.text : gen;
-    h += '<section class="card proto" id="sec-proto"><h3>' + t('pr.title') + '<span class="h3-r"><button type="button" class="btn small ai" data-act="aiproto"' + (dr.protoAI ? ' disabled' : '') + '>' + ico('sparkle', 15) + (dr.protoAI ? LL('Пишу…', 'Writing…') : LL('Написать с ИИ', 'Write with AI')) + '</button><button type="button" class="btn small primary" data-act="copyproto">' + ico('file', 15) + t('pr.copy') + '</button></span></h3><p class="hint">' + LL('Места, которые нужно уточнить, отмечены [уточнить]. Текст можно править перед копированием.', 'Places to check are marked [check]. You can edit the text before copying.') + '</p><textarea id="protoText" class="protoText" data-proto="1" spellcheck="false">' + esc(pe) + '</textarea></section>';
-  }
+  h += sumCard(dr);
   h += commentsCard(p.comments, 'p') + historyCard(p.log);
   h += '</div></div>';
   } else h += cardTabBody(dr, tab, tags);
@@ -1635,8 +1630,11 @@ function savePatient() {
   if (dr.isNew) { p.created = nowIso(); DB.patients.push(p); DB.seq++; } else DB.patients = DB.patients.map(function (x) { return x.id === p.id ? p : x; });
   if (dr.linkRec) { var lr = DB.cols[dr.linkRec.k].filter(function (x) { return x.id === dr.linkRec.id; })[0]; if (lr) lr.pid = p.id; }
   if (dr.qlAttach) { var qr0 = (QL.resp || []).filter(function (x) { return x.id === dr.qlAttach; })[0]; if (qr0) { qlAttach(qr0, p); if (CLOUD.db) CLOUD.db.collection('qresp').doc(qr0.id).update({ status: 'done', pid: p.id, doneAt: nowIso(), doneBy: me() }).catch(function () {}); QL.resp = QL.resp.filter(function (x) { return x.id !== qr0.id; }); } }
+  if (dr.sumEdit != null && dr.sumEdit !== ((p.summary || {}).text || '')) p.summary = { text: dr.sumEdit, at: nowIso(), by: me(), ai: false, edited: true, hash: sumHash(p) };
+  var needSum = aiReady() && !dr.sumAI && (!p.summary || p.summary.hash !== sumHash(p));
   var tgt = dr.target && dr.target !== 'all' ? regOf(dr.target) : null;
   S.drawer = null; if (save()) toast(tgt ? t('toast.savedTo', { n: pName(p), r: regName(tgt) }) : t('toast.saved', { n: pName(p) })); render();
+  if (needSum) aiSummaryBg(p.id);
 }
 function openRec(k, id, preset) {
   S.linkPick = false;
@@ -3502,6 +3500,69 @@ function aiProtocol() {
   });
 }
 
+/* ======================= Резюме: история болезни ======================= */
+function sumHash(p) { var s0 = JSON.stringify(p.d || {}) + '|' + (p.comments || []).length + '|' + (p.docsAI || []).length, h0 = 0; for (var i = 0; i < s0.length; i++) h0 = (h0 * 31 + s0.charCodeAt(i)) | 0; return String(h0); }
+function buildHistory(p) {
+  var d = p.d, F = function (id) { var x = FIELD[id]; return x && has(d[id]) ? fmtVal(x, d[id]) : ''; }, out = [], ev = [];
+  var head = [d.sex === 'М' ? 'Мужчина' : d.sex === 'Ж' ? 'Женщина' : 'Пациент', F('age') ? F('age') + ' лет' : ''].filter(Boolean).join(', ');
+  var dx = [F('loc') ? 'Рак: ' + F('loc').toLowerCase() : '', (d.cT || d.cN || d.cM) ? [d.cT, d.cN, d.cM].filter(Boolean).join(' ') : '', (d.pT || d.pN) ? [d.pT, d.pN, d.pM].filter(Boolean).join(' ') : '', F('hist')].filter(Boolean).join(', ');
+  out.push('КРАТКО\n' + head + (dx ? '. ' + dx : '') + '.');
+  var cm = ['diab', 'htn', 'cvd', 'lung', 'cvb', 'liverDz'].filter(function (k) { return d[k] === 'Да'; }).map(function (k) { return L(FIELD[k].label); });
+  if (cm.length || d.comorbOther || d.asa) out.push('СОПУТСТВУЮЩИЕ\n' + [cm.join(', '), d.comorbOther, d.asa ? 'ASA ' + d.asa : ''].filter(Boolean).join('; ') + '.');
+  var E = function (dt, t2) { if (t2) ev.push([dt || '', t2]); };
+  E(d.regDate, d.regDate ? 'Регистрация в регистре.' : '');
+  if (d.neoCrt === 'Да') E(d.rtStart, 'Неоадъювантная ХЛТ' + (d.rtStart || d.rtEnd ? ' ' + [fmtDate(d.rtStart), fmtDate(d.rtEnd)].filter(Boolean).join(' - ') : '') + (d.sod ? ', СОД ' + d.sod + ' Гр' : '') + (d.crtRegimen ? ', ' + d.crtRegimen : '') + '.');
+  E(d.admDate, d.admDate ? 'Госпитализация.' : '');
+  if (d.proc || d.date) E(d.date, 'Операция: ' + [F('proc'), F('access'), F('urg'), d.conv === 'Да' ? 'конверсия' : '', d.stoma ? 'стома: ' + F('stoma') : '', d.r ? F('r') : ''].filter(Boolean).join(', ') + (d.surgeon ? ' (хирург ' + d.surgeon + ')' : '') + '.');
+  ['cd1', 'cd2', 'cd3', 'cd4', 'cd5'].forEach(function (k, i) { if (has(d[k])) E(d.date, 'Осложнение Clavien-Dindo ' + ['I', 'II', 'III', 'IV', 'V'][i] + ': ' + d[k] + '.'); });
+  if (d.reop30 === 'Да') E(d.reopDate, 'Повторная операция' + (d.reopName ? ': ' + d.reopName : '') + '.');
+  if (d.histPost || d.pT) E(d.date, 'Гистология операционного материала: ' + [d.histPost, [d.pT, d.pN, d.pM].filter(Boolean).join(' '), d.lnT ? 'ЛУ ' + (d.lnP || 0) + '/' + d.lnT : ''].filter(Boolean).join('; ') + '.');
+  E(d.disDate, d.disDate ? 'Выписка' + (d.los ? ' (' + d.los + ' койко-дней)' : '') + '.' : '');
+  if (d.adj === 'Да') E(d.adjStart, 'Адъювантная терапия' + (d.adjRegimen ? ': ' + d.adjRegimen : '') + (d.adjEnd ? ', до ' + fmtDate(d.adjEnd) : '') + '.');
+  if (d.recur === 'Да') E(d.recurDate, 'Рецидив' + (d.localRecLoc ? ': ' + d.localRecLoc : '') + '.');
+  if (d.distMets === 'Да') E(d.metDate, 'Отдалённые метастазы' + (d.metLoc ? ': ' + d.metLoc : '') + '.');
+  if (d.dead === 'Да' || d.mort30 === 'Да') E(d.deathDate || d.mortDate, 'Смерть' + (d.mortCause ? ': ' + d.mortCause : '') + '.');
+  E(d.lastFu, d.lastFu ? 'Последний визит.' : '');
+  ev.sort(function (a, b) { return (a[0] || '9999').localeCompare(b[0] || '9999'); });
+  out.push('ХРОНОЛОГИЯ\n' + (ev.length ? ev.map(function (e) { return (e[0] ? fmtDate(e[0]) : 'дата не указана') + ': ' + e[1]; }).join('\n') : 'нет данных'));
+  return out.join('\n\n');
+}
+function sumCard(dr) {
+  var p = dr.p, sm = p.summary || null, busy = !!dr.sumAI, txt = dr.sumEdit != null ? dr.sumEdit : (sm && sm.text) || buildHistory(p);
+  var stale = sm && sm.hash !== sumHash(p);
+  var h = '<section class="card proto" id="sec-proto"><h3>' + t('pr.title') + '<span class="h3-r">' + (aiReady() ? '<button type="button" class="btn small ai" data-act="aisum"' + (busy ? ' disabled' : '') + '>' + ico('sparkle', 15) + (busy ? LL('Пишу…', 'Writing…') : LL('Обновить с ИИ', 'Update with AI')) + '</button>' : '') + '<button type="button" class="btn small primary" data-act="copysum">' + ico('file', 15) + LL('Копировать', 'Copy') + '</button></span></h3>';
+  h += '<p class="hint">' + (sm ? LL('Обновлено ', 'Updated ') + (function (z) { return ('0' + z.getDate()).slice(-2) + '.' + ('0' + (z.getMonth() + 1)).slice(-2) + '.' + z.getFullYear() + ' ' + ('0' + z.getHours()).slice(-2) + ':' + ('0' + z.getMinutes()).slice(-2); })(new Date(sm.at)) + (sm.ai ? LL(' · ИИ', ' · AI') : LL(' · вручную', ' · manual')) + (stale ? LL(' · в карточке есть новые данные, резюме обновится после сохранения', ' · new data, will update after saving') : '') + '. ' : LL('Черновик собран из полей карточки. ', 'Draft built from the record fields. ')) + LL('Резюме обновляется само после загрузки документа и после сохранения карточки. Текст можно править: ваши правки ИИ сохранит.', 'Updates automatically after a document upload and after saving; your edits are kept.') + '</p>';
+  h += '<textarea id="sumText" class="protoText' + (busy ? ' gen' : '') + '" data-sum="1" spellcheck="false">' + esc(txt) + '</textarea></section>';
+  return h;
+}
+var SUM_SYS = 'Ты ведёшь резюме истории болезни пациента колоректального сектора ННОЦ (Астана). Пиши по-русски, медицинским языком, связно и структурно, без выдумок: только то, что есть в данных. Не используй длинные тире, вместо них двоеточие или запятую. Формат (заголовки заглавными буквами, без markdown):\n' +
+  'КРАТКО\nПол, возраст, основной диагноз (локализация, клиническая и патоморфологическая стадия, гистология), ключевое на сегодня, 2-4 предложения.\n\n' +
+  'АНАМНЕЗ И СОПУТСТВУЮЩИЕ\nЖалобы и начало заболевания, сопутствующие заболевания, привычки, семейный анамнез.\n\n' +
+  'ХРОНОЛОГИЯ\nСобытия строго по датам, каждое с новой строки в виде «ДД.ММ.ГГГГ: событие» (обследования, МДГ и решения, неоадъювантное лечение, госпитализации, операция с ключевыми деталями, осложнения, гистология, выписка, адъювантная терапия, наблюдение, рецидив). Если точной даты нет, пиши «дата не указана» и ставь событие по смыслу.\n\n' +
+  'ТЕКУЩИЙ СТАТУС И ПЛАН\nГде пациент сейчас, что запланировано, что осталось неясным.\n\n' +
+  'Если есть предыдущая версия резюме, сохрани её факты и правки врача, встрои новые данные в нужные места хронологии, исправь то, что новые данные опровергают. Верни только текст резюме.';
+function sumPrompt(p, extra) {
+  var sm = p.summary && p.summary.text ? p.summary.text : '';
+  return 'ДАННЫЕ КАРТОЧКИ:\n' + patText(p, true) + (sm ? '\n\nПРЕДЫДУЩАЯ ВЕРСИЯ РЕЗЮМЕ (сохрани правки врача):\n' + sm : '') + (extra ? '\n\nНОВЫЙ ДОКУМЕНТ ИЛИ ИНФОРМАЦИЯ:\n' + String(extra).slice(0, 40000) : '') + '\n\nНапиши обновлённое резюме истории болезни.';
+}
+function aiSummary(dr, extra, auto) {
+  if (!dr || !aiReady() || dr.sumAI) return;
+  var p = dr.p; if (dr.sumEdit != null) p.summary = { text: dr.sumEdit, at: nowIso(), by: me(), ai: false, edited: true, hash: '' };
+  dr.sumAI = true; render();
+  aiStream({ system: SUM_SYS, contents: [{ role: 'user', parts: [{ text: sumPrompt(p, extra) }] }], search: false, temp: 0.2,
+    chunk: function (txt) { var ta = root.querySelector('#sumText'); if (ta && S.drawer === dr) { ta.value = txt; } },
+    done: function (txt) { dr.sumAI = false; txt = String(txt || '').trim(); if (txt) { p.summary = { text: txt, at: nowIso(), by: me(), ai: true, hash: sumHash(p) }; dr.sumEdit = null; } if (S.drawer === dr) render(); else save(); if (!auto) toast(LL('Резюме обновлено', 'Summary updated')); },
+    fail: function (e) { dr.sumAI = false; if (S.drawer === dr) render(); if (!auto) toast(e); }
+  });
+}
+function aiSummaryBg(pid) {
+  var p = DB.patients.filter(function (x) { return x.id === pid; })[0]; if (!p || !aiReady()) return;
+  var hs = sumHash(p);
+  aiStream({ system: SUM_SYS, contents: [{ role: 'user', parts: [{ text: sumPrompt(p, '') }] }], search: false, temp: 0.2, chunk: function () {},
+    done: function (txt) { txt = String(txt || '').trim(); if (!txt) return; var q = DB.patients.filter(function (x) { return x.id === pid; })[0]; if (!q) return; q.summary = { text: txt, at: nowIso(), by: me(), ai: true, hash: hs }; if (S.drawer && S.drawer.p.id === pid && !S.drawer.sumAI && S.drawer.sumEdit == null) S.drawer.p.summary = q.summary; save(); render(); },
+    fail: function () {}
+  });
+}
 /* ======================= v10: morning briefing ======================= */
 var ROUTE_WIN = { 'Палата пробуждения': [2, 4], 'Реанимация (ОАРИТ)': [3, 5] };
 function briefing(forAI) {
@@ -4167,6 +4228,8 @@ document.addEventListener('click', function (ev) {
     case 'mpcopy': { var mt = mdtProtoText(S.rec.r, false); if (navigator.clipboard) navigator.clipboard.writeText(mt).then(function () { toast(LL('Протокол МДГ скопирован', 'MDT protocol copied')); }); break; }
     case 'mpai': { UI.aip = true; saveUI(); if (!aiReady()) { render(); break; } var cx1 = aiCtx(); aiRun(cx1, null, LL('Разбор протокола МДГ', 'MDT protocol review'), 'Проанализируй протокол МДГ целиком. Структура ответа:\n1) Резюме случая (3-4 строки).\n2) Недостающие обследования и данные для принятия решения (по стандарту стадирования колоректального рака: колоноскопия с биопсией, МРТ малого таза для рака прямой кишки с CRM/EMVI, КТ ОГК и ОБП, РЭА, MMR/MSI, RAS/BRAF при метастазах и т.д.) с пометкой, почему важно.\n3) Доступные варианты дальнейшего лечения по NCCN/ESMO/протоколам МЗ РК с уровнем доказательности и ссылками.\n4) Подходящие клинические исследования сектора или международные.\n5) Вопросы для обсуждения на МДГ.\n6) Черновик формулировки заключения МДГ (помеченный как черновик).'); break; }
     case 'aiproto': aiProtocol(); break;
+    case 'aisum': aiSummary(S.drawer, '', false); break;
+    case 'copysum': { var ts = root.querySelector('#sumText'); if (!ts) break; var tx0 = ts.value, dn = function () { toast(LL('Резюме скопировано', 'Summary copied')); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tx0).then(dn, function () { ts.select(); document.execCommand('copy'); dn(); }); else { ts.select(); document.execCommand('copy'); dn(); } break; }
     case 'logout': doLogout(); if (!SESSION) location.reload(); break;
     case 'amode': S.auth = S.auth || {}; S.auth.mode = g('v'); S.auth.err = ''; render(); break;
     case 'arole': S.auth.role = g('v'); render(); break;
@@ -4187,6 +4250,7 @@ document.addEventListener('click', function (ev) {
 });
 document.addEventListener('input', function (ev) {
   var tg = ev.target;
+  if (tg.getAttribute && tg.getAttribute('data-sum') && S.drawer) { S.drawer.sumEdit = tg.value; }
   if (tg.getAttribute && tg.getAttribute('data-proto') && S.drawer) { S.drawer.protoEdit = { base: buildProtocol(S.drawer.p), text: tg.value }; }
   var ib = tg.getAttribute && tg.getAttribute('data-bind');
   if (ib && tg.type !== 'checkbox' && tg.tagName !== 'SELECT') { bind(ib, tg.value); refreshProto(); }
@@ -4777,13 +4841,14 @@ function dxFields() {
     s.fields.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = 1; list.push({ x: x, sec: L(s.title) }); } });
     MODULES.forEach(function (m) { if (m.sec !== s.id) return; m.fields.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = 1; list.push({ x: x, sec: L(s.title) + ' / ' + L(m.title) }); } }); });
   });
-  return list.filter(function (o) { return ['files', 'nodes'].indexOf(o.x.type) < 0 && o.x.id !== 'studyNo'; });
+  return list.filter(function (o) { return o.x.type !== 'files' && o.x.id !== 'studyNo'; });
 }
 function dxSchemaText() {
   var TY = { text: 'строка', long: 'текст', num: 'число', date: 'дата YYYY-MM-DD', sel: 'один вариант из списка', seg: 'один вариант из списка', multi: 'массив вариантов из списка' };
   var cur = '';
   return dxFields().map(function (o) {
     var x = o.x, head = o.sec !== cur ? '\n# ' + (cur = o.sec) + '\n' : '';
+    if (x.type === 'nodes') return head + x.id + ' | ' + x.label[0] + ' | массив кодов групп лимфоузлов по JSCCR (rt = справа, lt = слева); заполняй только если в документе явно названы удалённые группы или их анатомия (например «запирательные слева» = "283 lt", «внутренние подвздошные проксимальные справа» = "263P rt") | ' + LN_ST.map(function (st) { return st[0] + ' ' + st[1].toLowerCase(); }).join('; ') + ' | коды: ' + nodeCodes().map(function (v) { return '"' + v + '"'; }).join(', ');
     return head + x.id + ' | ' + x.label[0] + ' | ' + (TY[x.type] || x.type) + (x.unit ? ' (' + t(x.unit) + ')' : '') + (x.options ? ' | ' + x.options.map(function (v) { return '"' + v + '"'; }).join(', ') : '');
   }).join('\n');
 }
@@ -4795,6 +4860,7 @@ var DX_SYS = 'Ты модуль извлечения данных колорек
   '4. Для каждого значения дай quote: дословную короткую цитату из документа (до 150 символов), на которой оно основано, и confidence от 0 до 1.\n' +
   '5. issues: всё, что мешало: неразборчиво (unreadable), двусмысленно (ambiguous), противоречия внутри документа (conflict), нет варианта в списке (not_in_options), клинически несогласованно (inconsistent: например стадия не соответствует TNM, возраст не соответствует дате рождения).\n' +
   'Главное: понимай смысл, а не ищи слова. Документы из разных больниц формулируют одно и то же по-разному (синонимы, сокращения, казахский и русский текст, описание по блокам и флаконам, отрицания «не выявлено», «без признаков»). Рассуждай как врач-онколог: сопоставляй части документа, считай, где нужно, и в note коротко объясняй, как получено значение, если оно не написано одной фразой. Если смысл неоднозначен, не угадывай: оставь поле пустым и опиши в issues.\n' +
+  'Поля «Да/Нет» (сопутствующие, привычки, семейный анамнез, первично-множественный рак, гемотрансфузия, конверсия, осложнения, повторная операция и т. п.): если документ описывает соответствующий этап или раздел, а явление нигде не упоминается, ставь «Нет» с note «не упоминается». Если упомянуто, ставь «Да».\n' +
   '6. «ПГЗ до операции» (hist) это гистология биопсии до лечения; «ПГЗ после операции» (histPost) это заключение гистологии операционного материала (удалённого препарата). Не путай их. В histPost пиши заключение патолога целиком. Количество ЛУ (lnT) и метастатических ЛУ (lnP) считай суммой по всем блокам и флаконам микроскопического описания; pN выводи по числу метастатических ЛУ (TNM 8), если он не указан прямо.\n' +
   '7. questions: конкретные вопросы врачу, ответ на которые позволит заполнить или уточнить поля.\n' +
   '8. {PII}\n' +
@@ -5078,6 +5144,18 @@ function dxRules(doc) {
   /* pathology */
   if ((m = m1(/(?:исследовано|удалено|выделено|обнаружено)\s+(\d{1,3})\s+лимф[\wА-Яа-яЁё]*\s*узл[\wА-Яа-яЁё]*[^\n]{0,80}?(?:из\s+них\s+)?(?:метастаз[\wА-Яа-яЁё]*\s+(?:в|обнаружен[\wА-Яа-яЁё]*\s+в)\s+)?(\d{1,2}|нет|ни\s+в\s+одном)?/i))) { add('lnT', m[1], m[0], 0.75); if (!m[2]) { var mp = /(?:в\s+(\d{1,2})\s+(?:из\s+них\s+)?метастаз|метастаз[\wА-Яа-яЁё]*\s+(?:обнаружен[\wА-Яа-яЁё]*\s+)?в\s+(\d{1,2}))/i.exec(m[0] + tx.slice(tx.indexOf(m[0]) + m[0].length, tx.indexOf(m[0]) + m[0].length + 60)); if (mp) m[2] = mp[1] || mp[2]; } if (m[2]) add('lnP', /нет|ни/.test(m[2]) ? '0' : m[2], m[0], 0.65); }
   else if ((m = m1(/\b(\d{1,2})\s*\/\s*(\d{1,3})\s*(?:ЛУ|лимф)/i))) { add('lnP', m[1], m[0], 0.7); add('lnT', m[2], m[0], 0.7); }
+  /* группы лимфоузлов JSCCR, если явно названы рядом с лимфодиссекцией */
+  (function () {
+    var i0 = tx.search(/лимфодиссекци|лимфаденэктоми/i); if (i0 < 0) return;
+    var zone = tx.slice(Math.max(0, i0 - 300), i0 + 900), got = [];
+    var MAP = [['263P', /внутренн[\wА-Яа-яЁё]*\s+подвздошн[\wА-Яа-яЁё]*[^.;]{0,30}проксимальн|263\s?P/i], ['263D', /внутренн[\wА-Яа-яЁё]*\s+подвздошн[\wА-Яа-яЁё]*[^.;]{0,30}дистальн|263\s?D/i], ['283', /запирательн|obturator|\b283\b/i], ['273', /общ[\wА-Яа-яЁё]*\s+подвздошн|\b273\b/i], ['293', /наружн[\wА-Яа-яЁё]*\s+подвздошн|\b293\b/i], ['260', /латеральн[\wА-Яа-яЁё]*\s+крестцов|\b260\b/i], ['270', /срединн[\wА-Яа-яЁё]*\s+крестцов|\b270\b/i], ['280', /бифуркаци[\wА-Яа-яЁё]*\s+аорт|\b280\b/i], ['292', /пахов|\b292\b/i]];
+    zone.split(/[.;\n]/).forEach(function (sn) {
+      var side = /с\s+обеих\s+сторон|билатеральн|двусторонн/i.test(sn) ? ['rt', 'lt'] : /справа|правост|\bправ[\wА-Яа-яЁё]*/i.test(sn) ? ['rt'] : /слева|левост|\bлев[\wА-Яа-яЁё]*/i.test(sn) ? ['lt'] : [];
+      MAP.forEach(function (m) { if (!m[1].test(sn)) return; var st = LN_ST.filter(function (z) { return z[0] === m[0]; })[0]; if (st[3] === 1) got.push(m[0]); else side.forEach(function (sd) { got.push(m[0] + ' ' + sd); }); });
+    });
+    got = got.filter(function (v, i) { return got.indexOf(v) === i; });
+    if (got.length) add('llSt', got, ctx(/лимфодиссекци|лимфаденэктоми/i), 0.6, LL('группы отмечены по тексту, проверьте на схеме', 'stations from text, check the map'));
+  })();
   /* описание по блокам/флаконам: «8 лимфатических узлов с наличием метастатического роста», «6 лимфатических узлов, 1 из которых с наличием метастатического…», «с наличием 1 лимфатического узла без признаков…» */
   if (!F.lnT) (function () {
     var cut = tx.search(/Патогистологи[\wА-Яа-яЁё]*\s+заключени|ұйғарым/i), part = (cut > 200 ? tx.slice(0, cut) : tx).replace(/у\s?з\s?л\s?о\s+в(?![А-Яа-яЁё])/g, 'узлов');
@@ -5124,6 +5202,7 @@ function dxNorm(x, v) {
   if (x.type === 'date') { var s = String(v).trim(), m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s) || null; if (!m && (m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(s))) return { v: m[3] + '-' + m[2] + '-' + m[1] }; return m ? { v: m[1] + '-' + m[2] + '-' + m[3] } : { err: LL('дата не распознана: ', 'bad date: ') + s }; }
   function opt(z) { z = String(z).trim(); var o = x.options || []; if (o.indexOf(z) >= 0) return z; var lz = z.toLowerCase(); return o.filter(function (q) { return q.toLowerCase() === lz; })[0] || null; }
   if (x.type === 'sel' || x.type === 'seg') { var o1 = opt(Array.isArray(v) ? v[0] : v); return o1 ? { v: o1 } : { err: LL('нет такого варианта: ', 'no such option: ') + v }; }
+  if (x.type === 'nodes') { var codes = nodeCodes(), na = (Array.isArray(v) ? v : String(v).split(/[;,]/)).map(function (z) { z = String(z).trim().replace(/\s+/g, ' ').replace(/справа|right|R$/i, 'rt').replace(/слева|left|L$/i, 'lt'); return codes.filter(function (c) { return c.toLowerCase() === z.toLowerCase(); })[0] || null; }).filter(Boolean); return na.length ? { v: na } : { err: LL('коды групп не распознаны: ', 'unknown stations: ') + [].concat(v).join(', ') }; }
   if (x.type === 'multi') { var arr = (Array.isArray(v) ? v : [v]).map(opt), bad = (Array.isArray(v) ? v : [v]).filter(function (z, i) { return !arr[i]; }); arr = arr.filter(Boolean); return arr.length ? { v: arr, warn: bad.length ? LL('не распознаны варианты: ', 'unknown options: ') + bad.join(', ') : '' } : { err: LL('нет таких вариантов: ', 'no such options: ') + [].concat(v).join(', ') }; }
   return { v: String(v).trim() };
 }
@@ -5132,7 +5211,7 @@ function dxApply(res, keep, local) {
   var dr = S.drawer, d = dr.p.d, rep = { doc: res.doc || {}, filled: [], same: [], conflict: [], rejected: [], issues: [], questions: (res.questions || []).filter(Boolean), missing: [] };
   dr.aiFilled = dr.aiFilled || {};
   (res.fields || []).forEach(function (r) {
-    var x = FIELD[r.id]; if (!x || ['files', 'nodes'].indexOf(x.type) >= 0) { if (r.id) rep.rejected.push({ id: r.id, label: r.id, why: LL('такого поля нет в карточке', 'no such field'), quote: r.quote, raw: r.value }); return; }
+    var x = FIELD[r.id]; if (!x || x.type === 'files') { if (r.id) rep.rejected.push({ id: r.id, label: r.id, why: LL('такого поля нет в карточке', 'no such field'), quote: r.quote, raw: r.value }); return; }
     var nv = dxNorm(x, r.value), row = { id: x.id, label: L(x.label), quote: r.quote || '', conf: typeof r.confidence === 'number' ? r.confidence : 0.5, note: r.note || '', raw: r.value };
     if (nv.err) { if (nv.err !== 'empty') rep.rejected.push(Object.assign(row, { why: nv.err })); return; }
     row.v = nv.v; if (nv.warn) row.note = (row.note ? row.note + '. ' : '') + nv.warn;
@@ -5201,10 +5280,36 @@ function dxRun() {
   }).then(function (o) {
     if (!S.dx || !S.drawer) return;
     dx.docText = o.text || ''; dx.usedAI = !!o.ai; dx.ans = ''; dx.qa = [];
+    o.res = dxDefaultNo(o.res, o.text, S.drawer.p.d);
     dx.rep = dxApply(o.res, dx.keep, o.local); dx.rep.src = o.src; dx.rep.fallback = o.fallback; dx.rep.file = dx.file.name; dx.rep.at = nowIso();
     var dr = S.drawer; dr.p.docsAI = (dr.p.docsAI || []).concat([{ name: dx.file.name, at: dx.rep.at, by: me(), src: o.src, n: dx.rep.filled.length }]);
     dx.step = 'rep'; render();
+    if (dx.usedAI && aiReady()) aiSummary(S.drawer, dx.docText || '', true);
   }).catch(function (e) { if (!S.dx) return; dx.step = 'err'; dx.err = (e && e.message) || String(e); render(); });
+}
+/* правило врача: если в документе с анамнезом заболевание или привычка нигде не упоминаются, считаем «Нет» */
+function dxDefaultNo(res, text, d) {
+  res = res || {}; res.fields = res.fields || [];
+  var got = {}; res.fields.forEach(function (f) { if (f && f.id) got[f.id] = f; });
+  var anam = !!text && /сопутствующ|анамнез|anamnesis|жалоб|объективн|эпикриз|осмотр|консультаци|вредные\s+привычки/i.test(text || '') || ['comorb', 'hx'].some(function (sid) { var sc = SECTIONS.filter(function (z) { return z.id === sid; })[0]; return sc && sc.fields.some(function (x) { return got[x.id]; }); });
+  if (!anam) return res;
+  var note = LL('в документе не упоминается: по правилу «не указано = Нет»', 'not mentioned: treated as No');
+  var d2 = {}; Object.keys(d).forEach(function (k) { d2[k] = d[k]; }); res.fields.forEach(function (f) { if (f && f.id && has(f.value)) d2[f.id] = f.value; });
+  var SKIP = { primary: 1, adjComplete: 1, comorb: 1 };
+  var TOUCH = {}; SECTIONS.forEach(function (sc) { var nh = sc.fields.filter(function (x) { return got[x.id]; }).length; TOUCH[sc.id] = (sc.id === 'comorb' || sc.id === 'hx') ? anam : (nh >= 2 || (nh && nh >= sc.fields.length / 3)); });
+  if (TOUCH.op) TOUCH.simult = true; if (TOUCH.op && TOUCH.hosp) TOUCH.cx = true;
+  SECTIONS.forEach(function (sc) {
+    if (!TOUCH[sc.id]) return;
+    sc.fields.forEach(function (x) {
+      var id = x.id; if (SKIP[id] || got[id] || has(d[id]) || !(x.type === 'seg' || x.type === 'sel') || !x.options || x.options.indexOf('Нет') < 0 || x.options.indexOf('Да') < 0) return;
+      if (x.show && !x.show(d2)) return;
+      if (/^s(Liver|Bladder|Gyn|Lnd|LndPelv|LndIng|Gi|Other)$/.test(id) && d2.simult !== 'Да') return;
+      if (id === 'ecig' && d2.smoke === 'Да') return; if (id === 'famCrc' && d2.famCa === 'Да') return;
+      res.fields.push({ id: id, value: 'Нет', confidence: 0.6, quote: LL('не упоминается', 'not mentioned'), note: note }); got[id] = res.fields[res.fields.length - 1]; d2[id] = 'Нет';
+    });
+  });
+  if (!got.comorb && !has(d.comorb)) { var any = ['diab', 'htn', 'cvd', 'lung', 'cvb', 'liverDz'].some(function (id) { return (got[id] && got[id].value === 'Да') || d[id] === 'Да'; }) || !!got.comorbOther || has(d.comorbOther); res.fields.push({ id: 'comorb', value: any ? 'Да' : 'Нет', confidence: 0.7, quote: any ? LL('есть сопутствующие заболевания', 'comorbidities present') : LL('сопутствующие не упоминаются', 'none mentioned'), note: any ? '' : note }); }
+  return res;
 }
 function dxAnswer() {
   var dx = S.dx, dr = S.drawer; if (!dx || !dx.rep || !dx.doc || !dr || dx.busyAns) return;
@@ -5225,6 +5330,7 @@ function dxAnswer() {
     nr.same = old.same.filter(function (x) { return !ids[x.id]; });
     nr.doc = old.doc; nr.src = old.src + LL(' + ответы врача', ' + doctor\'s answers'); nr.fallback = old.fallback; nr.file = old.file; nr.at = nowIso();
     dx.qa.push(ans); dx.rep = nr; dx.ans = ''; dx.busyAns = false; render();
+    aiSummary(S.drawer, (dx.docText || '') + '\n\nОТВЕТЫ ВРАЧА НА ВОПРОСЫ ПО ДОКУМЕНТУ:\n' + ans, true);
     toast(LL('Карточка дозаполнена по вашим ответам: ', 'Updated from your answers: ') + Object.keys(ids).length + LL(' полей', ' fields'));
   }).catch(function (e) { if (!S.dx) return; dx.busyAns = false; dx.ansErr = LL('ИИ не ответил: ', 'AI failed: ') + ((e && e.message) || e); render(); });
 }
@@ -5327,6 +5433,7 @@ function retroOpen(id) {
   openPatient(pid, pid ? null : {});
   S.drawer.retroItem = it.id;
   S.dx = { step: 'rep', keep: RETRO.keep, file: it.file, docText: it.text || '' };
+  it.res = dxDefaultNo(it.res, it.text || '', S.drawer.p.d);
   S.dx.rep = dxApply(it.res, RETRO.keep, it.local); S.dx.rep.src = it.src; S.dx.rep.fallback = it.fallback; S.dx.rep.file = it.file.name; S.dx.rep.at = nowIso();
   S.dx.rep.match = it.m ? (pid ? LL('Документ отнесён к карточке ', 'Matched to record ') + pid + ' (' + it.m.how + ')' : it.m.how) : '';
   S.drawer.p.docsAI = (S.drawer.p.docsAI || []).concat([{ name: it.file.name, at: S.dx.rep.at, by: me(), src: it.src, n: S.dx.rep.filled.length }]);

@@ -157,7 +157,7 @@ ui: {
   'ph.postSub': ['Осложнения, патоморфология, контрольные осмотры и отдалённые результаты', 'Complications, pathology, follow-up visits and long-term outcomes'],
   'ph.more': ['Прочее', 'Other'],
   'ph.moreSub': ['Фото, теги и протокол операции', 'Photos, tags and operative report'],
-  'pr.title': ['Резюме: протокол операции', 'Summary: operative report'],
+  'pr.title': ['Резюме: история болезни', 'Summary: case history'],
   'pr.copy': ['Копировать', 'Copy'],
   'pr.copied': ['Протокол скопирован', 'Report copied'],
   'pr.hint': ['Собирается автоматически из полей операции. Текст можно поправить здесь перед копированием; при изменении полей карточки он соберётся заново.', 'Built automatically from the operation fields. You can edit it here before copying; it is rebuilt when card fields change.'],
