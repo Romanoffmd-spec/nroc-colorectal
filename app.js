@@ -3449,7 +3449,7 @@ function renderAIPill() {
     h += '<label class="af"><span>' + LL('Модель', 'Model') + '</span><select id="aimodel">' + (AI.avail && AI.avail.length ? AI.avail.map(function (m) { return [m.id, m.name, m.id]; }) : AI.prov === 'gemini' ? AI_MODELS : [[AI.model, AI.model, AI_PROV[AI.prov].name]]).map(function (m) { return '<option value="' + m[0] + '"' + (AI.model === m[0] ? ' selected' : '') + '>' + esc(m[1]) + ' · ' + esc(m[2]) + '</option>'; }).join('') + '</select></label>';
     h += '<label class="chk"><input type="checkbox" id="aideid"' + (AI.deid ? ' checked' : '') + '><span>' + LL('Обезличивать данные перед отправкой (ФИО, ИИН, ИБ, адрес)', 'De-identify data before sending (name, ID, case no., address)') + '</span></label>';
     h += '<div class="aistat s-' + st + '"><span class="dot"></span>' + ({ off: LL('Ключ не введён', 'No key'), check: LL('Проверяю ключ…', 'Checking key…'), ok: LL('Подключено: ключ принят, всё работает', 'Connected: key accepted, all good'), err: esc(AI.err) }[st]) + '</div>';
-    h += '<div class="actions"><button type="button" class="btn primary small" data-act="aikeysave">' + LL('Сохранить и проверить', 'Save and test') + '</button>' + (AI.key && !AI.shared ? '<button type="button" class="btn small ghost" data-act="aikeyclear">' + (AI.sharedKey ? LL('Вернуть общий ключ', 'Back to shared key') : LL('Отключить', 'Disconnect')) + '</button>' : '') + '</div></div></div>';
+    h += '<div class="actions"><button type="button" class="btn primary small" data-act="aikeysave">' + LL('Сохранить и проверить', 'Save and test') + '</button>' + '<button type="button" class="btn small danger" data-act="aikeyreset" title="' + LL('Удалить все сохранённые на этом устройстве ключи (Gemini, ChatGPT, Claude, DeepSeek) и выбор модели', 'Remove all keys saved on this device') + '">' + ico('trash', 14) + LL('Сбросить ключи', 'Reset keys') + '</button></div>' + (CLOUD.on && isAdmin() && AI.sharedKey ? '<button type="button" class="linkbtn" data-act="aisharedel" style="margin-top:8px">' + LL('Удалить общий ключ сектора', 'Remove the shared unit key') + '</button>' : '') + '</div></div>';
   }
   return h + '</div>';
 }
@@ -4127,6 +4127,20 @@ document.addEventListener('click', function (ev) {
     case 'aistop': if (AI.ctrl) AI.ctrl.abort(); break;
     case 'aikeysave': { var ui0 = root.querySelector('#aiurl-in'); if (ui0) try { localStorage.setItem('crr.ai.localurl', ui0.value.trim()); } catch (e) {} var ki = root.querySelector('#aikey-in'), mo = root.querySelector('#aimodel'), de = root.querySelector('#aideid'); if (mo && mo.value !== AI.model) try { localStorage.setItem(aiModelName(AI.prov) + '.m', '1'); } catch (e) {} AI.model = mo ? mo.value : AI.model; AI.deid = de ? de.checked : AI.deid; try { localStorage.setItem(aiModelName(AI.prov), AI.model); localStorage.setItem('crr.aideid', AI.deid ? '1' : '0'); } catch (e) {} AI.threads = {}; aiSetKey(ki ? ki.value : ''); break; }
     case 'aikeyclear': AI.threads = {}; aiSetKey(''); break;
+    case 'aikeyreset': {
+      try { var rm = []; for (var li = 0; li < localStorage.length; li++) { var lk = localStorage.key(li); if (/^crr\.ai(key|model)/.test(lk)) rm.push(lk); } rm.forEach(function (k) { localStorage.removeItem(k); }); } catch (e) {}
+      AI.threads = {}; AI.coolUntil = 0; AI.avail = null; AI.err = ''; AI.key = ''; AI.shared = false; AI.model = AI_PROV[AI.prov].def;
+      if (AI.sharedKey && AI.prov === 'gemini') { AI.key = AI.sharedKey; AI.shared = true; }
+      var kin = root.querySelector('#aikey-in'); if (kin) kin.value = '';
+      aiCheck(); toast(AI.shared ? LL('Ваши ключи удалены с этого устройства, используется общий ключ сектора. Можно ввести новый.', 'Your keys removed; the shared key is used. You can enter a new one.') : LL('Ключи удалены с этого устройства. Введите новый ключ и нажмите «Сохранить и проверить».', 'Keys removed. Enter a new key and press Save and test.'));
+      break;
+    }
+    case 'aisharedel': {
+      if (!CLOUD.on || !CLOUD.db || !isAdmin()) break;
+      if (!confirm(LL('Удалить общий ключ сектора? У пользователей без своего ключа ИИ отключится до ввода нового.', 'Remove the shared key? Users without their own key lose AI until a new one is set.'))) break;
+      CLOUD.db.collection('config').doc('ai').set({ key: '', by: me(), at: nowIso() }).then(function () { var was = AI.sharedKey; AI.sharedKey = ''; if (AI.shared && AI.key === was) { AI.key = ''; AI.shared = false; } aiCheck(); toast(LL('Общий ключ удалён', 'Shared key removed')); render(); }).catch(function (e) { toast(LL('Не удалось удалить общий ключ: ', 'Could not remove shared key: ') + (e.code || e.message)); });
+      break;
+    }
     case 'ptag': ptagToggle(g('id')); break;
     case 'aiprov': aiSetProv(g('v')); break;
     case 'theme': UI.theme = themeCur() === 'dark' ? 'light' : 'dark'; saveUI(); themeApply(); render(); break;
