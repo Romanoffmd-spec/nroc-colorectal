@@ -757,7 +757,7 @@ function apprAct(kind, id) {
   if (kind === 'ok') {
     if (!canApprove(r)) return;
     r.appr.st = 'approved'; r.appr.okBy = me(); r.appr.okAt = nowIso();
-    DB.pending = DB.pending.filter(function (x) { return x.id !== id; }); DB.registries.push(r);
+    DB.pending = DB.pending.filter(function (x) { return x.id !== id; }); DB.registries.push(r); if (r.impData) impDataApply(r);
     save(); toast((r.kind === 'study' ? LL('Исследование одобрено: ', 'Study approved: ') : LL('Регистр одобрен: ', 'Registry approved: ')) + regName(r)); render();
   } else if (kind === 'no') {
     if (!canApprove(r)) return;
@@ -1301,7 +1301,17 @@ function ptagToggle(id) {
 function draftIn(dr, reg) { if (reg.parent) { var par = regOf(reg.parent); if (par && !draftIn(dr, par)) return false; } return reg.mode === 'manual' ? !!dr.members[reg.id] : inReg({ id: dr.p.id, d: dr.p.d }, Object.assign({}, reg, { parent: null })); }
 /* ======================= Карточка: вкладки по этапам ======================= */
 var CARD_TABS = [['pre', 'ph.pre'], ['op', 'ph.op'], ['post', 'ph.post'], ['more', 'ph.more']];
-function phaseFill(ph, d) { var n = 0, all = 0; SECTIONS.forEach(function (s) { if (s.phase !== ph) return; s.fields.forEach(function (x) { all++; if (has(d[x.id])) n++; }); }); return [n, all]; }
+/* поля регистра или научной работы: карточка, открытая из неё, показывает только её поля */
+function ctxRegOf(dr) { return dr && dr.ctx ? regOf(dr.ctx) : null; }
+function ctxOn(dr) { var r = ctxRegOf(dr); return !!(r && !dr.ctxAll && (r.fset || (r.custom || []).length)); }
+function viewSecs(dr) { var r = ctxRegOf(dr); if (!r || (dr && dr.ctxAll) || !r.fset) return SECTIONS; var set = {}; r.fset.forEach(function (id) { set[id] = 1; }); return SECTIONS.map(function (s) { var f = s.fields.filter(function (x) { return set[x.id]; }); return f.length ? Object.assign({}, s, { fields: f }) : null; }).filter(Boolean); }
+function ctxCustom(dr, ph) { var r = ctxRegOf(dr); if (!r || dr.ctxAll) return []; return (r.custom || []).filter(function (c) { return c.label && (c.phase || 'pre') === ph; }); }
+function ctxCustomCard(dr, ph) {
+  var r = ctxRegOf(dr), cf = ctxCustom(dr, ph); if (!cf.length) return '';
+  var vals = (dr.p.custom || {})[r.id] || {};
+  return '<section class="card csec open ctxcf"><div class="csec-h static">' + ico('flask', 15) + '<span class="csec-t">' + LL('Поля «', 'Fields of «') + esc(regName(r)) + '»</span></div><div class="fgrid">' + cf.map(function (c) { return fieldHTML(cfAsField(c), vals[c.id], 'c.' + r.id + '.' + c.id, dr.p.d); }).join('') + '</div></section>';
+}
+function phaseFill(ph, d, dr) { var n = 0, all = 0; viewSecs(dr).forEach(function (s) { if (s.phase !== ph) return; s.fields.forEach(function (x) { all++; if (has(d[x.id])) n++; }); }); if (dr) { var r = ctxRegOf(dr), vals = r ? ((dr.p.custom || {})[r.id] || {}) : {}; ctxCustom(dr, ph).forEach(function (c) { all++; if (has(vals[c.id])) n++; }); } return [n, all]; }
 var FGRP = { bio: ['Биология опухоли', 'Tumour biology'], resp: ['Ответ на лечение', 'Treatment response'], ln: ['Лимфоузлы по зонам', 'Nodes by zone'], mrg: ['Края и препарат', 'Margins and specimen'], find: ['Другие находки в препарате', 'Other findings'], req: ['Реквизиты исследования', 'Report details'] };
 function secFieldsHTML(s, d, dr) {
   var base = s.fields.filter(function (x) { return !x.grp; }), h = '<div class="fgrid">' + base.map(function (x) { return fieldHTML(x, d[x.id], 'd.' + x.id, d); }).join('') + '</div>', seen = [];
@@ -1317,13 +1327,19 @@ function secFieldsHTML(s, d, dr) {
   });
   return h + '</div>';
 }
+function ctxBanner(dr) {
+  var r = ctxRegOf(dr); if (!r || !(r.fset || (r.custom || []).length)) return '';
+  var nBase = r.fset ? r.fset.length : 0, nC = (r.custom || []).filter(function (c) { return c.label; }).length;
+  return '<div class="ctxbar">' + ico(r.kind === 'study' ? 'flask' : 'folder', 15) + '<span>' + (dr.ctxAll ? LL('Показаны все поля карточки. ', 'Showing all record fields. ') : LL('Карточка открыта из «', 'Opened from «') + '<b>' + esc(regName(r)) + '</b>' + LL('»: только поля этой работы', '»: only its fields') + ' (' + (r.fset ? nBase + LL(' из карточки', ' from the record') : LL('все из карточки', 'all record fields')) + (nC ? ' + ' + nC + LL(' своих', ' own') : '') + '). ') + '</span><button type="button" class="linkbtn" data-act="ctxall">' + (dr.ctxAll ? LL('Только поля «', 'Only fields of «') + esc(regName(r)) + '»' : LL('Показать все поля карточки', 'Show all record fields')) + '</button></div>';
+}
 function secFilled(s, d) { return s.fields.filter(function (x) { return has(d[x.id]); }).length; }
 function secIsOpen(dr, s) { var o = dr.open || {}; if (o[s.id] !== undefined) return o[s.id]; return secFilled(s, dr.p.d) > 0 || (dr.isNew && s.id === 'pat'); }
 function cardTabs(dr, tab) {
   var d = dr.p.d;
   var h = '<div class="ctabs" role="tablist" aria-label="' + t('a11y.cardSections') + '">';
   CARD_TABS.forEach(function (c, i) {
-    var on = tab === c[0], cnt = c[0] === 'more' ? '' : (function () { var f = phaseFill(c[0], d); return '<em>' + f[0] + ' / ' + f[1] + '</em>'; })();
+    if (ctxOn(dr) && c[0] !== 'more' && tab !== c[0] && phaseFill(c[0], d, dr)[1] === 0) return;
+    var on = tab === c[0], cnt = c[0] === 'more' ? '' : (function () { var f = phaseFill(c[0], d, dr); return '<em>' + f[0] + ' / ' + f[1] + '</em>'; })();
     h += '<button type="button" role="tab" aria-selected="' + on + '" class="ctab ph-' + c[0] + (on ? ' on' : '') + '" data-act="ctab" data-v="' + c[0] + '">' + (c[0] === 'more' ? ico('folder', 15) : '<span class="ct-n">' + (i + 1) + '</span>') + '<span class="ct-l">' + t(c[1]) + '</span>' + cnt + '</button>';
   });
   h += '<span class="ct-sp"></span><button type="button" class="ctab view' + (tab === 'view' ? ' on' : '') + '" data-act="ctab" data-v="view" title="' + LL('Вся карточка одним листом', 'Whole record on one page') + '">' + ico('eye', 15) + '<span class="ct-l">' + LL('Просмотр', 'View') + '</span></button>';
@@ -1341,8 +1357,9 @@ function cardTabBody(dr, tab, tags) {
   if (isStudent()) h += '<div class="lockbox">' + ico('lock', 15) + LL('Режим студента: данные обезличены, изменения не сохраняются.', 'Student mode: anonymised, changes are not saved.') + '</div>';
   if (dr.errs) h += '<div class="errbox"><b>' + ico('alert', 16) + LL('Карточку нельзя сохранить', 'Cannot save the record') + '</b><ul>' + dr.errs.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></div>';
   if (tab !== 'more') {
-    var ss = SECTIONS.filter(function (s) { return s.phase === tab; });
+    var ss = viewSecs(dr).filter(function (s) { return s.phase === tab; });
     var shut = ss.filter(function (s) { return !secIsOpen(dr, s); }).length;
+    h += ctxBanner(dr) + ctxCustomCard(dr, tab);
     h += '<div class="csec-bar"><span class="muted">' + (shut ? LL('Пустые разделы свёрнуты. Нажмите на заголовок, чтобы заполнить вручную.', 'Empty sections are collapsed. Click a heading to fill in manually.') : '') + '</span><span class="actions"><button type="button" class="btn small ghost" data-act="secall" data-v="1" data-ph="' + tab + '">' + LL('Развернуть всё', 'Expand all') + '</button><button type="button" class="btn small ghost" data-act="secall" data-v="0" data-ph="' + tab + '">' + LL('Свернуть всё', 'Collapse all') + '</button></span></div>';
     h += '<div class="csecs">' + ss.map(function (s) { return secCardTab(dr, s); }).join('') + '</div>';
     if (tab === 'post') {
@@ -1388,7 +1405,7 @@ function renderPatient() {
   if (tab === 'view') {
   var nav = [['', [{ id: 'links', title: t('lk.title') }]]];
   PHASES.forEach(function (ph) {
-    var ss = SECTIONS.filter(function (s) { return s.phase === ph[0] && secOn(s, d); }).map(function (s) { return { id: s.id, title: L(s.title) }; });
+    var ss = viewSecs(dr).filter(function (s) { return s.phase === ph[0] && secOn(s, d); }).map(function (s) { return { id: s.id, title: L(s.title) }; });
     if (ph[0] === 'post') ss.push({ id: 'fu', title: t('pc.followup') });
     nav.push([ph[0], ss]);
   });
@@ -1406,7 +1423,8 @@ function renderPatient() {
   h += '<section class="card" id="sec-links"><h3>' + t('lk.title') + '</h3>' + (dr.isNew ? '<p class="hint">' + t(dr.linkRec ? 'lk.willLink' : 'lk.saveFirst') + '</p>' : '<p class="hint">' + t('lk.hint') + '</p>' + linkedBlock(p.id, true)) + '</section>';
   var mods = MODULES.filter(function (m) { return !m.last; }).concat(MODULES.filter(function (m) { return m.last; }));
   PHASES.forEach(function (ph, pi) {
-    var ss = SECTIONS.filter(function (s) { return s.phase === ph[0] && secOn(s, d); });
+    var ss = viewSecs(dr).filter(function (s) { return s.phase === ph[0] && secOn(s, d); });
+    h += ctxCustomCard(dr, ph[0]);
     if (!ss.length && ph[0] !== 'post') return;
     h += '<div class="phase ph-' + ph[0] + '"><span class="ph-n">' + (pi + 1) + '</span><div><b>' + t(ph[1]) + '</b><span>' + t(ph[2]) + '</span></div></div>';
     ss.forEach(function (s) {
@@ -1661,7 +1679,8 @@ function openPatient(id, preset) {
   }
   var members = {};
   DB.registries.forEach(function (r) { if (r.mode === 'manual') members[r.id] = r.members.indexOf(p.id) >= 0 || (isNew && S.view === 'reg:' + r.id); });
-  S.drawer = { p: clone(p), isNew: isNew, members: members, full: true, orig: isNew ? null : clone(p), unl: {} }; S.menu = null; S.cdraft = ''; S.histAll = false; S.qview = null;
+  var cxr = S.view.indexOf('reg:') === 0 ? regOf(S.view.slice(4)) : null;
+  S.drawer = { p: clone(p), isNew: isNew, members: members, full: true, orig: isNew ? null : clone(p), unl: {}, ctx: cxr && (cxr.fset || (cxr.custom || []).length) ? cxr.id : null }; S.menu = null; S.cdraft = ''; S.histAll = false; S.qview = null;
   render(); var b = root.querySelector('.dbody'); if (b) b.scrollTop = 0;
 }
 function savePatient() {
@@ -1740,6 +1759,7 @@ function saveEditor() {
     render(); return;
   }
   DB.registries = DB.registries.map(function (r) { return r.id === e.id ? e : r; });
+  if (e.impData) impDataApply(e);
   S.edit = null; S.view = 'reg:' + e.id; UI.view = S.view; if (e.kind === 'study' && isNew) { UI.stab = 'pts'; UI.stabFor = e.id; } saveUI();
   if (save()) toast(e.kind === 'study' ? (isNew ? LL('Исследование создано: ', 'Study created: ') + e.proto.no : LL('Протокол сохранён', 'Protocol saved')) : isNew ? t('toast.regCreated') : t('toast.regSaved')); render();
 }
@@ -2434,7 +2454,7 @@ function stStatusPill(pr) { return '<span class="st st-' + (ST_ST_CLS[pr.status]
 function progressBar(n, of, cls) { var w = of ? Math.min(100, Math.round(n / of * 100)) : 0; return '<div class="pbar' + (cls ? ' ' + cls : '') + '"><span style="width:' + w + '%"></span></div>'; }
 
 /* protocol editor (5 steps) */
-var ST_STEPS = [['Параметры', 'Parameters'], ['Синопсис', 'Synopsis'], ['Контрольные точки', 'Checkpoints'], ['Участники', 'Team'], ['Набор и рандомизация', 'Enrolment and randomisation']];
+var ST_STEPS = [['Параметры', 'Parameters'], ['Синопсис', 'Synopsis'], ['Контрольные точки', 'Checkpoints'], ['Участники', 'Team'], ['Набор и рандомизация', 'Enrolment and randomisation'], ['Поля и данные', 'Fields and data']];
 function edF(lab, path, type, o) {
   o = o || {}; var v = getPath(S.edit, path), id = 'e_' + path.replace(/\./g, '_'), wide = o.wide ? ' wide' : '', fl = has(v) ? ' filled' : '';
   var lb = '<label for="' + id + '">' + esc(lab) + (o.req ? ' <i class="req">*</i>' : '') + '</label>';
@@ -2484,10 +2504,119 @@ function edWho(e) {
   var preview = DB.patients.filter(function (p) { return inReg(p, e); }).length;
   return h + '<p class="hint">' + t('ed.matches') + ' <b>' + plural(preview, 'pl.patient') + '</b></p></section>';
 }
+/* ======================= Поля регистра / научной работы ======================= */
+function edFields(e) {
+  var sel = !!e.fset, fs = e.fset || [], q = String(S.fsq || '').trim().toLowerCase();
+  var h = '<section class="card edfields"><h3>' + LL('Поля этой работы', 'Fields of this work') + '</h3><p class="hint">' + LL('Карточка, открытая из этого раздела, покажет только выбранные поля карточки и свои поля ниже. Данные общие: заполненное в карточке пациента видно здесь, и наоборот.', 'A record opened from here shows only the chosen fields plus the own fields below. Data are shared with the main record.') + '</p>';
+  h += '<div class="seg edfs-mode"><button type="button" class="' + (sel ? '' : 'on') + '" data-act="fsetmode" data-v="all">' + LL('Все поля карточки', 'All record fields') + '</button><button type="button" class="' + (sel ? 'on' : '') + '" data-act="fsetmode" data-v="sel">' + LL('Только выбранные', 'Only selected') + (sel ? ' · ' + fs.length : '') + '</button></div>';
+  h += '<div class="edfs-imp"><button type="button" class="btn small" data-act="fimp">' + ico('upload', 15) + LL('Импорт полей из Excel, CSV или Notion', 'Import fields from Excel, CSV or Notion') + '</button><span class="hint">' + LL('Первая строка файла: названия столбцов. Похожие на поля карточки встанут на свои места, остальные станут своими полями. Из Notion: ⋯ → Export → Markdown & CSV.', 'First row: column names.') + '</span></div>';
+  if (sel) {
+    h += '<input type="search" class="edfs-q" data-sb="fsq" data-rr="1" value="' + esc(S.fsq || '') + '" placeholder="' + LL('Найти поле', 'Find a field') + '">';
+    h += '<div class="edfs">' + SECTIONS.map(function (sc) {
+      var fl = sc.fields.filter(function (x) { return !q || L(x.label).toLowerCase().indexOf(q) >= 0 || L(sc.title).toLowerCase().indexOf(q) >= 0; }); if (!fl.length) return '';
+      var n = sc.fields.filter(function (x) { return fs.indexOf(x.id) >= 0; }).length, op = q || (S.fsOpen || {})[sc.id];
+      var r = '<div class="edfs-s' + (op ? ' open' : '') + '"><div class="edfs-h"><button type="button" class="edfs-t" data-act="fsopen" data-id="' + sc.id + '">' + ico('right', 13) + esc(L(sc.title)) + '<em>' + n + ' / ' + sc.fields.length + '</em></button><button type="button" class="linkbtn" data-act="fsec" data-id="' + sc.id + '">' + (n === sc.fields.length ? LL('снять все', 'none') : LL('весь раздел', 'whole section')) + '</button></div>';
+      if (op) r += '<div class="edfs-c">' + fl.map(function (x) { var on = fs.indexOf(x.id) >= 0; return '<button type="button" class="chip' + (on ? ' on' : '') + '" data-act="ftog" data-id="' + x.id + '">' + esc(L(x.label)) + '</button>'; }).join('') + '</div>';
+      return r + '</div>';
+    }).join('') + '</div>';
+  }
+  if (e.impData) h += '<p class="hint ok">' + ico('check', 14) + LL('Данные из файла подготовлены: строк ', 'Data prepared: rows ') + e.impData.rows.length + LL('. Они загрузятся в карточки при сохранении', '. They will load on save') + (regOf(e.id) ? '' : LL(' и одобрении', ' and approval')) + '.</p>';
+  return h + '</section>';
+}
+function fimpGuessType(vals) {
+  vals = vals.filter(function (v) { return has(v) && String(v).trim() !== ''; }).map(function (v) { return String(v).trim(); });
+  if (!vals.length) return { type: 'text' };
+  if (vals.every(function (v) { return /^(да|нет|yes|no|0|1|true|false|\+|-)$/i.test(v); })) return { type: 'yn' };
+  if (vals.every(function (v) { return /^\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4}$|^\d{4}-\d{2}-\d{2}/.test(v); })) return { type: 'date' };
+  if (vals.every(function (v) { return /^-?\d+([.,]\d+)?$/.test(v); })) return { type: 'num' };
+  var u = vals.filter(function (v, i) { return vals.indexOf(v) === i; });
+  if (u.length <= 8 && vals.length >= u.length * 2 && u.every(function (v) { return v.length <= 40; })) return { type: 'sel', opts: u.join(', ') };
+  return { type: 'text' };
+}
+function fimpNorm(s) { return String(s || '').toLowerCase().replace(/[a-z]/g, function (c) { return { a: 'а', c: 'с', e: 'е', o: 'о', p: 'р', x: 'х', y: 'у', m: 'м', k: 'к', t: 'т', h: 'н', b: 'в' }[c] || c; }).replace(/ё/g, 'е').replace(/\([^)]*\)/g, ' ').replace(/[^а-яa-z0-9]+/g, ' ').trim(); }
+function fimpLev(a, b) { if (Math.abs(a.length - b.length) > 3) return 9; var d = []; for (var i = 0; i <= a.length; i++) { d[i] = [i]; } for (var j = 1; j <= b.length; j++) d[0][j] = j; for (i = 1; i <= a.length; i++) for (j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
+function fimpMatch(h, used) {
+  var all = []; SECTIONS.forEach(function (sc) { sc.fields.forEach(function (x) { all.push(x); }); });
+  var n = fimpNorm(h); if (!n) return null;
+  var ex = all.filter(function (x) { return fimpNorm(x.label[0]) === n || fimpNorm(x.label[1]) === n || x.id.toLowerCase() === String(h).trim().toLowerCase(); });
+  var free = ex.filter(function (x) { return !used[x.id]; }); if (free.length) return free[0].id; if (ex.length) return null;
+  var best = null, bd = 9; all.forEach(function (x) { if (used[x.id]) return; var ln = fimpNorm(x.label[0]); if (ln.length < 6) return; var dd = fimpLev(n, ln); if (dd < bd) { bd = dd; best = x; } });
+  return best && bd <= 2 ? best.id : null;
+}
+function fimpStart(file, target) {
+  var isX = /\.xlsx$/i.test(file.name), rd = new FileReader();
+  rd.onload = function () {
+    var pr = isX ? readXlsx(rd.result) : Promise.resolve(readCsv(String(rd.result).replace(/\t/g, ',')));
+    pr.then(function (rows) {
+      rows = rows.filter(function (r) { return r && r.some(function (v) { return has(v) && String(v).trim() !== ''; }); });
+      if (!rows.length) { toast(LL('В файле нет строк', 'Empty file')); return; }
+      /* шапка может быть в две строки (разделы сверху, поля под ними): берём строку с наибольшим числом заполненных ячеек среди первых трёх */
+      var hi = 0; for (var k = 1; k < Math.min(3, rows.length); k++) if (rows[k].filter(function (v) { return has(v); }).length > rows[hi].filter(function (v) { return has(v); }).length * 1.3) hi = k;
+      var head = rows[hi], data = rows.slice(hi + 1);
+      var used = {};
+      var map = head.map(function (h0, ci) {
+        var hname = String(h0 == null ? '' : h0).trim(); if (!hname) return null;
+        var fid = fimpMatch(hname, used), col = data.map(function (r) { return r[ci]; });
+        if (fid) { used[fid] = 1; return { h: hname, ci: ci, t: 'b:' + fid, sample: col.filter(has).slice(0, 3) }; }
+        if (/^(№|n|no|#)$/i.test(hname)) return { h: hname, ci: ci, t: 'skip', sample: [] };
+        var g = fimpGuessType(col); return { h: hname, ci: ci, t: 'new', type: g.type, opts: g.opts || '', sample: col.filter(has).slice(0, 3) };
+      }).filter(Boolean);
+      S.fimp = { fname: file.name, target: target, map: map, rows: data, data: data.length > 0 }; render();
+    }).catch(function () { toast(LL('Не удалось прочитать файл. Нужен .xlsx или .csv', 'Could not read the file')); });
+  };
+  if (isX) rd.readAsArrayBuffer(file); else rd.readAsText(file, 'utf-8');
+}
+function renderFimp() {
+  var o = S.fimp, nB = o.map.filter(function (m) { return /^b:/.test(m.t); }).length, nN = o.map.filter(function (m) { return m.t === 'new'; }).length;
+  var opts = '<option value="skip">' + LL('Пропустить', 'Skip') + '</option><option value="new">' + LL('Новое своё поле', 'New own field') + '</option>' + SECTIONS.map(function (sc) { return '<optgroup label="' + esc(L(sc.title)) + '">' + sc.fields.map(function (x) { return '<option value="b:' + x.id + '">' + esc(L(x.label)) + '</option>'; }).join('') + '</optgroup>'; }).join('');
+  var h = '<div class="dim" data-act="fimpclose"></div><section class="modal xmodal wide" role="dialog" aria-modal="true"><div class="dhead"><div><div class="dh-kicker">' + LL('Импорт полей', 'Import fields') + '</div><div class="dh-title">' + esc(o.fname) + '</div></div><button type="button" class="iconbtn" data-act="fimpclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
+  h += '<div class="kpis sm">' + kpi(o.map.length, LL('столбцов', 'columns')) + kpi(nB, LL('встанут в поля карточки', 'to record fields')) + kpi(nN, LL('станут своими полями', 'new own fields')) + kpi(o.rows.length, LL('строк данных', 'data rows')) + '</div>';
+  h += '<p class="hint">' + LL('Проверьте, куда встанет каждый столбец. Поле карточки выбирается из списка, «Новое своё поле» появится только в этой работе.', 'Check where each column goes.') + '</p><div class="tablewrap"><table class="grid fimpt"><thead><tr><th>' + LL('Столбец файла', 'File column') + '</th><th>' + LL('Примеры', 'Examples') + '</th><th>' + LL('Куда', 'Target') + '</th><th>' + LL('Тип нового поля', 'New field type') + '</th></tr></thead><tbody>';
+  o.map.forEach(function (m, i) {
+    h += '<tr><td class="strong">' + esc(m.h) + '</td><td class="muted small">' + esc(m.sample.map(String).join('; ').slice(0, 80)) + '</td><td><select data-sb="fimp.map.' + i + '.t" data-rr="1">' + opts.replace('value="' + m.t + '"', 'value="' + m.t + '" selected') + '</select></td><td>' + (m.t === 'new' ? '<select data-sb="fimp.map.' + i + '.type" data-rr="1">' + CF_TYPES.map(function (z) { return '<option value="' + z[0] + '"' + (z[0] === m.type ? ' selected' : '') + '>' + t(z[1]) + '</option>'; }).join('') + '</select>' : '') + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  if (o.rows.length) h += '<label class="chk big"><input type="checkbox" data-sb="fimp.data"' + (o.data ? ' checked' : '') + '><span><b>' + LL('Загрузить и данные: ', 'Also load data: ') + o.rows.length + LL(' строк', ' rows') + '</b><em>' + LL('Пациенты ищутся по ИИН, затем по № ИБ, затем по ФИО. Найденные карточки дополняются (заполненное не перезаписывается), ненайденные создаются. Все попадут в эту работу.', 'Patients matched by IIN, case no., then name; existing values are not overwritten.') + '</em></span></label>';
+  h += '</div><div class="dfoot"><div></div><div class="actions"><button type="button" class="btn" data-act="fimpclose">' + t('b.cancel') + '</button><button type="button" class="btn primary" data-act="fimpgo">' + LL('Применить', 'Apply') + '</button></div></div></section>';
+  return h;
+}
+function fimpApply() {
+  var o = S.fimp, e = S.edit; if (!o || !e) { S.fimp = null; render(); return; }
+  var fs = e.fset ? e.fset.slice() : [], cmap = [];
+  o.map.forEach(function (m) {
+    if (/^b:/.test(m.t)) { var id = m.t.slice(2); if (fs.indexOf(id) < 0) fs.push(id); cmap.push({ ci: m.ci, k: 'b', id: id }); }
+    else if (m.t === 'new') { var ex = (e.custom || []).filter(function (c) { return c.label.trim().toLowerCase() === m.h.toLowerCase(); })[0]; if (!ex) { ex = { id: uid('c'), label: m.h, type: m.type || 'text', opts: m.opts || '', phase: 'pre' }; e.custom.push(ex); } cmap.push({ ci: m.ci, k: 'c', id: ex.id, type: ex.type }); }
+  });
+  ['fio', 'iin', 'ib'].forEach(function (k) { if (fs.indexOf(k) < 0 && cmap.some(function (c) { return c.k === 'b'; })) fs.unshift(k); });
+  e.fset = fs;
+  if (o.data && o.rows.length) e.impData = { fname: o.fname, map: cmap, rows: o.rows };
+  S.fimp = null; toast(LL('Поля применены. Сохраните, чтобы изменения вступили в силу.', 'Fields applied. Save to keep them.')); render();
+}
+function normFio(s) { return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[^а-яa-zәіңғүұқөһ ]/g, ' ').replace(/\s+/g, ' ').trim(); }
+function impDataApply(r) {
+  var im = r.impData; if (!im) return; delete r.impData;
+  var ts = nowIso(), nNew = 0, nUpd = 0, nConf = 0;
+  im.rows.forEach(function (row) {
+    var d = {}, c = {};
+    im.map.forEach(function (m) { var v = row[m.ci]; if (!has(v) || String(v).trim() === '') return; if (m.k === 'b') { var cv = convVal(FIELD[m.id], v); if (cv !== undefined && !(Array.isArray(cv) && !cv.length)) d[m.id] = cv; } else { var x = { type: m.type === 'yn' ? 'seg' : m.type, options: YN }; c[m.id] = m.type === 'yn' ? (/^(да|yes|1|true|\+)$/i.test(String(v).trim()) ? 'Да' : 'Нет') : String(convVal(x, v)); } });
+    if (!Object.keys(d).length && !Object.keys(c).length) return;
+    var p = null;
+    if (d.iin) p = DB.patients.filter(function (x) { return String(x.d.iin || '') === String(d.iin).trim(); })[0];
+    if (!p && d.ib) p = DB.patients.filter(function (x) { return String(x.d.ib || '').trim() === String(d.ib).trim(); })[0];
+    if (!p && d.fio) { var nf = normFio(d.fio); p = DB.patients.filter(function (x) { return normFio(x.d.fio) === nf && (!d.dob || !x.d.dob || x.d.dob === d.dob); })[0]; }
+    if (!p) { p = { id: 'CR-' + String(DB.seq).padStart(4, '0'), created: ts, d: {}, fu: {}, custom: {}, log: [{ ts: ts, by: me(), act: 'import', note: im.fname + ' → ' + regName(r), ch: [] }] }; DB.seq++; DB.patients.push(p); nNew++; } else nUpd++;
+    Object.keys(d).forEach(function (k) { if (!has(p.d[k])) p.d[k] = d[k]; else if (JSON.stringify(p.d[k]) !== JSON.stringify(d[k])) nConf++; });
+    p.custom = p.custom || {}; p.custom[r.id] = Object.assign({}, p.custom[r.id] || {}, c);
+    if (r.kind === 'study') { p.enroll = p.enroll || {}; if (!p.enroll[r.id]) { var nx = nextPatNo(r); p.enroll[r.id] = { no: nx.no, date: isoOf(new Date()), by: me() }; stProto(r).seq = nx.n; } }
+    else if (r.mode === 'manual' && r.members.indexOf(p.id) < 0) r.members.push(p.id);
+  });
+  toast(LL('Данные загружены: новых карточек ', 'Data loaded: new ') + nNew + LL(', дополнено ', ', updated ') + nUpd + (nConf ? LL(', расхождений с уже заполненным (не перезаписано): ', ', conflicts kept: ') + nConf : ''));
+}
 function edCustom(e) {
   var h = '<section class="card"><h3>' + t('ed.custom') + '</h3><p class="hint">' + t('ed.customHint') + '</p><div class="cfs">';
   e.custom.forEach(function (c, i) {
     h += '<div class="cfrow"><input type="text" placeholder="' + t('ed.cfName') + '" aria-label="' + t('ed.cfName') + '" data-ebind="custom.' + i + '.label" value="' + esc(c.label) + '"><select aria-label="' + t('ed.cfType') + '" data-ebind="custom.' + i + '.type">' + CF_TYPES.map(function (z) { return '<option value="' + z[0] + '"' + (z[0] === c.type ? ' selected' : '') + '>' + t(z[1]) + '</option>'; }).join('') + '</select>';
+    h += '<select aria-label="' + LL('Этап', 'Stage') + '" data-ebind="custom.' + i + '.phase" title="' + LL('На какой вкладке карточки показывать', 'Card tab') + '">' + [['pre', LL('До операции', 'Pre-op')], ['op', LL('Операция', 'Surgery')], ['post', LL('После операции', 'Post-op')]].map(function (z) { return '<option value="' + z[0] + '"' + ((c.phase || 'pre') === z[0] ? ' selected' : '') + '>' + z[1] + '</option>'; }).join('') + '</select>';
     h += c.type === 'sel' ? '<input type="text" placeholder="' + t('ed.cfOpts') + '" aria-label="' + t('ed.cfOpts') + '" data-ebind="custom.' + i + '.opts" value="' + esc(c.opts || '') + '">' : '<span></span>';
     h += '<div class="cfflags"><button type="button" class="flag' + (c.req ? ' on' : '') + '" data-act="cflag" data-i="' + i + '" data-k="req" title="' + LL('Без него карточку нельзя сохранить', 'Record cannot be saved without it') + '">' + LL('обязательное', 'required') + '</button><button type="button" class="flag' + (c.uniq ? ' on' : '') + '" data-act="cflag" data-i="' + i + '" data-k="uniq" title="' + LL('Значение не может повторяться у двух пациентов', 'Value cannot repeat across patients') + '">' + LL('уникальное', 'unique') + '</button></div>';
     h += '<button type="button" class="iconbtn" aria-label="' + t('ed.cfDel') + '" data-act="cdel" data-i="' + i + '">' + ico('x', 18) + '</button></div>';
@@ -2506,7 +2635,7 @@ function renderEditor() {
   var opts = [['', t('ed.top')]];
   (function walk(pid, dep) { kids(pid, false).forEach(function (r) { if (r.id === e.id) return; opts.push([r.id, new Array(dep + 1).join('   ') + regName(r)]); walk(r.id, dep + 1); }); })(null, 0);
   h += '<div class="fld wide"><label for="regpar">' + t('ed.parent') + '</label><select id="regpar" data-ebind="parent">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + ((e.parent || '') === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select><p class="hint">' + t('ed.parentHint') + '</p></div></section>';
-  h += edWho(e) + edCustom(e) + warnBox(edWarnings(e));
+  h += edWho(e) + edFields(e) + edCustom(e) + warnBox(edWarnings(e));
   h += '</div><div class="dfoot"><div class="actions">' + (e.isNew ? '' : '<button type="button" class="btn danger" data-act="edelete">' + t('ed.delete') + '</button>') + '<button type="button" class="btn ghost" data-act="tplsave">' + ico('copy', 15) + LL('Сохранить как шаблон', 'Save as template') + '</button></div><div class="actions"><button type="button" class="btn" data-act="eclose">' + t('b.cancel') + '</button><button type="button" class="btn primary" data-act="esave">' + (e.isNew ? t('b.create') : t('b.save')) + '</button></div></div></section>';
   return h;
 }
@@ -2576,10 +2705,11 @@ function renderStudyEditor() {
       h += '</div>' + (randLocked ? '' : '<button type="button" class="btn small" data-act="elistadd" data-list="proto.rand.arms" data-tpl=\'{"name":"","limit":""}\'>' + ico('plus', 15) + LL('Добавить группу', 'Add arm') + '</button>');
       h += '<div class="xlab">' + LL('Стратификация: факторы', 'Stratification factors') + '</div><div class="chips">' + RULE_FIELDS.filter(function (x) { return x.type === 'sel' || x.type === 'seg'; }).map(function (x) { var on = (pr.rand.strat || []).indexOf(x.id) >= 0; return '<button type="button" class="chip' + (on ? ' on' : '') + '" data-act="estrat" data-f="' + x.id + '"' + (randLocked ? ' disabled' : '') + '>' + esc(L(x.label)) + '</button>'; }).join('') + '</div><p class="hint">' + LL('Стратифицированная блоковая рандомизация.', 'Stratified block randomisation.') + '</p>';
     } else h += '</div>';
-    h += '</section>' + edWho(e) + edCustom(e);
+    h += '</section>' + edWho(e);
   }
-  h += warnBox(step === 4 ? edWarnings(e) : []);
-  h += '</div><div class="dfoot"><div class="actions">' + (e.isNew ? '' : '<button type="button" class="btn danger" data-act="edelete">' + t('ed.delete') + '</button>') + '<button type="button" class="btn ghost" data-act="tplsave">' + ico('copy', 15) + LL('Сохранить как шаблон', 'Save as template') + '</button></div><div class="actions">' + (step ? '<button type="button" class="btn" data-act="estep" data-v="' + (step - 1) + '">' + ico('left', 16) + LL('Назад', 'Back') + '</button>' : '') + (step < 4 ? '<button type="button" class="btn" data-act="estep" data-v="' + (step + 1) + '">' + LL('Далее', 'Next') + ico('right', 16) + '</button>' : '') + '<button type="button" class="btn primary" data-act="esave">' + (e.isNew ? LL('Создать исследование', 'Create study') : t('b.save')) + '</button></div></div></section>';
+  if (step === 5) h += edFields(e) + edCustom(e);
+  h += warnBox(step === 5 ? edWarnings(e) : []);
+  h += '</div><div class="dfoot"><div class="actions">' + (e.isNew ? '' : '<button type="button" class="btn danger" data-act="edelete">' + t('ed.delete') + '</button>') + '<button type="button" class="btn ghost" data-act="tplsave">' + ico('copy', 15) + LL('Сохранить как шаблон', 'Save as template') + '</button></div><div class="actions">' + (step ? '<button type="button" class="btn" data-act="estep" data-v="' + (step - 1) + '">' + ico('left', 16) + LL('Назад', 'Back') + '</button>' : '') + (step < 5 ? '<button type="button" class="btn" data-act="estep" data-v="' + (step + 1) + '">' + LL('Далее', 'Next') + ico('right', 16) + '</button>' : '') + '<button type="button" class="btn primary" data-act="esave">' + (e.isNew ? LL('Создать исследование', 'Create study') : t('b.save')) + '</button></div></div></section>';
   return h;
 }
 function applyTemplate(id) {
@@ -3951,6 +4081,7 @@ function render() {
   if (S.pick) h += renderPick();
   if (S.xport) h += renderExport();
   if (S.imp) h += renderImport();
+  if (S.fimp) h += renderFimp();
   if (S.cx) h += renderColExport();
   if (S.qs) h += renderQSched();
   if (S.qb) h += renderQB();
@@ -4350,6 +4481,14 @@ document.addEventListener('click', function (ev) {
     case 'aiproto': aiProtocol(); break;
     case 'aisum': aiSummary(S.drawer, '', false); break;
     case 'drnote': drNoteApply(); break;
+    case 'ctxall': if (S.drawer) { S.drawer.ctxAll = !S.drawer.ctxAll; render(); } break;
+    case 'fsetmode': if (S.edit) { if (g('v') === 'all') delete S.edit.fset; else S.edit.fset = S.edit.fset || []; render(); } break;
+    case 'ftog': if (S.edit) { var fs0 = S.edit.fset || (S.edit.fset = []), fi0 = fs0.indexOf(g('id')); if (fi0 >= 0) fs0.splice(fi0, 1); else fs0.push(g('id')); render(); } break;
+    case 'fsec': if (S.edit) { var sec0 = SECTIONS.filter(function (z) { return z.id === g('id'); })[0], fs1 = S.edit.fset || (S.edit.fset = []), allIn = sec0.fields.every(function (x) { return fs1.indexOf(x.id) >= 0; }); sec0.fields.forEach(function (x) { var k = fs1.indexOf(x.id); if (allIn && k >= 0) fs1.splice(k, 1); if (!allIn && k < 0) fs1.push(x.id); }); render(); } break;
+    case 'fsopen': S.fsOpen = S.fsOpen || {}; S.fsOpen[g('id')] = !S.fsOpen[g('id')]; render(); break;
+    case 'fimp': { var fi3 = document.createElement('input'); fi3.type = 'file'; fi3.accept = '.xlsx,.csv,.tsv,.txt'; fi3.onchange = function () { if (fi3.files[0]) fimpStart(fi3.files[0], g('v') || 'edit'); }; fi3.click(); break; }
+    case 'fimpclose': S.fimp = null; render(); break;
+    case 'fimpgo': fimpApply(); break;
     case 'grptog': if (S.drawer) { var gk = g('id'), gs = SECTIONS.filter(function (z) { return z.id === gk.split(':')[0]; })[0], gcur = root.querySelector('[data-act="grptog"][data-id="' + gk + '"]'); S.drawer.grpOpen = S.drawer.grpOpen || {}; S.drawer.grpOpen[gk] = !(gcur && gcur.getAttribute('aria-expanded') === 'true'); render(); } break;
     case 'drnundo': drNoteUndo(g('id'), g('f')); break;
     case 'copysum': { var ts = root.querySelector('#sumText'); if (!ts) break; var tx0 = ts.value, dn = function () { toast(LL('Резюме скопировано', 'Summary copied')); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tx0).then(dn, function () { ts.select(); document.execCommand('copy'); dn(); }); else { ts.select(); document.execCommand('copy'); dn(); } break; }
