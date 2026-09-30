@@ -1635,7 +1635,7 @@ function savePatient() {
   if (dr.linkRec) { var lr = DB.cols[dr.linkRec.k].filter(function (x) { return x.id === dr.linkRec.id; })[0]; if (lr) lr.pid = p.id; }
   if (dr.qlAttach) { var qr0 = (QL.resp || []).filter(function (x) { return x.id === dr.qlAttach; })[0]; if (qr0) { qlAttach(qr0, p); if (CLOUD.db) CLOUD.db.collection('qresp').doc(qr0.id).update({ status: 'done', pid: p.id, doneAt: nowIso(), doneBy: me() }).catch(function () {}); QL.resp = QL.resp.filter(function (x) { return x.id !== qr0.id; }); } }
   if (dr.sumEdit != null && dr.sumEdit !== ((p.summary || {}).text || '')) p.summary = { text: dr.sumEdit, at: nowIso(), by: me(), ai: false, edited: true, hash: sumHash(p) };
-  var needSum = aiReady() && !dr.sumAI && (!p.summary || p.summary.hash !== sumHash(p));
+  var needSum = sumAuto() && aiReady() && !dr.sumAI && (!p.summary || p.summary.hash !== sumHash(p));
   var tgt = dr.target && dr.target !== 'all' ? regOf(dr.target) : null;
   S.drawer = null; if (save()) toast(tgt ? t('toast.savedTo', { n: pName(p), r: regName(tgt) }) : t('toast.saved', { n: pName(p) })); render();
   if (needSum) aiSummaryBg(p.id);
@@ -3528,7 +3528,7 @@ function drNoteApply() {
     note.ch = r.filled.map(function (x) { return { id: x.id, label: x.label, v: x.v, prev: x.prev }; });
     dr.noteBusy = false; render();
     toast(note.ch.length ? LL('Исправлено полей: ', 'Fields changed: ') + note.ch.length + LL('. Не забудьте сохранить карточку.', '. Remember to save.') : LL('Поля не изменились, комментарий учтён в резюме', 'No field changes; note used in the summary'));
-    aiSummary(dr, LL('НОВЫЙ КОММЕНТАРИЙ ВРАЧА (важнее всего): ', 'NEW DOCTOR NOTE: ') + text, true);
+    sumLater(dr, LL('комментарий врача', 'doctor note'), text);
   }).catch(function (e) { if (S.drawer !== dr) return; dr.noteBusy = false; dr.noteErr = LL('ИИ не ответил: ', 'AI failed: ') + ((e && e.message) || e) + LL('. Комментарий сохранён, можно нажать «Обновить с ИИ».', '. Note kept.'); render(); });
 }
 function drNoteUndo(nid, fid) {
@@ -3567,7 +3567,7 @@ function sumCard(dr) {
   var p = dr.p, sm = p.summary || null, busy = !!dr.sumAI, txt = dr.sumEdit != null ? dr.sumEdit : (sm && sm.text) || buildHistory(p);
   var stale = sm && sm.hash !== sumHash(p);
   var h = '<section class="card proto" id="sec-proto"><h3>' + t('pr.title') + '<span class="h3-r">' + (dxAiAvail() ? '<button type="button" class="btn small ai" data-act="aisum"' + (busy ? ' disabled' : '') + '>' + ico('sparkle', 15) + (busy ? LL('Пишу…', 'Writing…') : LL('Обновить с ИИ', 'Update with AI')) + '</button>' : '') + '<button type="button" class="btn small primary" data-act="copysum">' + ico('file', 15) + LL('Копировать', 'Copy') + '</button></span></h3>';
-  h += '<p class="hint">' + (sm ? LL('Обновлено ', 'Updated ') + (function (z) { return ('0' + z.getDate()).slice(-2) + '.' + ('0' + (z.getMonth() + 1)).slice(-2) + '.' + z.getFullYear() + ' ' + ('0' + z.getHours()).slice(-2) + ':' + ('0' + z.getMinutes()).slice(-2); })(new Date(sm.at)) + (sm.ai ? LL(' · ИИ', ' · AI') : LL(' · вручную', ' · manual')) + (stale ? LL(' · в карточке есть новые данные, резюме обновится после сохранения', ' · new data, will update after saving') : '') + '. ' : LL('Черновик собран из полей карточки. ', 'Draft built from the record fields. ')) + LL('Резюме обновляется само после загрузки документа и после сохранения карточки. Текст можно править: ваши правки ИИ сохранит.', 'Updates automatically after a document upload and after saving; your edits are kept.') + '</p>';
+  h += '<p class="hint">' + (sm ? LL('Обновлено ', 'Updated ') + (function (z) { return ('0' + z.getDate()).slice(-2) + '.' + ('0' + (z.getMonth() + 1)).slice(-2) + '.' + z.getFullYear() + ' ' + ('0' + z.getHours()).slice(-2) + ':' + ('0' + z.getMinutes()).slice(-2); })(new Date(sm.at)) + (sm.ai ? LL(' · ИИ', ' · AI') : LL(' · вручную', ' · manual')) + '. ' : LL('Черновик собран из полей карточки. ', 'Draft built from the record fields. ')) + ((p.sumQueue || []).length || stale ? '<b class="sum-new">' + LL('Есть новые сведения', 'New information') + ((p.sumQueue || []).length ? ' (' + p.sumQueue.map(function (x) { return x.kind; }).join(', ') + ')' : '') + LL(': нажмите «Обновить с ИИ». </b>', ': press Update with AI. </b>') : '') + (sumAuto() ? LL('С ИИ центра резюме обновляется само. ', 'With the centre AI the summary updates itself. ') : LL('Резюме обновляется только по кнопке, чтобы не тратить токены. ', 'Updated only by the button to save tokens. ')) + LL('Текст можно править: ваши правки ИИ сохранит.', 'You can edit the text; your edits are kept.') + '</p>';
   h += '<textarea id="sumText" class="protoText' + (busy ? ' gen' : '') + '" data-sum="1" spellcheck="false">' + esc(txt) + '</textarea>';
   h += '<div class="actions" style="margin-top:10px">' + (dxAiAvail() ? '<button type="button" class="btn small ai" data-act="aisum"' + (busy ? ' disabled' : '') + '>' + ico('sparkle', 15) + (busy ? LL('Пишу…', 'Writing…') : LL('Обновить с ИИ', 'Update with AI')) + '</button>' : '<span class="muted small">' + LL('Подключите ИИ в шапке, чтобы резюме писал ИИ', 'Connect AI in the header') + '</span>') + '<button type="button" class="btn small" data-act="copysum">' + ico('file', 15) + LL('Копировать', 'Copy') + '</button></div>';
   h += drNotesHTML(dr) + '</section>';
@@ -3598,22 +3598,29 @@ function sumPrompt(p, extra) {
   var nts = (p.drNotes || []).map(function (n) { return locTs(n.ts) + ' (' + (n.by || '') + '): ' + n.text; }).join('\n');
   return 'ДАННЫЕ КАРТОЧКИ:\n' + patText(p, true) + (nts ? '\n\nКОММЕНТАРИИ ЛЕЧАЩЕГО ВРАЧА (важнее документов и старого резюме, обязательно учти каждый):\n' + nts : '') + (sm ? '\n\nПРЕДЫДУЩАЯ ВЕРСИЯ РЕЗЮМЕ (сохрани правки врача):\n' + sm : '') + (extra ? '\n\nНОВЫЙ ДОКУМЕНТ ИЛИ ИНФОРМАЦИЯ:\n' + String(extra).slice(0, 40000) : '') + '\n\nСначала мысленно датируй каждый документ и каждый факт, затем напиши обновлённое резюме истории болезни.';
 }
+/* облачный ИИ платный: резюме пишется только по кнопке, а новые сведения копятся в очереди; ИИ центра (локальный) обновляет сам */
+function sumAuto() { return AI.prov === 'local'; }
+function sumQueue(p, kind, text) { text = String(text || '').trim(); if (!text) return; var q = p.sumQueue || []; q.push({ at: nowIso(), kind: kind, text: text.slice(0, 40000) }); var tot = 0; for (var i = q.length - 1; i >= 0; i--) { tot += q[i].text.length; if (tot > 80000) { q = q.slice(i + 1); break; } } p.sumQueue = q; }
+function sumQueueText(p) { return (p.sumQueue || []).map(function (x) { return '--- ' + x.kind + ' (' + locTs(x.at) + ') ---\n' + x.text; }).join('\n\n'); }
+function sumLater(dr, kind, text) { if (!dr) return; sumQueue(dr.p, kind, text); if (sumAuto() && aiReady()) aiSummary(dr, '', true); else if (S.drawer === dr) render(); }
 function aiSummary(dr, extra, auto) {
   if (!dr || dr.sumAI) return;
   if (!aiReady()) { if (!auto) toast(AI.st === 'check' ? LL('ИИ ещё подключается, нажмите через пару секунд', 'AI is connecting, try again in a moment') : LL('ИИ не подключён: откройте переключатель ИИ в шапке', 'AI not connected')); return; }
   var p = dr.p; if (dr.sumEdit != null) p.summary = { text: dr.sumEdit, at: nowIso(), by: me(), ai: false, edited: true, hash: '' };
   dr.sumAI = true; render();
-  aiStream({ system: SUM_SYS, contents: [{ role: 'user', parts: [{ text: sumPrompt(p, extra) }] }], search: false, temp: 0.2,
+  var qn = (p.sumQueue || []).length, ex2 = [sumQueueText(p), extra].filter(Boolean).join('\n\n');
+  aiStream({ system: SUM_SYS, contents: [{ role: 'user', parts: [{ text: sumPrompt(p, ex2) }] }], search: false, temp: 0.2,
     chunk: function (txt) { var ta = root.querySelector('#sumText'); if (ta && S.drawer === dr) { ta.value = txt; } },
-    done: function (txt) { dr.sumAI = false; txt = sumOrder(String(txt || '').trim()); if (txt) { p.summary = { text: txt, at: nowIso(), by: me(), ai: true, hash: sumHash(p) }; dr.sumEdit = null; } if (S.drawer === dr) render(); else save(); if (!auto) toast(LL('Резюме обновлено', 'Summary updated')); },
+    done: function (txt) { dr.sumAI = false; txt = sumOrder(String(txt || '').trim()); if (txt) { p.summary = { text: txt, at: nowIso(), by: me(), ai: true, hash: sumHash(p) }; dr.sumEdit = null; if (p.sumQueue) p.sumQueue = p.sumQueue.slice(qn); if (!p.sumQueue || !p.sumQueue.length) delete p.sumQueue; } if (S.drawer === dr) render(); else save(); if (!auto) toast(LL('Резюме обновлено', 'Summary updated')); },
     fail: function (e) { dr.sumAI = false; if (S.drawer === dr) render(); if (!auto) toast(e); }
   });
 }
 function aiSummaryBg(pid) {
   var p = DB.patients.filter(function (x) { return x.id === pid; })[0]; if (!p || !aiReady()) return;
   var hs = sumHash(p);
-  aiStream({ system: SUM_SYS, contents: [{ role: 'user', parts: [{ text: sumPrompt(p, '') }] }], search: false, temp: 0.2, chunk: function () {},
-    done: function (txt) { txt = sumOrder(String(txt || '').trim()); if (!txt) return; var q = DB.patients.filter(function (x) { return x.id === pid; })[0]; if (!q) return; q.summary = { text: txt, at: nowIso(), by: me(), ai: true, hash: hs }; if (S.drawer && S.drawer.p.id === pid && !S.drawer.sumAI && S.drawer.sumEdit == null) S.drawer.p.summary = q.summary; save(); render(); },
+  var qn = (p.sumQueue || []).length;
+  aiStream({ system: SUM_SYS, contents: [{ role: 'user', parts: [{ text: sumPrompt(p, sumQueueText(p)) }] }], search: false, temp: 0.2, chunk: function () {},
+    done: function (txt) { txt = sumOrder(String(txt || '').trim()); if (!txt) return; var q = DB.patients.filter(function (x) { return x.id === pid; })[0]; if (!q) return; q.summary = { text: txt, at: nowIso(), by: me(), ai: true, hash: hs }; if (q.sumQueue) { q.sumQueue = q.sumQueue.slice(qn); if (!q.sumQueue.length) delete q.sumQueue; } if (S.drawer && S.drawer.p.id === pid && !S.drawer.sumAI && S.drawer.sumEdit == null) S.drawer.p.summary = q.summary; save(); render(); },
     fail: function () {}
   });
 }
@@ -5380,7 +5387,7 @@ function dxRun() {
     dx.rep = dxApply(o.res, dx.keep, o.local); dx.rep.src = o.src; dx.rep.fallback = o.fallback; dx.rep.file = dx.file.name; dx.rep.at = nowIso();
     var dr = S.drawer; dr.p.docsAI = (dr.p.docsAI || []).concat([{ name: dx.file.name, at: dx.rep.at, by: me(), src: o.src, n: dx.rep.filled.length }]);
     dx.step = 'rep'; render();
-    if (dx.usedAI && aiReady()) aiSummary(S.drawer, dx.docText || '', true);
+    sumLater(S.drawer, LL('документ «', 'document «') + dx.file.name + '»', dx.docText || '');
   }).catch(function (e) { if (!S.dx) return; dx.step = 'err'; dx.err = (e && e.message) || String(e); render(); });
 }
 /* пакетная загрузка: документы разбираются по очереди, результат складывается в одну сводку */
@@ -5422,7 +5429,7 @@ function dxRunMany() {
     all.src = srcs.join(' + ') || LL('без ИИ', 'no AI'); all.file = LL('документов: ', 'documents: ') + n; all.at = nowIso(); all.fallback = fails ? LL('Не обработано документов: ', 'Failed documents: ') + fails + LL('. Подробности в «Трудностях».', '. See difficulties.') : '';
     dx.rep = all; dx.docText = texts.join('\n\n'); dx.doc = { name: LL('пакет из ', 'batch of ') + n, kind: 'text', text: dx.docText.slice(0, 120000), images: [], scanned: false };
     dx.usedAI = anyAI; dx.ans = ''; dx.qa = []; dx.step = 'rep'; render();
-    if (anyAI && aiReady()) aiSummary(S.drawer, dx.docText, true);
+    sumLater(S.drawer, LL('пакет документов', 'document batch'), dx.docText);
   });
 }
 function dxRunManyAI(files, log) {
@@ -5445,7 +5452,7 @@ function dxRunManyAI(files, log) {
       if (fails.length) { r.fallback = LL('Не прочитаны: ', 'Unreadable: ') + fails.join('; '); r.issues = r.issues.concat(fails.map(function (f) { return { id: '', label: '', kind: 'unreadable', text: f }; })); }
       S.drawer.p.docsAI = (S.drawer.p.docsAI || []).concat(docs.map(function (d) { return { name: d.name, at: r.at, by: me(), src: r.src, n: 0 }; }));
       dx.rep = r; dx.docs = docs; dx.doc = null; dx.docText = allText; dx.usedAI = true; dx.ans = ''; dx.qa = []; dx.step = 'rep'; render();
-      if (aiReady()) aiSummary(S.drawer, allText, true);
+      sumLater(S.drawer, LL('пакет документов', 'document batch'), allText);
     });
   }).catch(function (e) { if (!S.dx) return; dx.step = 'err'; dx.err = LL('ИИ не ответил: ', 'AI failed: ') + ((e && e.message) || String(e)) + LL('. Карточка не изменена.', '. Record unchanged.'); render(); });
 }
@@ -5492,7 +5499,7 @@ function dxAnswer() {
     nr.same = old.same.filter(function (x) { return !ids[x.id]; });
     nr.doc = old.doc; nr.src = old.src + LL(' + ответы врача', ' + doctor\'s answers'); nr.fallback = old.fallback; nr.file = old.file; nr.at = nowIso();
     dx.qa.push(ans); dx.rep = nr; dx.ans = ''; dx.busyAns = false; render();
-    aiSummary(S.drawer, (dx.docText || '') + '\n\nОТВЕТЫ ВРАЧА НА ВОПРОСЫ ПО ДОКУМЕНТУ:\n' + ans, true);
+    sumLater(S.drawer, LL('ответы врача на вопросы по документу', 'doctor answers'), ans);
     toast(LL('Карточка дозаполнена по вашим ответам: ', 'Updated from your answers: ') + Object.keys(ids).length + LL(' полей', ' fields'));
   }).catch(function (e) { if (!S.dx) return; dx.busyAns = false; dx.ansErr = LL('ИИ не ответил: ', 'AI failed: ') + ((e && e.message) || e); render(); });
 }
