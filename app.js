@@ -33,6 +33,7 @@ function monthName(y, m) { var s = new Date(y, m, 1).toLocaleDateString(locale()
 function wdNames() { var base = new Date(2024, 0, 1); var out = []; for (var i = 0; i < 7; i++) { var d = new Date(base); d.setDate(1 + i); var s = d.toLocaleDateString(locale(), { weekday: 'short' }); out.push(s.charAt(0).toUpperCase() + s.slice(1).replace('.', '')); } return out; }
 
 var IC = {
+  alignl: '<path d="M4 6h16M4 10h10M4 14h16M4 18h10"/>', alignc: '<path d="M4 6h16M7 10h10M4 14h16M7 18h10"/>', alignr: '<path d="M4 6h16M10 10h10M4 14h16M10 18h10"/>', alignj: '<path d="M4 6h16M4 10h16M4 14h16M4 18h16"/>', grid: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/>', zot: '<path d="M5 5h14L5 19h14"/>',
   phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/>',
   dot: '<circle cx="12" cy="12" r="2.5"/>',
   wand: '<path d="M4 20 15 9M14 4v3M12.5 5.5h3M19 8v3M17.5 9.5h3M18 2v2M17 3h2"/><path d="m13 7 4 4"/>',
@@ -902,6 +903,7 @@ function renderRegistry() {
   else {
     h = '<div class="head"><div>' + (crumbs ? '<div class="crumbs">' + crumbs + '</div>' : '<div class="kicker">' + (reg && reg.sci ? LL('Научный регистр', 'Research registry') : LL('Регистр', 'Registry')) + '</div>') + '<h1>' + esc(reg ? regName(reg) : t('nav.allPatients')) + '</h1><p class="sub">' + esc(reg ? ruleText(reg) : t('reg.allSub')) + '</p></div>';
     h += '<div class="actions"><input class="search" type="search" data-act="search" placeholder="' + t('reg.search') + '" aria-label="' + t('reg.search') + '" value="' + esc(S.q) + '">';
+    if (reg && reg.kind !== 'track') h += '<button type="button" class="btn" data-act="wropen" data-id="' + reg.id + '" title="' + LL('Статьи, тезисы и литература по этому регистру', 'Papers and library for this registry') + '">' + ico('doc', 16) + LL('Рукописи', 'Manuscripts') + '</button>';
     if (reg) h += '<button type="button" class="btn" data-act="editreg" data-id="' + reg.id + '">' + t('reg.configure') + '</button>';
     h += '<div class="dd"><button type="button" class="btn" data-act="menu" data-id="xl">' + ico('sheet', 16) + 'Excel' + ico('down', 14) + '</button>' + (S.menu === 'xl' ? '<div class="pop right" role="menu"><button type="button" class="opt" data-act="csv">' + ico('download', 16) + LL('Экспорт в Excel', 'Export to Excel') + '</button><button type="button" class="opt" data-act="imp">' + ico('upload', 16) + LL('Импорт из Excel или CSV', 'Import from Excel or CSV') + '</button><div class="pop-note">' + LL('Экспорт с кодами и кодбуком, обезличенный вариант. Импорт обновляет карточки по ID или № ИБ.', 'Export with codes and codebook, anonymised option. Import updates records by ID or case no.') + '</div></div>' : '') + '</div>';
     h += '<button type="button" class="btn primary" data-act="newp">' + ico('plus', 16) + t('reg.addPatient') + '</button></div></div>';
@@ -2675,7 +2677,7 @@ function renderEditor() {
 function renderStudyEditor() {
   var e = S.edit, pr = e.proto, step = e._step || 0, randLocked = (pr.log || []).length > 0;
   var h = '<div class="dim" data-act="eclose"></div><section class="drawer full sted" role="dialog" aria-modal="true">';
-  h += '<div class="dhead"><div class="dh-main"><div class="dh-kicker">' + LL('Протокол исследования', 'Study protocol') + (pr.no ? ' · <span class="mono">' + esc(pr.no) + '</span>' : '') + '</div><div class="dh-title">' + esc((e.nameKey ? t(e.nameKey) : e.name) || LL('Новое исследование', 'New study')) + '</div></div><div class="dh-r">' + stStatusPill(pr) + '<button type="button" class="iconbtn" aria-label="' + t('a11y.close') + '" data-act="eclose">' + ico('x', 20) + '</button></div></div>';
+  h += '<div class="dhead"><div class="dh-main"><div class="dh-kicker">' + LL('Протокол исследования', 'Study protocol') + (pr.no ? ' · <span class="mono">' + esc(pr.no) + '</span>' : '') + '</div><div class="dh-title">' + esc((e.nameKey ? t(e.nameKey) : e.name) || LL('Новое исследование', 'New study')) + '</div></div><div class="dh-r">' + (e.isNew ? '' : '<button type="button" class="btn small" data-act="wropen" data-id="' + e.id + '" title="' + LL('Сохранить мастер и открыть совместную работу над текстом протокола, статьями и литературой', 'Save and open collaborative writing') + '">' + ico('doc', 15) + LL('Текст протокола, статьи, литература', 'Protocol text, papers, library') + '</button>') + stStatusPill(pr) + '<button type="button" class="iconbtn" aria-label="' + t('a11y.close') + '" data-act="eclose">' + ico('x', 20) + '</button></div></div>';
   h += '<div class="stepper">' + ST_STEPS.map(function (s, i) { return '<button type="button" class="step' + (i === step ? ' on' : '') + (i < step ? ' past' : '') + '" data-act="estep" data-v="' + i + '"><span class="sn">' + (i < step ? ico('check', 14) : i + 1) + '</span><span class="sl">' + L(s) + '</span></button>'; }).join('') + '</div><div class="dbody">';
   if (step === 0) {
     h += tplPicker(e);
@@ -2981,6 +2983,7 @@ function goNotif(i) {
   if (n.go[0] === 'v') setView(n.go[1]);
   else if (n.go[0] === 'p') openPatient(n.go[1]);
   else if (n.go[0] === 'r') openRec(n.go[1], n.go[2]);
+  else if (n.go[0] === 'w') wrOpen(n.go[1], n.go[2]);
   else if (n.go[0] === 's') { UI.stab = n.go[2]; UI.stabFor = n.go[1]; setView('reg:' + n.go[1]); }
 }
 
@@ -3139,7 +3142,7 @@ function cloudListen() {
       return;
     }
     CLOUD.cache = map; CLOUD.empty = false;
-    var busy = S.drawer || S.rec || S.edit || S.enr || S.fill || S.msEdit || S.msCite;
+    var busy = S.drawer || S.rec || S.edit || S.enr || S.fill || S.msEdit || S.msCite || S.cmNew || S.zot;
     DB = migrate(dbFromDocs(map));
     if (DB._dirty) { delete DB._dirty; if (can('edit')) save(); }
     try { localStorage.setItem(KEY_CLOUD, JSON.stringify(DB)); } catch (e) {}
@@ -4176,6 +4179,7 @@ function viewTitle() {
   if (v === 'studies') return t('nav.studies');
   if (v === 'q') return LL('Анкеты', 'Questionnaires');
   if (v === 'appr') return LL('На одобрении', 'Awaiting approval');
+  if (v === 'write') return LL('Рукописи и литература', 'Manuscripts and library');
   if (v.indexOf('col:') === 0 && COLS[v.slice(4)]) return L(COLS[v.slice(4)].title);
   if (v.indexOf('reg:') === 0) { var r = regOf(v.slice(4)); return r ? regName(r) : t('nav.allPatients'); }
   return '';
@@ -4194,7 +4198,8 @@ function render() {
   document.title = (SESSION ? viewTitle() + ' · ' : '') + 'NROC ' + LL('Колоректальный сектор', 'Colorectal');
   var keep = {};
   ['.dbody', '.content', '.tablewrap', '.side-in', '.fill-body', '.aip-body', '.cmd-l'].forEach(function (s) { keep[s] = [].map.call(root.querySelectorAll(s), function (el) { return el.scrollTop; }); });
-  var fa = document.activeElement, faId = fa && fa.id && (fa.id === 'ai-in' || fa.id === 'cmd-in') ? fa.id : null, faPos = faId ? fa.selectionStart : 0;
+  var fa = document.activeElement, faId = fa && fa.id && (fa.id === 'ai-in' || fa.id === 'cmd-in') ? fa.id : null, faPos = faId ? fa.selectionStart : 0, rtc = fa && fa.id === 'msed' && fa.isContentEditable ? rtCaretGet(fa) : null;
+  if (typeof selPopHide === 'function') selPopHide();
   document.body.classList.toggle('ai-open', !!(SESSION && UI.aip));
   var h;
   if (!SESSION) { h = renderPortal(); if (S.cs) h += renderCloudSetup(); root.innerHTML = h; return; }
@@ -4204,6 +4209,7 @@ function render() {
   if (S.drawer) h += renderPatient();
   if (S.msCite) h += renderCite();
   if (S.libImp) h += renderLibImport();
+  if (S.zot) h += renderZotero();
   if (!S.drawer && S.wipeAsk !== false && needWipe()) h += renderWipe();
   if (S.rec) h += renderRecord();
   if (S.qlink) h += renderQLink();
@@ -4226,6 +4232,8 @@ function render() {
   Object.keys(keep).forEach(function (s) { var els = root.querySelectorAll(s); keep[s].forEach(function (v, i) { if (els[i]) els[i].scrollTop = v; }); });
   if (faId) { var ne = document.getElementById(faId); if (ne) { ne.focus(); try { ne.setSelectionRange(faPos, faPos); } catch (e) {} } }
   else { var fi = root.querySelector('[data-autofocus]'); if (fi) { fi.focus(); if (fi.setSelectionRange && fi.type !== 'number') { try { fi.setSelectionRange(fi.value.length, fi.value.length); } catch (e) {} } } }
+  if (rtc !== null && !S.msCite && !S.cmNew) { var ned = root.querySelector('#msed[contenteditable]'); if (ned) { ned.focus(); rtCaretSet(ned, rtc); } }
+  try { msAfterRender(); } catch (e) {}
   var ab = root.querySelector('.aip-body'); if (ab && AI.scrollEnd) { ab.scrollTop = ab.scrollHeight; AI.scrollEnd = false; }
   if (UI.aip && aiReady()) setTimeout(aiMaybeGreet, 0);
 }
@@ -4283,6 +4291,7 @@ function renderMain() {
   if (v === 'home') return renderHome();
   if (v === 'users') return renderUsers();
   if (v === 'appr') return renderAppr();
+  if (v === 'write') return renderWrite();
   if (v === 'fu') return renderFu();
   if (v === 'retro') return renderRetro();
   if (v === 'studies') return renderStudies();
@@ -4295,7 +4304,7 @@ function renderMain() {
 /* ======================= v10: command palette ======================= */
 function cmdItems() {
   var q = String(S.cmd.q || '').trim().toLowerCase(), out = [];
-  var nav = [['home', 'home', LL('Главная', 'Home')], ['col:planner', 'cal', L(COLS.planner.title)], ['col:mdt', 'mdt', L(COLS.mdt.title)], ['col:mm', 'alert', 'M&M'], ['reg:all', 'users', t('nav.allPatients')], ['fu', 'clock', t('nav.followup')], ['studies', 'flask', t('nav.studies')], ['q', 'clipboard', LL('Анкеты', 'Questionnaires')], ['col:pubs', 'book', L(COLS.pubs.title)], ['col:redcap', 'flask', 'RedCap'], ['col:goals', 'flag', L(COLS.goals.title)]];
+  var nav = [['home', 'home', LL('Главная', 'Home')], ['col:planner', 'cal', L(COLS.planner.title)], ['col:mdt', 'mdt', L(COLS.mdt.title)], ['col:mm', 'alert', 'M&M'], ['reg:all', 'users', t('nav.allPatients')], ['write', 'doc', LL('Рукописи и литература', 'Manuscripts and library')], ['fu', 'clock', t('nav.followup')], ['studies', 'flask', t('nav.studies')], ['q', 'clipboard', LL('Анкеты', 'Questionnaires')], ['col:pubs', 'book', L(COLS.pubs.title)], ['col:redcap', 'flask', 'RedCap'], ['col:goals', 'flag', L(COLS.goals.title)]];
   DB.registries.forEach(function (r) { nav.push(['reg:' + r.id, r.kind === 'study' ? 'flask' : 'tag', regName(r)]); });
   var acts = [];
   if (can('edit')) acts = [['newp', 'plus', LL('Новый пациент', 'New patient')], ['newstudy', 'flask', LL('Новое исследование', 'New study')], ['newreg', 'plus', LL('Новый регистр', 'New registry')]];
@@ -6014,6 +6023,7 @@ function renderRetro() {
 /* ======================= v12: top navigation (no sidebar) ======================= */
 /* ======================= Наука: литература (как Zotero) и совместное написание статей ======================= */
 var PAPER_TPL = {
+  proto: [LL('Протокол исследования', 'Study protocol'), ['Титульный лист', 'Список сокращений', 'Синопсис', 'Актуальность и обоснование', 'Цель и задачи', 'Дизайн исследования', 'Популяция: критерии включения и исключения', 'Вмешательство и группы сравнения', 'Конечные точки', 'Гипотеза и расчёт размера выборки', 'Рандомизация и ослепление', 'Методология, обследование и сбор данных', 'Статистический анализ', 'Безопасность и нежелательные явления', 'Этические аспекты и информированное согласие', 'Управление данными и конфиденциальность', 'Этапы и сроки', 'Ожидаемые результаты', 'Приложения']],
   orig: [LL('Оригинальная статья', 'Original article'), ['Аннотация', 'Ключевые слова', 'Введение', 'Материалы и методы', 'Результаты', 'Обсуждение', 'Заключение', 'Конфликт интересов', 'Финансирование']],
   case: [LL('Клинический случай', 'Case report'), ['Аннотация', 'Ключевые слова', 'Введение', 'Описание клинического случая', 'Обсуждение', 'Заключение', 'Информированное согласие пациента']],
   review: [LL('Обзор литературы', 'Literature review'), ['Аннотация', 'Ключевые слова', 'Введение', 'Методология поиска', 'Обзор', 'Заключение']],
@@ -6028,7 +6038,7 @@ function msSecs(sid, pid) { var m = msOf(sid), pp = m.papers[pid]; if (!pp) retu
 function msLib(sid) { var m = msOf(sid); return Object.keys(m.lib).map(function (k) { return m.lib[k]; }); }
 function msMe() { return SESSION ? SESSION.id : 'local'; }
 function msLockFree(sec) { var l = sec.lock; if (!l) return true; if (l.uid === msMe()) return true; return (Date.now() - new Date(l.at).getTime()) / 60000 > MS_LOCK_MIN; }
-function words(s) { var m = String(s || '').replace(/\[@[\w-]+(?:[;,]\s*@?[\w-]+)*\]/g, ' ').match(/[A-Za-zА-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ0-9]+/g); return m ? m.length : 0; }
+function words(s) { var m = String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\[@[\w-]+(?:[;,]\s*@?[\w-]+)*\]/g, ' ').match(/[A-Za-zА-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ0-9]+/g); return m ? m.length : 0; }
 
 /* ---------- ссылки: форматирование ---------- */
 function refAuthors(r) { return (r.authors || []).filter(function (a) { return a && (a.family || a.given); }); }
@@ -6161,7 +6171,7 @@ function libQuickAdd(sid, q) {
 /* ---------- вкладка «Литература»: раскладка как в Zotero ---------- */
 var ZTYPES = [['journal-article', 'Журнальная статья', 'Journal Article'], ['book', 'Книга', 'Book'], ['chapter', 'Глава книги', 'Book Section'], ['conference', 'Материалы конференции', 'Conference Paper'], ['thesis', 'Диссертация', 'Thesis'], ['webpage', 'Веб-страница', 'Web Page'], ['report', 'Отчёт', 'Report']];
 function ztype(k) { var x = ZTYPES.filter(function (z) { return z[0] === k; })[0] || ZTYPES[0]; return LL(x[1], x[2]); }
-function zst() { S.zBy = S.zBy || {}; return S.zBy[S.view] || (S.zBy[S.view] = { col: 'all', sel: null, q: '', sort: { k: 'at', d: -1 }, tag: null, open: {} }); }
+function zst() { S.zBy = S.zBy || {}; var zk = S.view === 'write' ? 'write:' + (UI.wrSid || '_lab') : S.view; return S.zBy[zk] || (S.zBy[zk] = { col: 'all', sel: null, q: '', sort: { k: 'at', d: -1 }, tag: null, open: {} }); }
 function zCols(sid) { var m = msOf(sid); m.zcols = m.zcols || {}; return Object.keys(m.zcols).map(function (k) { return m.zcols[k]; }).sort(function (a, b) { return String(a.name).localeCompare(String(b.name), locale()); }); }
 function zCreator(x) { var au = refAuthors(x); return !au.length ? '' : au.length === 1 ? au[0].family : au.length === 2 ? au[0].family + LL(' и ', ' and ') + au[1].family : au[0].family + ' et al.'; }
 function zItems(sid) {
@@ -6184,6 +6194,7 @@ function renderLibrary(r) {
   h += '<button type="button" class="z-tbtn" data-act="znote" data-id="' + sid + '" title="' + LL('Новая заметка к выбранному источнику', 'New Item Note') + '"' + (z.sel ? '' : ' disabled') + '>' + ico('note', 17) + '</button>';
   h += '<span class="z-sep"></span><button type="button" class="z-tbtn" data-act="libimp" data-id="' + sid + '" title="' + LL('Импорт BibTeX / RIS', 'Import BibTeX / RIS') + '">' + ico('upload', 17) + '</button>';
   h += '<div class="dd"><button type="button" class="z-tbtn" data-act="menu" data-id="libx" title="' + LL('Экспорт', 'Export') + '">' + ico('download', 17) + ico('down', 11) + '</button>' + (S.menu === 'libx' ? '<div class="pop" role="menu"><button type="button" class="opt" data-act="libexp" data-id="' + sid + '" data-v="bib">' + LL('Экспорт в BibTeX', 'Export BibTeX') + '</button><button type="button" class="opt" data-act="libexp" data-id="' + sid + '" data-v="ris">' + LL('Экспорт в RIS', 'Export RIS') + '</button><button type="button" class="opt" data-act="libbib" data-id="' + sid + '">' + LL('Создать список литературы из выбранного…', 'Create Bibliography from Items…') + '</button></div>' : '') + '</div>';
+  h += '<span class="z-sep"></span><button type="button" class="z-tbtn zotbtn" data-act="zot" data-id="' + sid + '" title="' + LL('Связь с Zotero', 'Zotero sync') + '">' + ico('zot', 17) + '<span>Zotero</span></button>';
   h += '<span class="z-sp"></span><div class="z-search">' + ico('search', 15) + '<input type="search" data-libf="1" placeholder="' + LL('Все поля и теги', 'All Fields & Tags') + '" value="' + esc(z.q || '') + '"></div></div>';
   h += '<div class="z-panes">';
   /* левая панель: коллекции и теги */
@@ -6224,7 +6235,7 @@ function renderLibrary(r) {
     (x.authors && x.authors.length ? x.authors : [{ family: '', given: '' }]).forEach(function (a, i) { h += '<div class="z-f au"><label>' + LL('Автор', 'Author') + ':</label><input type="text" placeholder="' + LL('фамилия', 'last') + '" data-zau="' + P + i + '.family" value="' + esc(a.family || '') + '"><input type="text" placeholder="' + LL('имя', 'first') + '" data-zau="' + P + i + '.given" value="' + esc(a.given || '') + '"><button type="button" class="iconbtn sm" data-act="zaudel" data-id="' + sid + '" data-v="' + x.id + '" data-i="' + i + '" aria-label="−">−</button><button type="button" class="iconbtn sm" data-act="zauadd" data-id="' + sid + '" data-v="' + x.id + '" data-i="' + i + '" aria-label="+">+</button></div>'; });
     h += row('journal', LL('Издание', 'Publication')) + row('volume', LL('Том', 'Volume')) + row('issue', LL('Выпуск', 'Issue')) + row('pages', LL('Страницы', 'Pages')) + row('year', LL('Дата', 'Date')) + row('doi', 'DOI') + row('pmid', 'PMID') + row('url', 'URL');
     h += '<div class="z-f"><label>' + LL('Добавлено', 'Date Added') + ':</label><span class="z-ro">' + fmtDT(x.at) + ' · ' + esc(x.addedBy || '') + '</span></div>';
-    h += '<div class="z-links">' + (x.doi ? '<a href="https://doi.org/' + esc(x.doi) + '" target="_blank" rel="noopener">' + ico('ext', 13) + LL('Открыть DOI', 'View Online') + '</a>' : '') + (x.pmid ? '<a href="https://pubmed.ncbi.nlm.nih.gov/' + esc(x.pmid) + '/" target="_blank" rel="noopener">' + ico('ext', 13) + 'PubMed</a>' : '') + (x.url && !x.doi && !x.pmid ? '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + ico('ext', 13) + 'URL</a>' : '') + '</div></div>';
+    h += '<div class="z-links">' + (x.pmid && !x.abstract ? '<button type="button" class="linkbtn" data-act="pmabs" data-id="' + sid + '" data-v="' + x.id + '"' + (S.libBusy ? ' disabled' : '') + '>' + ico('download', 13) + LL('Аннотация и ключевые слова из PubMed', 'Abstract and keywords from PubMed') + '</button>' : '') + (x.pmcid ? '<a href="https://pmc.ncbi.nlm.nih.gov/articles/' + esc(x.pmcid) + '/" target="_blank" rel="noopener">' + ico('ext', 13) + LL('Полный текст (PMC)', 'Full text (PMC)') + '</a>' : '') + '<a href="https://scholar.google.com/scholar?q=' + encodeURIComponent(x.doi || x.title || '') + '" target="_blank" rel="noopener">' + ico('ext', 13) + 'Google Scholar</a>' + (x.zkey ? (function () { var zc = zotCfg(); return zc ? '<a href="https://www.zotero.org/' + (zc.lib && zc.lib.indexOf('/groups/') === 0 ? 'groups/' + zc.lib.split('/')[2] : esc(zc.user || '')) + '/items/' + esc(x.zkey) + '" target="_blank" rel="noopener">' + ico('zot', 13) + LL('Открыть в Zotero', 'Open in Zotero') + '</a>' : ''; })() : '') + (x.doi ? '<a href="https://doi.org/' + esc(x.doi) + '" target="_blank" rel="noopener">' + ico('ext', 13) + LL('Открыть DOI', 'View Online') + '</a>' : '') + (x.pmid ? '<a href="https://pubmed.ncbi.nlm.nih.gov/' + esc(x.pmid) + '/" target="_blank" rel="noopener">' + ico('ext', 13) + 'PubMed</a>' : '') + (x.url && !x.doi && !x.pmid ? '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + ico('ext', 13) + 'URL</a>' : '') + '</div></div>';
     h += '<div class="z-sec"><div class="z-sh">' + LL('Аннотация', 'Abstract') + '</div><textarea rows="5" data-libed="' + P + 'abstract">' + esc(x.abstract || '') + '</textarea></div>';
     h += '<div class="z-sec"><div class="z-sh">' + LL('Коллекции', 'Collections') + '</div><div class="z-cchips">' + (cols.length ? cols.map(function (c) { var on = (x.cols || []).indexOf(c.id) >= 0; return '<button type="button" class="kchip' + (on ? ' on' : '') + '" data-act="zincol" data-id="' + sid + '" data-v="' + x.id + '" data-c="' + c.id + '">' + (on ? ico('check', 12) : '') + esc(c.name) + '</button>'; }).join('') : '<span class="muted small">' + LL('Коллекций нет. Создайте слева или перетащите источник на коллекцию.', 'No collections yet.') + '</span>') + '</div></div>';
     h += '<div class="z-sec"><div class="z-sh">' + LL('Теги', 'Tags') + ' <em>' + (x.tags || []).length + '</em></div><div class="z-cchips">' + (x.tags || []).map(function (t2, i) { return '<span class="z-tag on">' + esc(t2) + '<button type="button" data-act="ztagdel" data-id="' + sid + '" data-v="' + x.id + '" data-i="' + i + '" aria-label="' + LL('Убрать тег', 'Remove tag') + '">×</button></span>'; }).join('') + '<input type="text" class="z-tagin" data-ztagin="' + sid + '.' + x.id + '" placeholder="' + LL('+ тег, Enter', '+ tag, Enter') + '"></div></div>';
@@ -6238,25 +6249,389 @@ function renderLibImport() {
   return '<div class="dim" data-act="libimpx"></div><section class="modal" role="dialog" aria-modal="true" aria-label="' + LL('Импорт источников', 'Import references') + '" style="width:min(720px,calc(100% - 24px))"><div class="dhead"><div class="dh-title">' + LL('Импорт BibTeX или RIS', 'Import BibTeX or RIS') + '</div><button type="button" class="iconbtn" data-act="libimpx" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody"><p class="hint">' + LL('Zotero: правой кнопкой по коллекции, «Экспортировать коллекцию», формат BibTeX или RIS. Вставьте содержимое файла сюда или выберите файл.', 'Zotero: right-click a collection, Export Collection, BibTeX or RIS. Paste the file content or choose the file.') + '</p><textarea id="libimpt" rows="12" spellcheck="false" placeholder="@article{...} или TY  - JOUR ..."></textarea><div class="actions"><label class="btn">' + ico('upload', 15) + LL('Выбрать файл', 'Choose file') + '<input type="file" id="libimpf" accept=".bib,.ris,.txt" hidden></label><span class="sp"></span><button type="button" class="btn primary" data-act="libimpgo" data-id="' + S.libImp + '">' + LL('Импортировать', 'Import') + '</button></div></div></section>';
 }
 
+/* ---------- редактор с форматированием (протокол, статьи) ---------- */
+var RT_OK = { P: 1, BR: 1, B: 1, I: 1, U: 1, S: 1, SUP: 1, SUB: 1, H2: 1, H3: 1, H4: 1, UL: 1, OL: 1, LI: 1, TABLE: 1, THEAD: 1, TBODY: 1, TR: 1, TH: 1, TD: 1, BLOCKQUOTE: 1, A: 1, MARK: 1, HR: 1 };
+var RT_MAP = { DIV: 'P', H1: 'H2', H5: 'H4', H6: 'H4', STRONG: 'B', EM: 'I', STRIKE: 'S', DEL: 'S', INS: 'U', CENTER: 'P', SECTION: 'P', ARTICLE: 'P', CAPTION: 'P', DT: 'P', DD: 'P', PRE: 'P' };
+var RT_EMPTY_OK = { BR: 1, HR: 1, TD: 1, TH: 1 };
+function rtClean(html) {
+  var doc; try { doc = new DOMParser().parseFromString('<div>' + String(html || '') + '</div>', 'text/html'); } catch (e) { return esc(String(html || '')); }
+  var out = document.createElement('div');
+  function styleWraps(c) {
+    var st = String(c.getAttribute && c.getAttribute('style') || '').toLowerCase(), w = [];
+    if (/font-weight\s*:\s*(bold|[6-9]00)/.test(st)) w.push('B');
+    if (/font-style\s*:\s*italic/.test(st)) w.push('I');
+    if (/text-decoration[^;]*underline/.test(st)) w.push('U');
+    if (/text-decoration[^;]*line-through/.test(st)) w.push('S');
+    if (/vertical-align\s*:\s*super/.test(st)) w.push('SUP');
+    if (/vertical-align\s*:\s*sub/.test(st)) w.push('SUB');
+    var bg = /background(?:-color)?\s*:\s*([^;]+)/.exec(st); if (bg && !/transparent|none|initial|inherit|white|#fff\b|#ffffff|rgba\([^)]*,\s*0\)|rgb\(255,\s*255,\s*255\)/.test(bg[1])) w.push('MARK');
+    return w;
+  }
+  function walk(n, dst) {
+    [].slice.call(n.childNodes).forEach(function (c) {
+      if (c.nodeType === 3) { dst.appendChild(document.createTextNode(c.nodeValue.replace(/ /g, ' '))); return; }
+      if (c.nodeType !== 1) return;
+      var tg = c.tagName.toUpperCase();
+      if (c.getAttribute('data-cite')) { dst.appendChild(document.createTextNode('[@' + c.getAttribute('data-cite') + ']')); return; }
+      if (/^(SCRIPT|STYLE|META|LINK|TITLE|XML|HEAD|IFRAME|OBJECT|EMBED|SVG|IMG|INPUT|BUTTON|SELECT|TEXTAREA|NOSCRIPT)$/.test(tg) || tg.indexOf(':') >= 0) { if (tg.indexOf(':') >= 0) walk(c, dst); return; }
+      var nt = RT_MAP[tg] || (RT_OK[tg] ? tg : null);
+      if (tg === 'B' && /font-weight\s*:\s*normal/i.test(c.getAttribute('style') || '')) nt = null;
+      var cur = dst;
+      if (nt) {
+        var e = document.createElement(nt);
+        if (nt === 'A') { var hr = c.getAttribute('href') || ''; if (/^(https?:|mailto:)/i.test(hr)) { e.setAttribute('href', hr); e.setAttribute('target', '_blank'); e.setAttribute('rel', 'noopener'); } }
+        if (nt === 'TD' || nt === 'TH') ['colspan', 'rowspan'].forEach(function (a) { var v = c.getAttribute(a); if (v && /^\d{1,2}$/.test(v)) e.setAttribute(a, v); });
+        if (/^(P|H2|H3|H4|TD|TH|LI)$/.test(nt)) { var al = /text-align\s*:\s*(center|right|justify)/i.exec(c.getAttribute('style') || '') || (/^(center|right|justify)$/i.test(c.getAttribute('align') || '') ? [0, c.getAttribute('align')] : null); if (al || tg === 'CENTER') e.setAttribute('style', 'text-align:' + (al ? al[1].toLowerCase() : 'center')); }
+        dst.appendChild(e); cur = e;
+      }
+      styleWraps(c).forEach(function (w) { if (nt === w || (w === 'B' && /^H[2-4]$/.test(nt || ''))) return; var e2 = document.createElement(w); cur.appendChild(e2); cur = e2; });
+      walk(c, cur);
+    });
+  }
+  walk(doc.body.firstChild || doc.body, out);
+  /* убрать пустые обёртки и вложенные абзацы */
+  [].slice.call(out.querySelectorAll('b,i,u,s,sup,sub,mark,a')).forEach(function (e) { if (!e.textContent && !e.querySelector('br')) e.parentNode.removeChild(e); });
+  [].slice.call(out.querySelectorAll('p p, li p, td p p, h2 p, h3 p, h4 p')).forEach(function (e) { while (e.firstChild) e.parentNode.insertBefore(e.firstChild, e); if (e.nextSibling) e.parentNode.insertBefore(document.createElement('br'), e.nextSibling); e.parentNode.removeChild(e); });
+  return out.innerHTML.replace(/<p><\/p>/g, '<p><br></p>');
+}
+function plain2html(t) { t = String(t || ''); if (!t.trim()) return ''; return t.split(/\n{2,}/).map(function (p) { return '<p>' + esc(p).replace(/\n/g, '<br>') + '</p>'; }).join(''); }
+function secHTML(s) { return s.fmt === 'html' ? rtClean(s.text || '') : plain2html(s.text || ''); }
+function citeSpan(inner, lib, style, ord) {
+  var ks = inner.split(/[;,]\s*/).map(function (k) { return k.replace(/^@/, '').trim(); }).filter(Boolean);
+  if (style === 'apa') return '<span class="cite">(' + ks.map(function (k) { return lib[k] ? esc(inTextAPA(lib[k])) : '?'; }).join('; ') + ')</span>';
+  var nums = ks.map(function (k) { return ord.indexOf(k) + 1; }).filter(function (n) { return n > 0; }).sort(function (a, b) { return a - b; });
+  var out = [], i = 0; while (i < nums.length) { var j = i; while (j + 1 < nums.length && nums[j + 1] === nums[j] + 1) j++; out.push(j - i >= 2 ? nums[i] + '-' + nums[j] : nums.slice(i, j + 1).join(', ')); i = j + 1; }
+  return '<span class="cite">[' + (out.join(', ') || '?') + ']</span>';
+}
+function citeHTML(html, sid, style, ord) { var lib = msOf(sid).lib; return String(html || '').replace(/⁣|⁤/g, '').replace(/\[@([^\]<>]+)\]/g, function (m0, inner) { return citeSpan(inner, lib, style, ord); }); }
+function citeChips(html, sid) { var lib = msOf(sid).lib; return String(html || '').replace(/\[@([^\]<>]+)\]/g, function (m0, inner) { var ks = inner.split(/[;,]\s*/).map(function (k) { return k.replace(/^@/, '').trim(); }).filter(Boolean); return '<span class="cite-ed" contenteditable="false" data-cite="' + esc(ks.join('; @')) + '" title="' + esc(ks.map(function (k) { return lib[k] ? lib[k].title : '?'; }).join('; ')) + '">[' + esc(ks.map(function (k) { var x = lib[k]; return x ? (zCreator(x) || (x.title || '').split(' ').slice(0, 3).join(' ')) + (x.year ? ', ' + x.year : '') : '?'; }).join('; ')) + ']</span>'; }); }
+function secView(s, sid, style, ord) { var h = secHTML(s); return h ? citeHTML(h, sid, style, ord) : ''; }
+var RT_SYM = ['±', '≤', '≥', '≈', '≠', '×', '÷', '°', '‰', '·', 'µ', 'α', 'β', 'γ', 'δ', 'κ', 'λ', 'χ²', 'Σ', '→', '←', '↑', '↓', '§', '№', '«»'];
+function rtToolbar(sid, sec) {
+  function b(cmd, icoHtml, title, cls) { return '<button type="button" class="rtb' + (cls ? ' ' + cls : '') + '" data-rt="' + cmd + '" title="' + title + '" aria-label="' + title + '">' + icoHtml + '</button>'; }
+  var sep = '<span class="rt-sep"></span>';
+  var h = '<div class="rt-tb" role="toolbar" aria-label="' + LL('Форматирование', 'Formatting') + '" data-rtfor="' + sid + '.' + sec + '">';
+  h += b('undo', '↶', LL('Отменить (Ctrl+Z)', 'Undo')) + b('redo', '↷', LL('Повторить (Ctrl+Y)', 'Redo')) + sep;
+  h += b('p', LL('Текст', 'Text'), LL('Обычный абзац', 'Normal text'), 'wtxt') + b('h2', LL('Заголовок', 'Heading'), LL('Заголовок', 'Heading'), 'wtxt') + b('h3', LL('Подзаголовок', 'Subheading'), LL('Подзаголовок', 'Subheading'), 'wtxt') + b('quote', '❝', LL('Цитата (блок)', 'Block quote')) + sep;
+  h += b('bold', '<b>Ж</b>', LL('Жирный (Ctrl+B)', 'Bold (Ctrl+B)')) + b('italic', '<i>К</i>', LL('Курсив (Ctrl+I)', 'Italic (Ctrl+I)')) + b('underline', '<u>Ч</u>', LL('Подчёркнутый (Ctrl+U)', 'Underline (Ctrl+U)')) + b('strike', '<s>З</s>', LL('Зачёркнутый', 'Strikethrough')) + b('sup', 'x²', LL('Надстрочный', 'Superscript')) + b('sub', 'x₂', LL('Подстрочный', 'Subscript')) + b('mark', '<span class="rt-hl">А</span>', LL('Выделить жёлтым', 'Highlight')) + b('unmark', '<span class="rt-hl off">А</span>', LL('Снять выделение цветом', 'Remove highlight')) + b('clear', 'T̸', LL('Очистить форматирование', 'Clear formatting')) + sep;
+  h += b('ul', '•≡', LL('Маркированный список', 'Bulleted list')) + b('ol', '1≡', LL('Нумерованный список', 'Numbered list')) + b('outdent', '⇤', LL('Уменьшить отступ', 'Decrease indent')) + b('indent', '⇥', LL('Увеличить отступ', 'Increase indent')) + sep;
+  h += b('left', ico('alignl', 15), LL('По левому краю', 'Align left')) + b('center', ico('alignc', 15), LL('По центру', 'Center')) + b('right', ico('alignr', 15), LL('По правому краю', 'Align right')) + b('justify', ico('alignj', 15), LL('По ширине', 'Justify')) + sep;
+  h += b('table', ico('grid', 15), LL('Вставить таблицу', 'Insert table')) + b('row', '+' + LL('стр', 'row'), LL('Добавить строку в таблицу', 'Add table row'), 'wtxt') + b('col', '+' + LL('стлб', 'col'), LL('Добавить столбец в таблицу', 'Add table column'), 'wtxt') + b('link', ico('ext', 15), LL('Ссылка', 'Link')) + b('hr', '―', LL('Горизонтальная линия', 'Horizontal line')) + '<span class="rt-dd">' + b('sym', 'Ω', LL('Спецсимволы', 'Symbols')) + '<span class="rt-sym" hidden>' + RT_SYM.map(function (x) { return '<button type="button" class="rtb" data-rt="ins" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</span></span>' + sep;
+  h += b('cite', ico('book', 15) + '<span>' + LL('Цитировать', 'Cite') + '</span>', LL('Вставить ссылку на источник', 'Insert citation'), 'wtxt') + b('note', ico('chat', 15) + '<span>' + LL('Заметка к выделенному', 'Comment') + '</span>', LL('Оставить заметку к выделенному фрагменту', 'Comment on selection'), 'wtxt');
+  return h + '</div>';
+}
+function rtEd() { return root.querySelector('#msed[contenteditable]'); }
+function rtSync(ed) {
+  ed = ed || rtEd(); if (!ed) return null;
+  var p = (ed.getAttribute('data-msed') || '').split('.'), s = msOf(p[0]).secs[p[1]]; if (!s) return null;
+  s.text = rtClean(ed.innerHTML); s.fmt = 'html'; if (s.lock) s.lock.at = nowIso(); msSaveSoon(); return s;
+}
+function rtRange(ed) { var sl = window.getSelection(); if (!sl || !sl.rangeCount) return null; var r = sl.getRangeAt(0); return ed.contains(r.commonAncestorContainer) ? r : null; }
+function rtCaretGet(ed) { var r = rtRange(ed); if (!r) return null; var pre = document.createRange(); pre.selectNodeContents(ed); pre.setEnd(r.startContainer, r.startOffset); return pre.toString().length; }
+function rtCaretSet(ed, off) {
+  var w = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT, null, false), n, left = off;
+  while ((n = w.nextNode())) { if (left <= n.nodeValue.length) { var r = document.createRange(); r.setStart(n, left); r.collapse(true); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(r); return; } left -= n.nodeValue.length; }
+  var r2 = document.createRange(); r2.selectNodeContents(ed); r2.collapse(false); var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(r2);
+}
+function rtCell(ed) { var r = rtRange(ed); if (!r) return null; var n = r.startContainer; while (n && n !== ed) { if (n.nodeType === 1 && /^(TD|TH)$/.test(n.tagName)) return n; n = n.parentNode; } return null; }
+function rtExec(cmd, v) {
+  var ed = rtEd(); if (!ed) return;
+  if (cmd !== 'sym' && cmd !== 'ins') { var sp = root.querySelector('.rt-sym'); if (sp) sp.hidden = true; }
+  if (document.activeElement !== ed && cmd !== 'sym') ed.focus();
+  try { document.execCommand('styleWithCSS', false, false); document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) {}
+  var X = function (c, a) { try { document.execCommand(c, false, a === undefined ? null : a); } catch (e) {} };
+  switch (cmd) {
+    case 'undo': case 'redo': case 'bold': case 'italic': case 'underline': case 'indent': case 'outdent': case 'removeFormat': X(cmd); break;
+    case 'strike': X('strikeThrough'); break;
+    case 'sup': X('superscript'); break;
+    case 'sub': X('subscript'); break;
+    case 'p': X('formatBlock', '<p>'); break;
+    case 'h2': X('formatBlock', '<h2>'); break;
+    case 'h3': X('formatBlock', '<h3>'); break;
+    case 'quote': X('formatBlock', '<blockquote>'); break;
+    case 'ul': X('insertUnorderedList'); break;
+    case 'ol': X('insertOrderedList'); break;
+    case 'left': X('justifyLeft'); break;
+    case 'center': X('justifyCenter'); break;
+    case 'right': X('justifyRight'); break;
+    case 'justify': X('justifyFull'); break;
+    case 'clear': X('removeFormat'); X('unlink'); break;
+    case 'hr': X('insertHorizontalRule'); break;
+    case 'mark': X('hiliteColor', '#fff3a3'); break;
+    case 'unmark': { var r0 = rtRange(ed); if (r0) [].slice.call(ed.querySelectorAll('mark,span[style*="background"]')).forEach(function (m) { if (r0.intersectsNode(m)) { while (m.firstChild) m.parentNode.insertBefore(m.firstChild, m); m.parentNode.removeChild(m); } }); break; }
+    case 'ins': X('insertText', v === '«»' ? '«»' : v); break;
+    case 'sym': { var pop = root.querySelector('.rt-sym'); if (pop) pop.hidden = !pop.hidden; return; }
+    case 'link': { var r1 = rtRange(ed); var saved = r1 && r1.cloneRange(); var u = prompt(LL('Адрес ссылки (https://…)', 'Link URL (https://…)'), 'https://'); if (!u || !/^(https?:\/\/|mailto:)\S+/i.test(u.trim())) return; ed.focus(); if (saved) { var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(saved); } if (saved && !saved.collapsed) X('createLink', u.trim()); else X('insertHTML', '<a href="' + esc(u.trim()) + '">' + esc(u.trim()) + '</a>'); break; }
+    case 'table': {
+      var r2 = rtRange(ed), keep = r2 && r2.cloneRange(), dim = prompt(LL('Размер таблицы: строк x столбцов', 'Table size: rows x columns'), '3x3'); if (!dim) return;
+      var mm = /(\d+)\s*[x×х*,\s]\s*(\d+)/i.exec(dim), rows = mm ? Math.min(+mm[1], 40) : 3, cols = mm ? Math.min(+mm[2], 12) : 3; ed.focus(); if (keep) { var s3 = window.getSelection(); s3.removeAllRanges(); s3.addRange(keep); }
+      var t = '<table data-new="1"><thead><tr>' + new Array(cols + 1).join('<th><br></th>') + '</tr></thead><tbody>' + new Array(Math.max(rows - 1, 1) + 1).join('<tr>' + new Array(cols + 1).join('<td><br></td>') + '</tr>') + '</tbody></table><p><br></p>';
+      X('insertHTML', t); var nt = ed.querySelector('table[data-new]'); if (nt) { nt.removeAttribute('data-new'); var c0 = nt.querySelector('th,td'), rr = document.createRange(); rr.selectNodeContents(c0); rr.collapse(true); var s4 = window.getSelection(); s4.removeAllRanges(); s4.addRange(rr); } break;
+    }
+    case 'row': { var c = rtCell(ed); if (!c) { toast(LL('Поставьте курсор в ячейку таблицы', 'Put the cursor in a table cell')); return; } var tr = c.parentNode, nr = document.createElement('tr'); [].slice.call(tr.children).forEach(function () { var td = document.createElement('td'); td.innerHTML = '<br>'; nr.appendChild(td); }); if (tr.parentNode.tagName === 'THEAD') { var tb = tr.parentNode.parentNode.querySelector('tbody') || tr.parentNode.parentNode.appendChild(document.createElement('tbody')); tb.insertBefore(nr, tb.firstChild); } else tr.parentNode.insertBefore(nr, tr.nextSibling); break; }
+    case 'col': { var c2 = rtCell(ed); if (!c2) { toast(LL('Поставьте курсор в ячейку таблицы', 'Put the cursor in a table cell')); return; } var idx = [].indexOf.call(c2.parentNode.children, c2), tbl = c2.closest('table'); [].slice.call(tbl.querySelectorAll('tr')).forEach(function (tr2) { var ref = tr2.children[idx]; var nc = document.createElement(tr2.parentNode.tagName === 'THEAD' ? 'th' : 'td'); nc.innerHTML = '<br>'; tr2.insertBefore(nc, ref ? ref.nextSibling : null); }); break; }
+    case 'cite': {
+      var p = (ed.getAttribute('data-msed') || '').split('.'); X('insertText', '⁣'); var s = rtSync(ed); if (!s) return;
+      S.msCite = { sid: p[0], sec: p[1], rt: true, sel: [], q: '', i: 0 }; render(); setTimeout(function () { var e1 = root.querySelector('#citeq'); if (e1) e1.focus(); }, 10); return;
+    }
+    case 'note': {
+      var p2 = (ed.getAttribute('data-msed') || '').split('.'), r3 = rtRange(ed), q = r3 ? r3.toString() : '';
+      rtSync(ed); S.cmNew = { sid: p2[0], sec: p2[1], quote: q.replace(/[⁣⁤]/g, '').trim().slice(0, 400), kind: 'note' }; S.cmFilter = 'open'; render(); setTimeout(function () { var t5 = root.querySelector('#cmtext'); if (t5) t5.focus(); }, 30); return;
+    }
+  }
+  rtSync(ed);
+}
+function rtPlaceMarker(ed) {
+  var w = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT, null, false), n;
+  while ((n = w.nextNode())) { var i = n.nodeValue.indexOf('⁤'); if (i >= 0) { n.nodeValue = n.nodeValue.slice(0, i) + n.nodeValue.slice(i + 1); var r = document.createRange(); r.setStart(n, i); r.collapse(true); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(r); rtSync(ed); return true; } }
+  return false;
+}
+/* ---------- поиск фрагмента текста в DOM (для заметок в тексте и принятия правок) ---------- */
+function rtNorm(s) { return String(s || '').replace(/[⁣⁤]/g, '').replace(/\s+/g, ' ').trim(); }
+function rtFind(box, quote) {
+  var nodes = [], w = document.createTreeWalker(box, NodeFilter.SHOW_TEXT, null, false), n, full = '';
+  while ((n = w.nextNode())) { nodes.push([n, full.length]); full += n.nodeValue; }
+  /* нормализованная строка с картой индексов */
+  var norm = '', map = [], prevSp = true;
+  for (var i = 0; i < full.length; i++) { var ch = full.charAt(i); if (/[\s⁣⁤]/.test(ch)) { if (ch !== '⁣' && ch !== '⁤' && !prevSp) { norm += ' '; map.push(i); prevSp = true; } } else { norm += ch; map.push(i); prevSp = false; } }
+  var q = rtNorm(quote); if (!q) return null;
+  var at = norm.indexOf(q), len = q.length;
+  if (at < 0 && /\[@/.test(q)) { var parts = q.split(/\s*\[@[^\]]*\]\s*/).sort(function (a, b) { return b.length - a.length; }); if (parts[0] && parts[0].length >= 8) { at = norm.indexOf(parts[0]); len = parts[0].length; } }
+  if (at < 0) return null;
+  var a = map[at], b = map[at + len - 1] + 1;
+  function pos(k, end) { for (var j = nodes.length - 1; j >= 0; j--) { if (nodes[j][1] < k || (!end && nodes[j][1] === k)) return { n: nodes[j][0], o: k - nodes[j][1] }; } return { n: nodes[0][0], o: 0 }; }
+  var s0 = pos(a, false), e0 = pos(b, true);
+  return { sn: s0.n, so: s0.o, en: e0.n, eo: e0.o };
+}
+function rtWrap(f, mk) {
+  /* обернуть найденный фрагмент по текстовым узлам (фрагмент может пересекать жирный, курсив и т. д.) */
+  var r = document.createRange(); r.setStart(f.sn, f.so); r.setEnd(f.en, f.eo);
+  var root0 = r.commonAncestorContainer.nodeType === 1 ? r.commonAncestorContainer : r.commonAncestorContainer.parentNode, list = [], w = document.createTreeWalker(root0, NodeFilter.SHOW_TEXT, null, false), n;
+  while ((n = w.nextNode())) if (r.intersectsNode(n)) list.push(n);
+  var first = null;
+  list.forEach(function (t) {
+    var st = t === f.sn ? f.so : 0, en = t === f.en ? f.eo : t.nodeValue.length; if (en <= st) return;
+    if (en < t.nodeValue.length) t.splitText(en); var mid = st > 0 ? t.splitText(st) : t;
+    var m = mk(); mid.parentNode.insertBefore(m, mid); m.appendChild(mid); if (!first) first = m;
+  });
+  return first;
+}
+function msAfterRender() {
+  /* заметки и правки прямо в тексте */
+  [].slice.call(root.querySelectorAll('.pp-txt[data-sec]')).forEach(function (box) {
+    var sid = box.getAttribute('data-sid'), sec = box.getAttribute('data-sec'), m = msOf(sid);
+    Object.keys(m.cm).map(function (k) { return m.cm[k]; }).filter(function (c) { return c.sec === sec && !c.parent && !c.done && c.quote; }).forEach(function (c) {
+      var f = rtFind(box, c.quote); if (!f) return;
+      rtWrap(f, function () { var e = document.createElement('mark'); e.className = 'cmk' + (c.kind === 'sug' ? ' sug' : '') + (S.cmFocus === c.id ? ' on' : ''); e.setAttribute('data-act', 'cmfocus'); e.setAttribute('data-v', c.id); e.title = c.by + ': ' + (c.kind === 'sug' ? LL('заменить на «', 'replace with «') + (c.repl || '') + '»' : c.text); return e; });
+    });
+  });
+  /* присутствие в документе */
+  var pw = root.querySelector('.paperw[data-sid]');
+  if (pw && SESSION && msCanEdit() && Date.now() - (MSX.presAt || 0) > 90000) {
+    MSX.presAt = Date.now(); var sid2 = pw.getAttribute('data-sid'), pid = pw.getAttribute('data-pid');
+    setTimeout(function () { var pp = msOf(sid2).papers[pid]; if (!pp) return; pp.pres = pp.pres || {}; var now = Date.now(); Object.keys(pp.pres).forEach(function (k) { if (now - new Date(pp.pres[k].at).getTime() > 86400000) delete pp.pres[k]; }); pp.pres[msMe()] = { by: me(), at: nowIso() }; save(); }, 50);
+  }
+}
+function msPresence(pp) { var now = Date.now(), mm = msMe(); return Object.keys(pp.pres || {}).filter(function (k) { return k !== mm && now - new Date(pp.pres[k].at).getTime() < 180000; }).map(function (k) { return pp.pres[k].by; }); }
+/* всплывающая кнопка на выделенном тексте */
+function selPopHide() { var e = document.getElementById('selpop'); if (e) e.hidden = true; }
+function selPopCheck() {
+  var sl = window.getSelection(); if (!sl || sl.isCollapsed || !sl.rangeCount) { selPopHide(); return; }
+  var r = sl.getRangeAt(0), n = r.commonAncestorContainer, box = (n.nodeType === 1 ? n : n.parentNode).closest && (n.nodeType === 1 ? n : n.parentNode).closest('.pp-txt[data-sec]');
+  var q = String(sl).trim(); if (!box || !q || q.length > 600) { selPopHide(); return; }
+  MSX.selq = { sid: box.getAttribute('data-sid'), sec: box.getAttribute('data-sec'), q: q };
+  var e = document.getElementById('selpop'); if (!e) { e = document.createElement('div'); e.id = 'selpop'; e.className = 'selpop'; document.body.appendChild(e); }
+  e.innerHTML = '<button type="button" data-act="cmsel" data-v="note">' + ico('chat', 14) + LL('Заметка', 'Comment') + '</button>' + (msCanEdit() ? '<button type="button" data-act="cmsel" data-v="sug">' + ico('doc', 14) + LL('Предложить правку', 'Suggest edit') + '</button>' : '');
+  var rc = r.getBoundingClientRect(); e.hidden = false; e.style.top = Math.max(8, rc.top - 42) + 'px'; e.style.left = Math.min(window.innerWidth - 280, Math.max(8, rc.left + rc.width / 2 - 110)) + 'px';
+}
+document.addEventListener('mouseup', function (ev) { if (ev.target.closest && ev.target.closest('#selpop')) return; setTimeout(selPopCheck, 10); });
+document.addEventListener('keyup', function (ev) { if (ev.shiftKey) setTimeout(selPopCheck, 10); });
+document.addEventListener('scroll', selPopHide, true);
+/* панель форматирования: не терять выделение при нажатии */
+document.addEventListener('mousedown', function (ev) {
+  var b = ev.target.closest && ev.target.closest('[data-rt]'); if (b) { ev.preventDefault(); rtExec(b.getAttribute('data-rt'), b.getAttribute('data-v')); return; }
+  if (ev.target.closest && ev.target.closest('#selpop')) ev.preventDefault();
+}, true);
+document.addEventListener('paste', function (ev) {
+  var ed = ev.target.closest && ev.target.closest('#msed[contenteditable]'); if (!ed) return;
+  var cd = ev.clipboardData; if (!cd) return; ev.preventDefault();
+  var html = cd.getData('text/html'), txt = cd.getData('text/plain');
+  try { document.execCommand('insertHTML', false, html ? rtClean(html) : plain2html(txt).replace(/^<p>|<\/p>$/g, '')); } catch (e) { document.execCommand('insertText', false, txt); }
+  rtSync(ed);
+}, true);
+document.addEventListener('keydown', function (ev) {
+  var ed = ev.target.closest && ev.target.closest('#msed[contenteditable]'); if (!ed || !(ev.ctrlKey || ev.metaKey)) return;
+  var k = ev.key.toLowerCase();
+  if (k === 's') { ev.preventDefault(); rtSync(ed); save(); toast(LL('Сохранено', 'Saved')); }
+  else if (ev.shiftKey && (k === 'x' || k === 'ч')) { ev.preventDefault(); rtExec('strike'); }
+  else if (k === '.' || k === 'ю') { ev.preventDefault(); rtExec('sup'); }
+  else if (k === ',' || k === 'б') { ev.preventDefault(); rtExec('sub'); }
+}, true);
+
+/* ---------- шаблон «Протокол исследования» (по SPIRIT 2013) и заполнение из мастера протокола ---------- */
+var PROTO_SECS = PAPER_TPL.proto[1];
+function protoPrefill(r) {
+  if (!r || r.kind !== 'study' || !r.proto) return {};
+  var pr = r.proto, s = pr.syn || {}, out = {};
+  function P(t) { return plain2html(t || ''); }
+  function li(t, tag) { var a = String(t || '').split(/\n+/).map(function (x) { return x.replace(/^\s*(?:[-•*]|\d+[.)])\s*/, '').trim(); }).filter(Boolean); return a.length ? '<' + tag + '>' + a.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</' + tag + '>' : ''; }
+  function kv(rows) { rows = rows.filter(function (x) { return has(x[1]); }); return rows.length ? '<table><tbody>' + rows.map(function (x) { return '<tr><th>' + esc(x[0]) + '</th><td>' + esc(String(x[1])).replace(/\n/g, '<br>') + '</td></tr>'; }).join('') + '</tbody></table>' : ''; }
+  var team = (pr.team || []).filter(function (x) { return x.name; });
+  out['Титульный лист'] = '<h2 style="text-align:center">' + esc(regName(r)) + '</h2>' + kv([[LL('Регистрационный номер', 'Registration no.'), pr.no], [LL('Источник', 'Source'), ov(pr.type || '')], [LL('Тип исследования', 'Study type'), (pr.kinds || []).join(', ')], [LL('Многоцентровое', 'Multicentre'), pr.multi === 'Да' ? LL('да', 'yes') + (pr.centers ? ': ' + pr.centers : '') : ''], [LL('Возраст', 'Age'), pr.age], [LL('Коды МКБ-10', 'ICD-10'), pr.icd], [LL('Начало', 'Start'), fmtDate(pr.start)], [LL('Окончание', 'End'), fmtDate(pr.deadline)]]) + (team.length ? '<h3>' + LL('Исследовательская группа', 'Study team') + '</h3>' + '<ul>' + team.map(function (x) { return '<li>' + esc(x.name) + (x.role ? ', ' + esc(x.role) : '') + (x.deg ? ', ' + esc(x.deg) : '') + '</li>'; }).join('') + '</ul>' : '');
+  out['Синопсис'] = kv([[LL('Название', 'Title'), regName(r)], [LL('Дизайн', 'Design'), s.design && ov(s.design)], [LL('Цель', 'Aim'), s.aim], [LL('Первичная конечная точка', 'Primary endpoint'), s.endpoint], [LL('Группы', 'Groups'), s.groups], [LL('Целевой набор', 'Target sample'), pr.target], [LL('Сроки', 'Timeline'), [fmtDate(pr.start), fmtDate(pr.deadline)].filter(Boolean).join(' - ')]]);
+  out['Актуальность и обоснование'] = P(s.act);
+  out['Цель и задачи'] = (s.aim ? '<p><b>' + LL('Цель.', 'Aim.') + '</b> ' + esc(s.aim) + '</p>' : '') + (s.tasks ? '<p><b>' + LL('Задачи:', 'Objectives:') + '</b></p>' + li(s.tasks, 'ol') : '');
+  out['Дизайн исследования'] = s.design ? '<p>' + esc(ov(s.design)) + '</p>' : '';
+  out['Популяция: критерии включения и исключения'] = (pr.incl ? '<h3>' + LL('Критерии включения', 'Inclusion criteria') + '</h3>' + li(pr.incl, 'ol') : '') + (pr.excl ? '<h3>' + LL('Критерии исключения', 'Exclusion criteria') + '</h3>' + li(pr.excl, 'ol') : '');
+  out['Вмешательство и группы сравнения'] = P(s.groups);
+  out['Конечные точки'] = s.endpoint ? '<p><b>' + LL('Первичная конечная точка.', 'Primary endpoint.') + '</b> ' + esc(s.endpoint) + '</p><p><b>' + LL('Вторичные конечные точки.', 'Secondary endpoints.') + '</b> </p>' : '';
+  out['Гипотеза и расчёт размера выборки'] = P(s.hyp);
+  if (pr.rand && pr.rand.on === 'Да') out['Рандомизация и ослепление'] = '<p>' + LL('Рандомизация: да. Группы: ', 'Randomisation: yes. Arms: ') + esc((pr.rand.arms || []).map(function (a) { return a.name; }).join(', ')) + '.</p>';
+  out['Методология, обследование и сбор данных'] = P(s.meth);
+  out['Этапы и сроки'] = (pr.cps || []).length ? '<table><thead><tr><th>' + LL('Этап', 'Milestone') + '</th><th>' + LL('Срок', 'Date') + '</th></tr></thead><tbody>' + pr.cps.map(function (c) { return '<tr><td>' + esc(c.title || '') + '</td><td>' + esc(fmtDate(c.date) || '') + '</td></tr>'; }).join('') + '</tbody></table>' : '';
+  out['Ожидаемые результаты'] = P(s.exp);
+  return out;
+}
+
+/* ---------- раздел «Рукописи и литература» ---------- */
+function labProj() { return { id: '_lab', kind: 'lab', name: LL('Сектор: общие документы и библиотека', 'Sector: shared documents and library') }; }
+function wrProjects() {
+  var a = [labProj()];
+  studies().forEach(function (r) { a.push(r); });
+  (DB.pending || []).filter(function (r) { return r.kind === 'study'; }).forEach(function (r) { a.push(r); });
+  DB.registries.filter(function (r) { return r.kind !== 'study' && r.kind !== 'track'; }).forEach(function (r) { a.push(r); });
+  return a;
+}
+function wrCur() { var id = UI.wrSid || '_lab'; return wrProjects().filter(function (x) { return x.id === id; })[0] || labProj(); }
+function renderWrite() {
+  var r = wrCur(), tab = UI.wrTab === 'lib' ? 'lib' : 'paper', all = wrProjects();
+  var h = pageHead(LL('Наука', 'Research'), LL('Рукописи и литература', 'Manuscripts and library'), LL('Совместная работа над протоколами, статьями и тезисами: форматирование как в Word, заметки и предложения правок прямо в тексте, версии разделов и библиотека источников как в Zotero (можно связать со своим Zotero). У каждого исследования и регистра свои документы и библиотека, есть и общая библиотека сектора.', 'Write protocols, papers and abstracts together: Word-like formatting, comments and suggested edits in the text, section versions and a Zotero-like library (can sync with your Zotero).'));
+  function opt(x) { return '<option value="' + x.id + '"' + (x.id === r.id ? ' selected' : '') + '>' + esc(regName(x)) + (x.appr && x.appr.st ? LL(' (на одобрении)', ' (pending)') : '') + ' · ' + msPapers(x.id).length + LL(' док.', ' docs') + ', ' + msLib(x.id).length + LL(' ист.', ' refs') + '</option>'; }
+  var st = all.filter(function (x) { return x.kind === 'study'; }), rg = all.filter(function (x) { return x.kind !== 'study' && x.kind !== 'lab'; });
+  h += '<div class="wr-bar"><label class="fsel wr-sel"><span>' + LL('Проект', 'Project') + '</span><select data-wrsid="1">' + opt(all[0]) + (st.length ? '<optgroup label="' + LL('Исследования', 'Studies') + '">' + st.map(opt).join('') + '</optgroup>' : '') + (rg.length ? '<optgroup label="' + LL('Регистры', 'Registries') + '">' + rg.map(opt).join('') + '</optgroup>' : '') + '</select></label>';
+  h += '<div class="tabs">' + [['paper', LL('Документы', 'Documents'), msPapers(r.id).length], ['lib', LL('Литература', 'Library'), msLib(r.id).length]].map(function (x) { return '<button type="button" class="tab' + (tab === x[0] ? ' on' : '') + '" data-act="wrtab" data-v="' + x[0] + '">' + x[1] + ' <em>' + x[2] + '</em></button>'; }).join('') + '</div></div>';
+  return h + (tab === 'lib' ? renderLibrary(r) : renderPapers(r));
+}
+function wrOpen(sid, tab) { UI.wrSid = sid || '_lab'; UI.wrTab = tab || 'paper'; S.paperId = null; S.edit = null; setView('write'); }
+
+/* ---------- Zotero: связь с личной или групповой библиотекой пользователя ---------- */
+var ZOT = { busy: false, msg: '' };
+function zotCfg() { try { return JSON.parse(localStorage.getItem('crr.zotero') || 'null'); } catch (e) { return null; } }
+function zotSaveCfg(c) { try { if (c) localStorage.setItem('crr.zotero', JSON.stringify(c)); else localStorage.removeItem('crr.zotero'); } catch (e) {} }
+function zotFetch(path, opt, key) {
+  var c = zotCfg() || {}; opt = opt || {}; opt.headers = Object.assign({ 'Zotero-API-Key': key || c.key, 'Zotero-API-Version': '3' }, opt.headers || {});
+  return fetch('https://api.zotero.org' + path, opt).then(function (r) { if (!r.ok) return r.text().then(function (t) { throw new Error('Zotero ' + r.status + (r.status === 403 ? LL(': ключ не даёт доступа к этой библиотеке', ': key has no access') : t ? ': ' + t.slice(0, 140) : '')); }); return r; });
+}
+function zotConnect(key) {
+  key = String(key || '').trim(); if (!/^[A-Za-z0-9]{20,40}$/.test(key)) return Promise.reject(new Error(LL('Ключ Zotero выглядит иначе: 24 латинские буквы и цифры', 'A Zotero key is 24 letters and digits')));
+  return zotFetch('/keys/current', {}, key).then(function (r) { return r.json(); }).then(function (j) {
+    var acc = j.access || {}, c = { key: key, uid: j.userID, user: j.username, write: !!(acc.user && acc.user.write), groups: [], lib: '/users/' + j.userID };
+    return zotFetch('/users/' + j.userID + '/groups?limit=100', {}, key).then(function (r) { return r.json(); }).then(function (g) { c.groups = (g || []).map(function (x) { return { id: x.id, name: (x.data && x.data.name) || String(x.id) }; }); }).catch(function () {}).then(function () { zotSaveCfg(c); return c; });
+  });
+}
+function zotAll(path) {
+  var out = [], start = 0;
+  function page() { return zotFetch(path + (path.indexOf('?') >= 0 ? '&' : '?') + 'limit=100&start=' + start).then(function (r) { var tot = +(r.headers.get('Total-Results') || 0); return r.json().then(function (j) { out = out.concat(j); start += 100; ZOT.msg = LL('Загружено ', 'Loaded ') + out.length + (tot ? LL(' из ', ' of ') + tot : ''); render(); if (j.length === 100 && start < 5000) return page(); return out; }); }); }
+  return page();
+}
+var ZOT_TYPE = { journalArticle: 'journal-article', book: 'book', bookSection: 'chapter', conferencePaper: 'conference', thesis: 'thesis', webpage: 'webpage', report: 'report' };
+function fromZotero(d) {
+  var pm = /PMID:\s*(\d+)/i.exec(d.extra || '');
+  return { type: ZOT_TYPE[d.itemType] || 'journal-article', title: d.title || '', authors: (d.creators || []).filter(function (c) { return !c.creatorType || c.creatorType === 'author'; }).map(function (c) { return c.name ? splitName(c.name) : { family: c.lastName || '', given: c.firstName || '' }; }).filter(Boolean), journal: d.publicationTitle || d.bookTitle || d.proceedingsTitle || d.websiteTitle || d.university || d.publisher || '', year: (/(\d{4})/.exec(d.date || '') || [])[1] || '', volume: d.volume || '', issue: d.issue || '', pages: d.pages || '', doi: cleanDoi(d.DOI || d.extra || '') || '', pmid: pm ? pm[1] : '', url: d.url || '', abstract: d.abstractNote || '', tags: (d.tags || []).map(function (t) { return t.tag; }).filter(Boolean), zkey: d.key };
+}
+function toZotero(r) {
+  var inv = {}; Object.keys(ZOT_TYPE).forEach(function (k) { inv[ZOT_TYPE[k]] = k; }); var ty = inv[r.type] || 'journalArticle';
+  var o = { itemType: ty, title: r.title || '', creators: refAuthors(r).map(function (a) { return { creatorType: 'author', firstName: a.given || '', lastName: a.family || '' }; }), date: r.year || '', url: r.url || '', abstractNote: r.abstract || '', tags: (r.tags || []).map(function (t) { return { tag: t }; }), extra: r.pmid ? 'PMID: ' + r.pmid : '' };
+  if (ty === 'journalArticle') { o.publicationTitle = r.journal || ''; o.volume = r.volume || ''; o.issue = r.issue || ''; o.pages = r.pages || ''; o.DOI = r.doi || ''; }
+  else if (ty === 'bookSection') { o.bookTitle = r.journal || ''; o.pages = r.pages || ''; }
+  else if (ty === 'conferencePaper') { o.proceedingsTitle = r.journal || ''; o.pages = r.pages || ''; o.DOI = r.doi || ''; }
+  else if (ty === 'thesis') o.university = r.journal || '';
+  else if (ty === 'webpage') o.websiteTitle = r.journal || '';
+  else if (ty === 'report' || ty === 'book') o.publisher = r.journal || '';
+  return o;
+}
+function zotPull(sid) {
+  var c = zotCfg(); if (!c) return; var lp = c.lib || '/users/' + c.uid, m = msOf(sid), n = 0, u = 0, nn = 0;
+  ZOT.busy = true; ZOT.msg = LL('Загружаю коллекции…', 'Loading collections…'); render();
+  zotAll(lp + '/collections').then(function (cols) {
+    m.zcols = m.zcols || {};
+    cols.forEach(function (x) { var id = 'z_' + x.key; m.zcols[id] = Object.assign(m.zcols[id] || { id: id }, { name: x.data.name, zkey: x.key }); });
+    ZOT.msg = LL('Загружаю источники…', 'Loading items…'); render();
+    return zotAll(lp + '/items?itemType=-attachment');
+  }).then(function (items) {
+    var byZ = {}; msLib(sid).forEach(function (x) { if (x.zkey) byZ[x.zkey] = x; });
+    items.filter(function (x) { return x.data.itemType !== 'note'; }).forEach(function (x) {
+      var r = fromZotero(x.data), cols = (x.data.collections || []).map(function (k) { return 'z_' + k; }).filter(function (k) { return m.zcols[k]; }), ex = byZ[x.key] || refDupe(sid, r);
+      if (ex) { ['type', 'title', 'authors', 'journal', 'year', 'volume', 'issue', 'pages', 'doi', 'pmid', 'url', 'abstract'].forEach(function (f) { if (has(r[f]) && !(Array.isArray(r[f]) && !r[f].length)) ex[f] = r[f]; }); ex.zkey = x.key; ex.tags = (ex.tags || []).concat(r.tags.filter(function (t) { return (ex.tags || []).indexOf(t) < 0; })); ex.cols = (ex.cols || []).concat(cols.filter(function (k) { return (ex.cols || []).indexOf(k) < 0; })); byZ[x.key] = ex; u++; }
+      else { r.cols = cols; var o = refAdd(sid, r); o.ref.addedBy = 'Zotero'; byZ[x.key] = o.ref; n++; }
+    });
+    items.filter(function (x) { return x.data.itemType === 'note' && x.data.parentItem && byZ[x.data.parentItem]; }).forEach(function (x) {
+      var it = byZ[x.data.parentItem], id = 'zn_' + x.key, txt = String(x.data.note || '').replace(/<(br|\/p|\/li|\/h\d)[^>]*>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\n{3,}/g, '\n\n').trim();
+      it.notes = (it.notes || []).filter(function (q) { return q.id !== id; }).concat([{ id: id, text: txt, by: 'Zotero', at: x.data.dateModified || nowIso() }]); nn++;
+    });
+    ZOT.busy = false; ZOT.msg = LL('Готово: новых ', 'Done: new ') + n + LL(', обновлено ', ', updated ') + u + LL(', заметок ', ', notes ') + nn + '.'; save(); render();
+  }).catch(function (e) { ZOT.busy = false; ZOT.msg = LL('Ошибка: ', 'Error: ') + (e.message || e); render(); });
+}
+function zotPush(sid) {
+  var c = zotCfg(); if (!c) return; if (!c.write) { ZOT.msg = LL('Ключ открыт только на чтение. Создайте ключ с разрешением «Allow write access».', 'The key is read-only. Create a key with write access.'); render(); return; }
+  var lp = c.lib || '/users/' + c.uid, list = msLib(sid).filter(function (x) { return !x.zkey && (x.title || x.doi); }), done = 0, fail = 0, chain = Promise.resolve();
+  if (!list.length) { ZOT.msg = LL('Все источники уже есть в Zotero.', 'Everything is already in Zotero.'); render(); return; }
+  ZOT.busy = true; ZOT.msg = LL('Отправляю ', 'Sending ') + list.length + '…'; render();
+  for (var i = 0; i < list.length; i += 50) (function (part) {
+    chain = chain.then(function () { return zotFetch(lp + '/items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(part.map(toZotero)) }).then(function (r) { return r.json(); }).then(function (j) { Object.keys(j.successful || {}).forEach(function (k) { part[+k].zkey = j.successful[k].key; done++; }); fail += Object.keys(j.failed || {}).length; }); });
+  })(list.slice(i, i + 50));
+  chain.then(function () { ZOT.busy = false; ZOT.msg = LL('Отправлено в Zotero: ', 'Sent to Zotero: ') + done + (fail ? LL(', не принято: ', ', rejected: ') + fail : '') + '.'; save(); render(); }).catch(function (e) { ZOT.busy = false; ZOT.msg = LL('Ошибка: ', 'Error: ') + (e.message || e); save(); render(); });
+}
+function renderZotero() {
+  var sid = S.zot, c = zotCfg();
+  var h = '<div class="dim" data-act="zotx"></div><section class="modal" role="dialog" aria-modal="true" aria-label="Zotero" style="width:min(620px,calc(100% - 24px))"><div class="dhead"><div><div class="dh-kicker">' + LL('Литература', 'Library') + '</div><div class="dh-title">' + LL('Связь с Zotero', 'Zotero sync') + '</div></div><button type="button" class="iconbtn" data-act="zotx" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
+  if (!c) {
+    h += '<section class="card"><p>' + LL('Подключите свою библиотеку Zotero, чтобы загрузить из неё источники, коллекции, теги и заметки в библиотеку проекта, а новые источники проекта отправить обратно в Zotero.', 'Connect your Zotero library to pull items, collections, tags and notes into this project, and push new items back.') + '</p><ol class="zot-steps"><li>' + LL('Откройте ', 'Open ') + '<a href="https://www.zotero.org/settings/keys/new" target="_blank" rel="noopener">zotero.org/settings/keys/new</a>' + LL(' (вход в свой аккаунт Zotero).', ' (sign in to Zotero).') + '</li><li>' + LL('Отметьте «Allow library access», для отправки в Zotero также «Allow write access», для групп: «Read Only» или «Read/Write». Нажмите «Save Key».', 'Tick “Allow library access” (and “Allow write access” to push), set group access, Save Key.') + '</li><li>' + LL('Скопируйте ключ и вставьте ниже.', 'Paste the key below.') + '</li></ol>';
+    h += '<div class="fld wide"><label for="zotkey">' + LL('Ключ Zotero API', 'Zotero API key') + '</label><input id="zotkey" type="password" autocomplete="off" placeholder="' + LL('24 символа', '24 characters') + '"></div><p class="hint">' + LL('Ключ хранится только на этом устройстве и никуда, кроме api.zotero.org, не отправляется. У каждого коллеги свой ключ.', 'Stored on this device only and sent only to api.zotero.org.') + '</p>';
+    h += '<div class="actions"><button type="button" class="btn primary" data-act="zotconn"' + (ZOT.busy ? ' disabled' : '') + '>' + (ZOT.busy ? LL('Проверяю…', 'Checking…') : LL('Подключить', 'Connect')) + '</button></div></section>';
+  } else {
+    var nNew = msLib(sid).filter(function (x) { return !x.zkey; }).length, nZ = msLib(sid).filter(function (x) { return x.zkey; }).length;
+    h += '<section class="card"><p>' + ico('check', 15) + ' ' + LL('Подключено: ', 'Connected: ') + '<b>' + esc(c.user || String(c.uid)) + '</b>' + (c.write ? '' : LL(' (только чтение)', ' (read only)')) + '</p>';
+    h += '<div class="fld wide"><label for="zotlib">' + LL('Библиотека Zotero', 'Zotero library') + '</label><select id="zotlib" data-zotlib="1"><option value="/users/' + c.uid + '"' + (c.lib === '/users/' + c.uid ? ' selected' : '') + '>' + LL('Моя библиотека', 'My Library') + '</option>' + (c.groups || []).map(function (g) { return '<option value="/groups/' + g.id + '"' + (c.lib === '/groups/' + g.id ? ' selected' : '') + '>' + LL('Группа: ', 'Group: ') + esc(g.name) + '</option>'; }).join('') + '</select><p class="hint">' + LL('Для совместной работы удобна групповая библиотека Zotero: все участники видят одни и те же источники.', 'A Zotero group library works best for a team.') + '</p></div>';
+    h += '<div class="zot-acts"><button type="button" class="btn primary" data-act="zotpull" data-id="' + sid + '"' + (ZOT.busy ? ' disabled' : '') + '>' + ico('download', 15) + LL('Загрузить из Zotero', 'Pull from Zotero') + '</button><button type="button" class="btn" data-act="zotpush" data-id="' + sid + '"' + (ZOT.busy || !nNew ? ' disabled' : '') + '>' + ico('upload', 15) + LL('Отправить в Zotero новые (', 'Push new (') + nNew + ')</button></div>';
+    h += '<p class="hint">' + LL('Связано с Zotero источников: ', 'Linked items: ') + nZ + LL('. Повторная загрузка обновляет данные и не создаёт дублей (сверка по ключу Zotero, DOI и PMID). Вложенные PDF остаются в Zotero: открывайте их по кнопке «Открыть в Zotero».', '. Re-pulling updates without duplicates. PDFs stay in Zotero.') + '</p>';
+    if (ZOT.msg) h += '<p class="zot-msg">' + esc(ZOT.msg) + '</p>';
+    h += '<button type="button" class="linkbtn danger" data-act="zotoff">' + LL('Отключить Zotero на этом устройстве', 'Disconnect Zotero on this device') + '</button></section>';
+  }
+  if (!c && ZOT.msg) h += '<p class="zot-msg">' + esc(ZOT.msg) + '</p>';
+  return h + '</div></section>';
+}
+function pubmedAbstract(sid, id) {
+  var it = msOf(sid).lib[id]; if (!it || !it.pmid) return;
+  S.libBusy = true; render();
+  fetch('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&retmode=xml&id=' + encodeURIComponent(it.pmid)).then(function (r) { return r.text(); }).then(function (x) {
+    var d = new DOMParser().parseFromString(x, 'text/xml'), parts = [].map.call(d.querySelectorAll('Abstract AbstractText'), function (n) { var lb = n.getAttribute('Label'); return (lb ? lb + ': ' : '') + n.textContent.trim(); });
+    var pmc = d.querySelector('ArticleId[IdType="pmc"]'); if (pmc) it.pmcid = pmc.textContent.trim();
+    var kw = [].map.call(d.querySelectorAll('KeywordList Keyword, MeshHeading DescriptorName[MajorTopicYN="Y"]'), function (n) { return n.textContent.trim(); }).slice(0, 12);
+    S.libBusy = false; if (parts.length) it.abstract = parts.join('\n\n'); if (kw.length) { it.tags = it.tags || []; kw.forEach(function (k) { if (it.tags.indexOf(k) < 0) it.tags.push(k); }); }
+    save(); toast(parts.length ? LL('Аннотация загружена', 'Abstract loaded') + (kw.length ? LL(', ключевые слова добавлены в теги', ', keywords added as tags') : '') : LL('В PubMed нет аннотации для этой статьи', 'No abstract in PubMed')); render();
+  }).catch(function (e) { S.libBusy = false; toast(LL('PubMed не ответил: ', 'PubMed failed: ') + (e.message || e)); render(); });
+}
+
 /* ---------- вкладка «Статьи» ---------- */
 function msCanEdit() { return can('edit') && !isStudent(); }
 function renderPapers(r) {
   var sid = r.id, list = msPapers(sid), cur = list.filter(function (p) { return p.id === S.paperId; })[0] || list[0];
-  var h = '<div class="paperw">';
+  var h = '<div class="paperw"' + (cur ? ' data-sid="' + sid + '" data-pid="' + cur.id + '"' : '') + '>';
   h += '<div class="pp-top"><div class="pp-list">' + list.map(function (p) { return '<button type="button" class="kchip' + (cur && cur.id === p.id ? ' on' : '') + '" data-act="paperpick" data-v="' + p.id + '">' + ico('doc', 13) + esc(p.title || LL('Без названия', 'Untitled')) + '</button>'; }).join('') + '</div>';
-  if (msCanEdit()) h += '<div class="dd"><button type="button" class="btn" data-act="menu" data-id="pnew">' + ico('plus', 15) + LL('Новая статья', 'New paper') + ico('down', 13) + '</button>' + (S.menu === 'pnew' ? '<div class="pop right" role="menu">' + Object.keys(PAPER_TPL).map(function (k) { return '<button type="button" class="opt" data-act="papernew" data-id="' + sid + '" data-v="' + k + '">' + esc(PAPER_TPL[k][0]) + '</button>'; }).join('') + '</div>' : '') + '</div>';
+  if (msCanEdit()) h += '<div class="dd"><button type="button" class="btn" data-act="menu" data-id="pnew">' + ico('plus', 15) + LL('Новый документ', 'New document') + ico('down', 13) + '</button>' + (S.menu === 'pnew' ? '<div class="pop right" role="menu">' + Object.keys(PAPER_TPL).map(function (k) { return '<button type="button" class="opt" data-act="papernew" data-id="' + sid + '" data-v="' + k + '">' + esc(PAPER_TPL[k][0]) + '</button>'; }).join('') + '</div>' : '') + '</div>';
   h += '</div>';
-  if (!cur) return h + '<div class="empty">' + LL('В проекте ещё нет статей. Создайте первую: разделы появятся по шаблону, писать можно вместе, каждый в своём разделе, с заметками друг для друга.', 'No papers yet. Create one from a template; write together, section by section, with notes to each other.') + '</div></div>';
+  if (!cur) return h + '<div class="empty">' + LL('В проекте ещё нет документов. Нажмите «Новый документ»: протокол исследования (разделы по SPIRIT, данные подтянутся из мастера протокола), статья, клинический случай, обзор или тезисы. Писать можно вместе, каждый в своём разделе, с форматированием как в Word, заметками и предложениями правок прямо в тексте.', 'No papers yet. Create one from a template; write together, section by section, with notes to each other.') + '</div></div>';
   S.paperId = cur.id;
   var secs = msSecs(sid, cur.id), style = cur.style || 'vancouver', ord = citeOrder(sid, cur.id), m = msOf(sid);
   var total = secs.reduce(function (a, s) { return a + words(s.text); }, 0);
   var cms = Object.keys(m.cm).map(function (k) { return m.cm[k]; }).filter(function (c) { return c.paper === cur.id && !c.parent; }).sort(function (a, b) { return String(b.at).localeCompare(String(a.at)); });
   h += '<div class="pp-head"><input type="text" class="pp-title" data-pmeta="' + sid + '.' + cur.id + '.title" value="' + esc(cur.title || '') + '" placeholder="' + LL('Название статьи', 'Paper title') + '"' + (msCanEdit() ? '' : ' readonly') + '>';
-  h += '<div class="pp-tools"><span class="muted">' + esc(PAPER_TPL[cur.tpl] ? PAPER_TPL[cur.tpl][0] : '') + ' · ' + total + LL(' слов', ' words') + ' · ' + ord.length + LL(' ссылок', ' citations') + '</span><label class="fsel"><select data-pstyle="' + sid + '.' + cur.id + '">' + CITE_STYLES.map(function (s2) { return '<option value="' + s2[0] + '"' + (s2[0] === style ? ' selected' : '') + '>' + LL('Стиль: ', 'Style: ') + s2[1] + '</option>'; }).join('') + '</select></label><button type="button" class="btn" data-act="paperdoc" data-id="' + sid + '">' + ico('download', 15) + 'Word</button><button type="button" class="btn" data-act="paperread" data-id="' + sid + '">' + ico('eye', 15) + (S.paperRead ? LL('Редактор', 'Editor') : LL('Как в журнале', 'Preview')) + '</button></div></div>';
+  h += '<div class="pp-tools"><span class="muted">' + esc(PAPER_TPL[cur.tpl] ? PAPER_TPL[cur.tpl][0] : '') + ' · ' + total + LL(' слов', ' words') + ' · ' + ord.length + LL(' ссылок', ' citations') + '</span><label class="fsel"><select data-pstyle="' + sid + '.' + cur.id + '">' + CITE_STYLES.map(function (s2) { return '<option value="' + s2[0] + '"' + (s2[0] === style ? ' selected' : '') + '>' + LL('Стиль: ', 'Style: ') + s2[1] + '</option>'; }).join('') + '</select></label><button type="button" class="btn" data-act="paperdoc" data-id="' + sid + '">' + ico('download', 15) + 'Word</button>' + (function () { var pz = msPresence(cur); return pz.length ? '<span class="pp-pres" title="' + LL('Сейчас открыли этот документ', 'Viewing now') + '">' + pz.map(function (n) { return '<span class="av sm">' + esc(initials(n)) + '</span>'; }).join('') + '<em>' + esc(pz.join(', ')) + '</em></span>' : ''; })() + '<button type="button" class="btn" data-act="paperread" data-id="' + sid + '">' + ico('eye', 15) + (S.paperRead ? LL('Редактор', 'Editor') : LL('Как в журнале', 'Preview')) + '</button></div></div>';
   h += '<div class="pp-body"><nav class="pp-nav">' + secs.map(function (s) { return '<button type="button" data-act="msjump" data-id="ms-' + s.id + '"><span>' + esc(s.title) + '</span><em>' + words(s.text) + '</em>' + (s.lock && !msLockFree(s) ? ico('lock', 12) : '') + '</button>'; }).join('') + '<button type="button" data-act="msjump" data-id="ms-refs"><span>' + LL('Список литературы', 'References') + '</span><em>' + ord.length + '</em></button>' + (msCanEdit() ? '<button type="button" class="add" data-act="secadd" data-id="' + sid + '">' + ico('plus', 13) + LL('Раздел', 'Section') + '</button>' : '') + '</nav>';
   h += '<div class="pp-main">';
   if (S.paperRead) {
-    h += '<article class="pp-read"><h1>' + esc(cur.title || '') + '</h1>' + secs.map(function (s) { return '<h2 id="ms-' + s.id + '">' + esc(s.title) + '</h2><p>' + renderCites(s.text || '', sid, cur.id, style, ord) + '</p>'; }).join('') + '<h2 id="ms-refs">' + LL('Список литературы', 'References') + '</h2><ol class="pp-refs' + (style === 'apa' ? ' apa' : '') + '">' + refList(sid, cur.id, style).map(function (x) { return '<li>' + refFmt(x, style) + '</li>'; }).join('') + '</ol></article>';
+    h += '<article class="pp-read"><h1>' + esc(cur.title || '') + '</h1>' + secs.map(function (s) { return '<h2 id="ms-' + s.id + '">' + esc(s.title) + '</h2><div class="rt-view">' + secView(s, sid, style, ord) + '</div>'; }).join('') + '<h2 id="ms-refs">' + LL('Список литературы', 'References') + '</h2><ol class="pp-refs' + (style === 'apa' ? ' apa' : '') + '">' + refList(sid, cur.id, style).map(function (x) { return '<li>' + refFmt(x, style) + '</li>'; }).join('') + '</ol></article>';
   } else {
     secs.forEach(function (s, i) {
       var mine = S.msEdit && S.msEdit.key === s.id, locked = !msLockFree(s), nc = cms.filter(function (c) { return c.sec === s.id && !c.done; }).length;
@@ -6264,12 +6639,12 @@ function renderPapers(r) {
       if (locked) h += '<span class="tag due">' + ico('lock', 12) + LL('Пишет ', 'Editing: ') + esc(s.lock.by) + '</span>';
       h += '<span class="pp-sa">';
       if (msCanEdit() && !mine && !locked) h += '<button type="button" class="btn small" data-act="secedit" data-id="' + sid + '" data-v="' + s.id + '">' + ico('doc', 14) + LL('Писать', 'Write') + '</button>';
-      if (mine) h += '<button type="button" class="btn small" data-act="citeopen" data-id="' + sid + '" data-v="' + s.id + '">' + ico('book', 14) + LL('Цитировать', 'Cite') + '</button><button type="button" class="btn small primary" data-act="secdone" data-id="' + sid + '" data-v="' + s.id + '">' + ico('check', 14) + LL('Готово', 'Done') + '</button>';
+      if (mine) h += '<button type="button" class="btn small primary" data-act="secdone" data-id="' + sid + '" data-v="' + s.id + '">' + ico('check', 14) + LL('Готово', 'Done') + '</button>';
       h += '<button type="button" class="btn small ghost" data-act="cmnew" data-id="' + sid + '" data-v="' + s.id + '">' + ico('chat', 14) + LL('Заметка', 'Note') + (nc ? ' <b class="badge">' + nc + '</b>' : '') + '</button>';
       if (msCanEdit() && !mine && !locked) h += '<div class="dd"><button type="button" class="iconbtn sm" data-act="menu" data-id="sm-' + s.id + '" aria-label="' + LL('Ещё', 'More') + '">' + ico('more', 16) + '</button>' + (S.menu === 'sm-' + s.id ? '<div class="pop right" role="menu">' + (i ? '<button type="button" class="opt" data-act="secmove" data-id="' + sid + '" data-v="' + s.id + '" data-d="-1">' + LL('Выше', 'Move up') + '</button>' : '') + (i < secs.length - 1 ? '<button type="button" class="opt" data-act="secmove" data-id="' + sid + '" data-v="' + s.id + '" data-d="1">' + LL('Ниже', 'Move down') + '</button>' : '') + ((s.hist || []).length ? '<button type="button" class="opt" data-act="sechist" data-id="' + sid + '" data-v="' + s.id + '">' + LL('Версии раздела', 'Section versions') + ' (' + s.hist.length + ')</button>' : '') + '<button type="button" class="opt danger" data-act="secdel" data-id="' + sid + '" data-v="' + s.id + '">' + LL('Удалить раздел', 'Delete section') + '</button></div>' : '') + '</div>';
       h += '</span></div>';
-      if (mine) h += '<textarea class="pp-ed" id="msed" data-msed="' + sid + '.' + s.id + '" spellcheck="true" placeholder="' + LL('Пишите здесь. Пустая строка начинает новый абзац. Ссылка на источник: кнопка «Цитировать».', 'Write here. A blank line starts a new paragraph. Use Cite to insert a reference.') + '">' + esc(s.text || '') + '</textarea>';
-      else h += '<div class="pp-txt">' + (s.text ? '<p>' + renderCites(s.text, sid, cur.id, style, ord) + '</p>' : '<p class="muted">' + LL('Раздел пуст', 'Empty section') + '</p>') + '</div>';
+      if (mine) h += rtToolbar(sid, s.id) + '<div class="pp-ed rt-view" id="msed" contenteditable="true" spellcheck="true" data-msed="' + sid + '.' + s.id + '" data-ph="' + LL('Пишите здесь. Форматирование: панель выше или Ctrl+B, Ctrl+I, Ctrl+U. Можно вставить текст из Word с оформлением.', 'Write here. Use the toolbar or Ctrl+B/I/U. Paste from Word keeps formatting.') + '">' + citeChips(secHTML(s), sid) + '</div>';
+      else h += s.text ? '<div class="pp-txt rt-view" data-sid="' + sid + '" data-sec="' + s.id + '">' + secView(s, sid, style, ord) + '</div>' : '<div class="pp-txt"><p class="muted">' + LL('Раздел пуст', 'Empty section') + '</p></div>';
       if (S.msHist && S.msHist.sec === s.id) h += '<div class="pp-hist"><b>' + LL('Версии раздела', 'Section versions') + '</b>' + (s.hist || []).slice().reverse().map(function (v, j) { return '<div class="ph-r"><span>' + fmtDT(v.at) + ' · ' + esc(v.by) + ' · ' + words(v.text) + LL(' слов', ' words') + '</span><button type="button" class="btn small" data-act="secrestore" data-id="' + sid + '" data-v="' + s.id + '" data-i="' + (s.hist.length - 1 - j) + '">' + LL('Вернуть эту версию', 'Restore') + '</button></div>'; }).join('') + '<button type="button" class="linkbtn" data-act="sechistx">' + LL('Закрыть', 'Close') + '</button></div>';
       h += '</section>';
     });
@@ -6282,17 +6657,17 @@ function renderPapers(r) {
   h += '<aside class="pp-notes"><div class="pn-top"><b>' + ico('chat', 15) + LL('Заметки команды', 'Team notes') + '</b><div class="seg sm">' + [['open', LL('Открытые', 'Open')], ['me', LL('Мне', 'To me')], ['all', LL('Все', 'All')]].map(function (x) { return '<button type="button" class="' + (fl === x[0] ? 'on' : '') + '" data-act="cmflt" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div>';
   if (S.cmNew && S.cmNew.sid === sid) {
     var people = msPeople(r);
-    h += '<div class="cm-new"><div class="muted small">' + LL('К разделу: ', 'Section: ') + esc((m.secs[S.cmNew.sec] || {}).title || '') + '</div>' + (S.cmNew.quote ? '<blockquote>' + esc(S.cmNew.quote) + '</blockquote>' : '') + '<textarea id="cmtext" rows="3" placeholder="' + LL('Что поправить, дописать, проверить…', 'What to fix, add, check…') + '"></textarea><label class="fsel"><select id="cmto"><option value="">' + LL('Кому: всем', 'To: everyone') + '</option>' + people.map(function (n) { return '<option value="' + esc(n) + '">' + LL('Кому: ', 'To: ') + esc(n) + '</option>'; }).join('') + '</select></label><div class="actions"><button type="button" class="btn small" data-act="cmx">' + t('b.cancel') + '</button><button type="button" class="btn small primary" data-act="cmsave" data-id="' + sid + '">' + LL('Оставить заметку', 'Post note') + '</button></div></div>';
+    h += '<div class="cm-new"><div class="muted small">' + LL('К разделу: ', 'Section: ') + esc((m.secs[S.cmNew.sec] || {}).title || '') + '</div>' + (S.cmNew.quote ? '<blockquote>' + esc(S.cmNew.quote) + '</blockquote>' + (msCanEdit() ? '<div class="seg sm cm-kind"><button type="button" class="' + (S.cmNew.kind !== 'sug' ? 'on' : '') + '" data-act="cmkind" data-v="note">' + LL('Заметка', 'Comment') + '</button><button type="button" class="' + (S.cmNew.kind === 'sug' ? 'on' : '') + '" data-act="cmkind" data-v="sug">' + LL('Предложить правку', 'Suggest edit') + '</button></div>' : '') + (S.cmNew.kind === 'sug' ? '<label class="muted small" for="cmrepl">' + LL('Заменить выделенное на:', 'Replace with:') + '</label><textarea id="cmrepl" rows="3">' + esc(S.cmNew.quote) + '</textarea>' : '') : '') + '<textarea id="cmtext" rows="' + (S.cmNew.kind === 'sug' ? 2 : 3) + '" placeholder="' + LL('Что поправить, дописать, проверить…', 'What to fix, add, check…') + '"></textarea><label class="fsel"><select id="cmto"><option value="">' + LL('Кому: всем', 'To: everyone') + '</option>' + people.map(function (n) { return '<option value="' + esc(n) + '">' + LL('Кому: ', 'To: ') + esc(n) + '</option>'; }).join('') + '</select></label><div class="actions"><button type="button" class="btn small" data-act="cmx">' + t('b.cancel') + '</button><button type="button" class="btn small primary" data-act="cmsave" data-id="' + sid + '">' + LL('Оставить заметку', 'Post note') + '</button></div></div>';
   }
   h += shown.length ? shown.map(function (c) {
     var reps = Object.keys(m.cm).map(function (k) { return m.cm[k]; }).filter(function (x) { return x.parent === c.id; }).sort(function (a, b) { return String(a.at).localeCompare(String(b.at)); });
-    return '<div class="cm' + (c.done ? ' done' : '') + (c.to === meN && !c.done ? ' tome' : '') + '"><div class="cm-h"><span class="av sm">' + esc(initials(c.by)) + '</span><b>' + esc(c.by) + '</b>' + (c.to ? '<span class="muted">→ ' + esc(c.to) + '</span>' : '') + '<span class="muted small">' + fmtDT(c.at) + '</span></div><button type="button" class="cm-sec" data-act="msjump" data-id="ms-' + c.sec + '">' + esc((m.secs[c.sec] || {}).title || LL('раздел удалён', 'section removed')) + '</button>' + (c.quote ? '<blockquote>' + esc(c.quote) + '</blockquote>' : '') + '<p>' + esc(c.text).replace(/\n/g, '<br>') + '</p>' + reps.map(function (x) { return '<div class="cm-rep"><b>' + esc(x.by) + '</b> <span class="muted small">' + fmtDT(x.at) + '</span><p>' + esc(x.text).replace(/\n/g, '<br>') + '</p></div>'; }).join('') + '<div class="cm-a"><input type="text" data-cmrep="' + sid + '.' + c.id + '" placeholder="' + LL('Ответить…', 'Reply…') + '"><button type="button" class="btn small ghost" data-act="cmdone" data-id="' + sid + '" data-v="' + c.id + '">' + (c.done ? LL('Открыть снова', 'Reopen') : ico('check', 13) + LL('Решено', 'Resolve')) + '</button></div></div>';
+    return '<div class="cm' + (c.done ? ' done' : '') + (c.to === meN && !c.done ? ' tome' : '') + (c.kind === 'sug' ? ' sug' : '') + (S.cmFocus === c.id ? ' focus' : '') + '" id="cm-' + c.id + '"><div class="cm-h"><span class="av sm">' + esc(initials(c.by)) + '</span><b>' + esc(c.by) + '</b>' + (c.to ? '<span class="muted">→ ' + esc(c.to) + '</span>' : '') + '<span class="muted small">' + fmtDT(c.at) + '</span></div><button type="button" class="cm-sec" data-act="msjump" data-id="ms-' + c.sec + '">' + esc((m.secs[c.sec] || {}).title || LL('раздел удалён', 'section removed')) + '</button>' + (c.kind === 'sug' ? '<div class="sug-b"><span class="muted small">' + LL('Предлагает заменить', 'Suggests replacing') + '</span><button type="button" class="sug-old" data-act="cmjump" data-v="' + c.id + '">' + esc(c.quote || '') + '</button><span class="muted small">' + LL('на', 'with') + '</span><div class="sug-new">' + esc(c.repl || '').replace(/\n/g, '<br>') + '</div>' + (c.accepted ? '<span class="tag ok">' + LL('Принято: ', 'Accepted: ') + esc(c.accBy || '') + '</span>' : !c.done && msCanEdit() ? '<div class="actions"><button type="button" class="btn small primary" data-act="cmaccept" data-id="' + sid + '" data-v="' + c.id + '">' + ico('check', 13) + LL('Принять', 'Accept') + '</button></div>' : '') + '</div>' : c.quote ? '<button type="button" class="cm-q" data-act="cmjump" data-v="' + c.id + '" title="' + LL('Показать в тексте', 'Show in text') + '">' + esc(c.quote) + '</button>' : '') + (c.text ? '<p>' + esc(c.text).replace(/\n/g, '<br>') + '</p>' : '') + reps.map(function (x) { return '<div class="cm-rep"><b>' + esc(x.by) + '</b> <span class="muted small">' + fmtDT(x.at) + '</span><p>' + esc(x.text).replace(/\n/g, '<br>') + '</p></div>'; }).join('') + '<div class="cm-a"><input type="text" data-cmrep="' + sid + '.' + c.id + '" placeholder="' + LL('Ответить…', 'Reply…') + '"><button type="button" class="btn small ghost" data-act="cmdone" data-id="' + sid + '" data-v="' + c.id + '">' + (c.done ? LL('Открыть снова', 'Reopen') : ico('check', 13) + LL('Решено', 'Resolve')) + '</button></div></div>';
   }).join('') : '<p class="muted small">' + (fl === 'me' ? LL('Вам заметок нет', 'No notes for you') : LL('Заметок нет. Кнопка «Заметка» у раздела: можно выделить фрагмент текста и оставить к нему заметку для коллеги.', 'No notes. Use Note on a section; select text first to quote it.')) + '</p>';
   h += '</aside></div></div>';
   return h;
 }
 function msPeople(r) {
-  var set = {}, pr = stProto(r); (pr.team || []).forEach(function (x) { if (x.name) set[x.name] = 1; });
+  var set = {}, pr = r.proto || {}; (pr.team || []).forEach(function (x) { if (x.name) set[x.name] = 1; });
   var m = msOf(r.id); Object.keys(m.cm).forEach(function (k) { if (m.cm[k].by) set[m.cm[k].by] = 1; }); Object.keys(m.secs).forEach(function (k) { var u = m.secs[k].upd; if (u && u.by) set[u.by] = 1; });
   delete set[me()]; return Object.keys(set).sort();
 }
@@ -6300,14 +6675,17 @@ function fmtDT(iso) { if (!iso) return ''; var d = new Date(iso); return isNaN(d
 function citeMatches() {
   var o = S.msCite, q = String(o.q || '').toLowerCase().trim(); if (!q) return [];
   var ws = q.split(/\s+/);
-  return msLib(o.sid).filter(function (x) { if ((o.sel || []).indexOf(x.id) >= 0) return false; var hay = (refAuthors(x).map(function (a) { return a.family + ' ' + a.given; }).join(' ') + ' ' + x.year + ' ' + x.title).toLowerCase(); return ws.every(function (w) { return hay.indexOf(w) >= 0; }); }).slice(0, 10);
+  function hit(x) { var hay = (refAuthors(x).map(function (a) { return a.family + ' ' + a.given; }).join(' ') + ' ' + x.year + ' ' + x.title + ' ' + (x.tags || []).join(' ')).toLowerCase(); return ws.every(function (w) { return hay.indexOf(w) >= 0; }); }
+  var own = msLib(o.sid).filter(function (x) { return (o.sel || []).indexOf(x.id) < 0 && hit(x); }).slice(0, 10);
+  if (o.sid !== '_lab' && own.length < 10) msLib('_lab').filter(function (x) { return hit(x) && !refDupe(o.sid, x); }).slice(0, 10 - own.length).forEach(function (x) { own.push(Object.assign({ _lab: true }, x)); });
+  return own;
 }
 function renderCite() {
   var o = S.msCite, lib = msOf(o.sid).lib, list = citeMatches(); o.i = Math.min(o.i || 0, Math.max(0, list.length - 1));
   var h = '<div class="dim light" data-act="citex"></div><div class="qf" role="dialog" aria-label="' + LL('Вставить цитату', 'Add Citation') + '"><div class="qf-bar"><span class="qf-z">' + ico('book', 18) + '</span>';
   h += (o.sel || []).map(function (k, i) { var x = lib[k]; return '<span class="qf-b">' + esc(x ? zCreator(x) + ', ' + (x.year || '') : '?') + '<button type="button" data-act="citebdel" data-i="' + i + '" aria-label="×">×</button></span>'; }).join('');
   h += '<input type="text" id="citeq" data-citeq="1" value="' + esc(o.q || '') + '" placeholder="' + ((o.sel || []).length ? '' : LL('Автор, год или слово из названия', 'Author, year or title word')) + '" autocomplete="off" data-autofocus></div>';
-  if (list.length) h += '<div class="qf-list"><div class="qf-g">' + LL('Моя библиотека', 'My Library') + '</div>' + list.map(function (x, i) { return '<button type="button" class="qf-it' + (i === o.i ? ' on' : '') + '" data-act="citeadd" data-v="' + x.id + '"><b>' + esc(x.title || '') + '</b><span>' + esc(zCreator(x)) + (x.year ? ', ' + esc(x.year) : '') + (x.journal ? ' · ' + esc(x.journal) : '') + '</span></button>'; }).join('') + '</div>';
+  if (list.length) h += '<div class="qf-list">' + (list[0] && !list[0]._lab ? '<div class="qf-g">' + LL('Библиотека проекта', 'Project library') + '</div>' : '') + list.map(function (x, i) { return (x._lab && !(list[i - 1] || {})._lab ? '<div class="qf-g">' + LL('Общая библиотека сектора (будет скопировано в проект)', 'Sector library (copied into project)') + '</div>' : '') + '<button type="button" class="qf-it' + (i === o.i ? ' on' : '') + '" data-act="citeadd" data-v="' + x.id + '"' + (x._lab ? ' data-lab="1"' : '') + '><b>' + esc(x.title || '') + '</b><span>' + esc(zCreator(x)) + (x.year ? ', ' + esc(x.year) : '') + (x.journal ? ' · ' + esc(x.journal) : '') + '</span></button>'; }).join('') + '</div>';
   else if (o.q) h += '<div class="qf-list"><div class="qf-none">' + LL('Не найдено. Добавьте источник во вкладке «Литература».', 'No match. Add the item in the Library tab.') + '</div></div>';
   h += '<div class="qf-hint">' + LL('Enter: выбрать источник · Enter по пустому полю: вставить · Esc: отмена', 'Enter: pick · Enter on empty: insert · Esc: cancel') + '</div></div>';
   return h;
@@ -6315,22 +6693,25 @@ function renderCite() {
 /* ---------- действия ---------- */
 function paperNew(sid, tpl) {
   var m = msOf(sid), pid = uid('p'), T = PAPER_TPL[tpl] || PAPER_TPL.orig;
-  var p = { id: pid, tpl: tpl, title: '', style: 'vancouver', order: [], created: nowIso(), by: me() };
-  T[1].forEach(function (nm) { var id = uid('s'); m.secs[id] = { id: id, paper: pid, title: nm, text: '' }; p.order.push(id); });
+  var pj = projOf(sid), pre = tpl === 'proto' ? protoPrefill(pj) : {};
+  var p = { id: pid, tpl: tpl, title: tpl === 'proto' && pj && pj.kind !== 'lab' ? LL('Протокол: ', 'Protocol: ') + regName(pj) : '', style: 'vancouver', order: [], created: nowIso(), by: me() };
+  T[1].forEach(function (nm) { var id = uid('s'); m.secs[id] = { id: id, paper: pid, title: nm, text: pre[nm] || '', fmt: 'html' }; p.order.push(id); });
   m.papers[pid] = p; S.paperId = pid; S.menu = null; save(); render();
 }
+function projOf(sid) { if (sid === '_lab') return labProj(); return regOf(sid) || (DB.pending || []).filter(function (x) { return x.id === sid; })[0] || null; }
 function msSaveSoon() { clearTimeout(MSX.timer); MSX.timer = setTimeout(function () { save(); }, 1200); }
 function secEdit(sid, key) {
   var s = msOf(sid).secs[key]; if (!s || !msLockFree(s)) { toast(LL('Раздел сейчас пишет другой участник', 'Someone else is editing this section')); return; }
   if (S.msEdit) secDone(S.msEdit.sid, S.msEdit.key, true);
-  s.lock = { uid: msMe(), by: me(), at: nowIso() }; MSX.start[key] = s.text || ''; S.msEdit = { sid: sid, key: key }; save(); render();
-  setTimeout(function () { var ta = root.querySelector('#msed'); if (ta) { ta.focus(); ta.style.height = ta.scrollHeight + 'px'; } }, 30);
+  s.lock = { uid: msMe(), by: me(), at: nowIso() }; MSX.start[key] = s.text || ''; MSX.startFmt = MSX.startFmt || {}; MSX.startFmt[key] = s.fmt; S.msEdit = { sid: sid, key: key }; save(); render();
+  setTimeout(function () { var ta = root.querySelector('#msed'); if (ta) { ta.focus(); if (ta.isContentEditable) rtCaretSet(ta, 1e9); else ta.style.height = ta.scrollHeight + 'px'; } }, 30);
 }
 function secDone(sid, key, silent) {
   var s = msOf(sid).secs[key]; S.msEdit = null; S.msCite = null;
   if (s) {
-    var ta = root.querySelector('#msed'); if (ta && ta.getAttribute('data-msed') === sid + '.' + key) s.text = ta.value;
-    if (MSX.start[key] !== undefined && MSX.start[key] !== (s.text || '')) { s.hist = (s.hist || []).concat([{ text: MSX.start[key], by: (s.upd && s.upd.by) || me(), at: (s.upd && s.upd.at) || nowIso() }]).slice(-10); s.upd = { by: me(), at: nowIso() }; }
+    var ta = root.querySelector('#msed'); if (ta && ta.getAttribute('data-msed') === sid + '.' + key) { if (ta.isContentEditable) { s.text = rtClean(ta.innerHTML); s.fmt = 'html'; } else s.text = ta.value; }
+    if (s.text) s.text = s.text.replace(/[\u2063\u2064]/g, '');
+    if (MSX.start[key] !== undefined && MSX.start[key] !== (s.text || '')) { s.hist = (s.hist || []).concat([{ text: MSX.start[key], fmt: MSX.startFmt && MSX.startFmt[key], by: (s.upd && s.upd.by) || me(), at: (s.upd && s.upd.at) || nowIso() }]).slice(-10); s.upd = { by: me(), at: nowIso() }; }
     delete MSX.start[key]; delete s.lock;
   }
   clearTimeout(MSX.timer); save(); if (!silent) { if (CLOUD.stale) CLOUD.stale = false; render(); }
@@ -6338,18 +6719,40 @@ function secDone(sid, key, silent) {
 function paperDoc(sid) {
   var p = msOf(sid).papers[S.paperId]; if (!p) return;
   var style = p.style || 'vancouver', ord = citeOrder(sid, p.id), secs = msSecs(sid, p.id);
-  var body = '<h1>' + esc(p.title || '') + '</h1>' + secs.map(function (s) { return '<h2>' + esc(s.title) + '</h2><p>' + renderCites(s.text || '', sid, p.id, style, ord).replace(/<span class="cite">/g, '').replace(/<\/span>/g, '') + '</p>'; }).join('') + '<h2>' + LL('Список литературы', 'References') + '</h2><ol>' + refList(sid, p.id, style).map(function (x) { return '<li>' + refFmt(x, style) + '</li>'; }).join('') + '</ol>';
-  var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>body{font-family:"Times New Roman";font-size:12pt;line-height:1.5}h1{font-size:14pt;text-align:center}h2{font-size:12pt}p{text-align:justify}</style></head><body>' + body + '</body></html>';
+  var body = '<h1>' + esc(p.title || '') + '</h1>' + secs.map(function (s) { return '<h2>' + esc(s.title) + '</h2>' + secView(s, sid, style, ord).replace(/<span class="cite">/g, '').replace(/<\/span>/g, ''); }).join('') + '<h2>' + LL('Список литературы', 'References') + '</h2><ol>' + refList(sid, p.id, style).map(function (x) { return '<li>' + refFmt(x, style) + '</li>'; }).join('') + '</ol>';
+  var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>body{font-family:"Times New Roman";font-size:12pt;line-height:1.5}h1{font-size:14pt;text-align:center}h2{font-size:12pt}h3{font-size:12pt;font-style:italic}p{text-align:justify;margin:0 0 6pt}table{border-collapse:collapse;width:100%;margin:6pt 0}td,th{border:1px solid #000;padding:3pt 5pt;vertical-align:top;text-align:left}th{background:#eee}mark{background:#ff0}blockquote{margin:6pt 24pt;font-style:italic}</style></head><body>' + body + '</body></html>';
   download((p.title || 'article').replace(/[\\\/:*?"<>|]+/g, ' ').slice(0, 80) + '.doc', '﻿' + html, 'application/msword');
 }
 function msAct(a, g) {
   var sid = g('id'), m = sid ? msOf(sid) : null, v = g('v');
   if (a === 'msjump') { var el0 = root.querySelector('#' + g('id')); if (el0) el0.scrollIntoView({ behavior: 'smooth', block: 'start' }); return true; }
-  var RO = { libopen: 1, libtag: 1, zcol: 1, zsel: 1, zselnote: 1, ztw: 1, zsort: 1, paperpick: 1, paperread: 1, paperdoc: 1, libexp: 1, libbib: 1, libfoundx: 1, libimpx: 1, cmnew: 1, cmx: 1, cmsave: 1, cmflt: 1, citex: 1, sechist: 1, sechistx: 1 };
-  var ALL = { libadd: 1, libpick: 1, libman: 1, libimp: 1, libimpgo: 1, libdel: 1, papernew: 1, secedit: 1, secdone: 1, secadd: 1, secdel: 1, secmove: 1, secrestore: 1, citeopen: 1, citego: 1, citeadd: 1, citebdel: 1, cmdone: 1, znew: 1, znote: 1, znotedel: 1, zcolnew: 1, zcolren: 1, zcoldel: 1, zincol: 1, ztagdel: 1, zaudel: 1, zauadd: 1 };
+  var RO = { cmsel: 1, cmfocus: 1, cmjump: 1, cmkind: 1, wrtab: 1, wropen: 1, zot: 1, zotx: 1, zotconn: 1, zotoff: 1, pmabs: 1, libopen: 1, libtag: 1, zcol: 1, zsel: 1, zselnote: 1, ztw: 1, zsort: 1, paperpick: 1, paperread: 1, paperdoc: 1, libexp: 1, libbib: 1, libfoundx: 1, libimpx: 1, cmnew: 1, cmx: 1, cmsave: 1, cmflt: 1, citex: 1, sechist: 1, sechistx: 1 };
+  var ALL = { cmaccept: 1, zotpull: 1, zotpush: 1, libadd: 1, libpick: 1, libman: 1, libimp: 1, libimpgo: 1, libdel: 1, papernew: 1, secedit: 1, secdone: 1, secadd: 1, secdel: 1, secmove: 1, secrestore: 1, citeopen: 1, citego: 1, citeadd: 1, citebdel: 1, cmdone: 1, znew: 1, znote: 1, znotedel: 1, zcolnew: 1, zcolren: 1, zcoldel: 1, zincol: 1, ztagdel: 1, zaudel: 1, zauadd: 1 };
   if (!RO[a] && !ALL[a]) return false;
   if (ALL[a] && !msCanEdit() && a !== 'cmdone') { toast(LL('Недостаточно прав', 'Not allowed')); return true; }
   switch (a) {
+    case 'wrtab': UI.wrTab = v; saveUI(); render(); return true;
+    case 'wropen': { if (S.edit && !S.edit.isNew) { saveEditor(); if (S.edit) return true; } wrOpen(sid, v || 'paper'); return true; }
+    case 'cmsel': { var sq = MSX.selq; selPopHide(); if (!sq) return true; var pp0 = Object.keys(msOf(sq.sid).papers).filter(function (k) { return (msOf(sq.sid).papers[k].order || []).indexOf(sq.sec) >= 0; })[0]; if (pp0) S.paperId = pp0; S.cmNew = { sid: sq.sid, sec: sq.sec, quote: sq.q.slice(0, 400), kind: v === 'sug' ? 'sug' : 'note' }; S.cmFilter = 'open'; try { window.getSelection().removeAllRanges(); } catch (e) {} render(); setTimeout(function () { var t0 = root.querySelector(v === 'sug' ? '#cmrepl' : '#cmtext'); if (t0) { t0.focus(); t0.select && v === 'sug' && t0.select(); } }, 30); return true; }
+    case 'cmkind': { if (S.cmNew) { var keepT = (root.querySelector('#cmtext') || {}).value; S.cmNew.kind = v; render(); var t1 = root.querySelector('#cmtext'); if (t1 && keepT) t1.value = keepT; var t2 = root.querySelector(v === 'sug' ? '#cmrepl' : '#cmtext'); if (t2) t2.focus(); } return true; }
+    case 'cmfocus': { S.cmFocus = v; if (S.cmFilter !== 'all') { var cf0 = null; Object.keys(DB.ms || {}).some(function (k) { cf0 = (DB.ms[k].cm || {})[v]; return cf0; }); if (cf0 && cf0.done) S.cmFilter = 'all'; } render(); setTimeout(function () { var e0 = root.querySelector('#cm-' + v); if (e0) e0.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 20); return true; }
+    case 'cmjump': { var mk = root.querySelector('mark.cmk[data-v="' + v + '"]'); S.cmFocus = v; [].forEach.call(root.querySelectorAll('mark.cmk.on'), function (x) { x.classList.remove('on'); }); if (mk) { [].forEach.call(root.querySelectorAll('mark.cmk[data-v="' + v + '"]'), function (x) { x.classList.add('on'); }); mk.scrollIntoView({ behavior: 'smooth', block: 'center' }); } else toast(LL('Фрагмент в тексте не найден: возможно, его уже изменили', 'Fragment not found in the text')); return true; }
+    case 'cmaccept': {
+      var c9 = m.cm[v], s9 = c9 && m.secs[c9.sec]; if (!c9 || !s9) return true;
+      if (!msLockFree(s9) || (S.msEdit && S.msEdit.key === s9.id)) { toast(LL('Раздел сейчас редактируется. Примите правку после того, как раздел освободится.', 'The section is being edited. Try again later.')); return true; }
+      var box9 = document.createElement('div'); box9.innerHTML = secHTML(s9); var f9 = rtFind(box9, c9.quote);
+      if (!f9) { toast(LL('Фрагмент в тексте уже изменён, правку нельзя применить автоматически', 'The fragment has changed; cannot apply')); return true; }
+      var rg9 = document.createRange(); rg9.setStart(f9.sn, f9.so); rg9.setEnd(f9.en, f9.eo); rg9.deleteContents(); rg9.insertNode(document.createTextNode(c9.repl || ''));
+      s9.hist = (s9.hist || []).concat([{ text: s9.text || '', fmt: s9.fmt, by: (s9.upd && s9.upd.by) || me(), at: (s9.upd && s9.upd.at) || nowIso() }]).slice(-10);
+      s9.text = rtClean(box9.innerHTML); s9.fmt = 'html'; s9.upd = { by: me(), at: nowIso() }; c9.done = true; c9.accepted = true; c9.accBy = me(); c9.doneBy = me(); c9.doneAt = nowIso(); save(); toast(LL('Правка принята', 'Edit accepted')); render(); return true;
+    }
+    case 'zot': S.zot = sid; ZOT.msg = ''; render(); return true;
+    case 'zotx': S.zot = null; render(); return true;
+    case 'zotconn': { var kk = (root.querySelector('#zotkey') || {}).value || ''; ZOT.busy = true; ZOT.msg = ''; render(); zotConnect(kk).then(function () { ZOT.busy = false; ZOT.msg = ''; render(); }).catch(function (e) { ZOT.busy = false; ZOT.msg = LL('Не удалось подключиться: ', 'Could not connect: ') + (e.message || e); render(); }); return true; }
+    case 'zotoff': zotSaveCfg(null); ZOT.msg = ''; render(); return true;
+    case 'zotpull': zotPull(sid); return true;
+    case 'zotpush': zotPush(sid); return true;
+    case 'pmabs': pubmedAbstract(sid, v); return true;
     case 'libadd': { var inp = root.querySelector('#libq'); libQuickAdd(sid, inp ? inp.value : S.libQ); return true; }
     case 'libpick': { var x = S.libFound && S.libFound.list[+g('i')]; if (x) { refAdd(sid, x); save(); toast(LL('Добавлено', 'Added')); render(); } return true; }
     case 'libfoundx': S.libFound = null; render(); return true;
@@ -6376,7 +6779,7 @@ function msAct(a, g) {
     case 'zaudel': { var it5 = m.lib[v]; if (it5 && it5.authors) { it5.authors.splice(+g('i'), 1); save(); render(); } return true; }
     case 'zauadd': { var it6 = m.lib[v]; if (it6) { it6.authors = it6.authors || []; it6.authors.splice(+g('i') + 1, 0, { family: '', given: '' }); save(); render(); } return true; }
     case 'libbib': { var z11 = zst(), lst2 = z11.sel ? [m.lib[z11.sel]] : zItems(sid); S.menu = null; var txt2 = lst2.map(function (x, i) { var ff = refFmt(x, 'vancouver').replace(/<[^>]+>/g, ''); return (i + 1) + '. ' + ff; }).join('\n'); try { navigator.clipboard.writeText(txt2); toast(LL('Список литературы (Vancouver) скопирован: ', 'Bibliography copied: ') + lst2.length); } catch (e) { download('bibliography.txt', txt2, 'text/plain'); } render(); return true; }
-    case 'citeadd': { var cc2 = S.msCite; cc2.sel = cc2.sel || []; if (cc2.sel.indexOf(v) < 0) cc2.sel.push(v); cc2.q = ''; cc2.i = 0; render(); setTimeout(function () { var e2 = root.querySelector('#citeq'); if (e2) e2.focus(); }, 10); return true; }
+    case 'citeadd': { var cc2 = S.msCite; cc2.sel = cc2.sel || []; if (g('lab') && cc2.sid !== '_lab') { var src0 = msOf('_lab').lib[v]; if (src0) { var cp0 = JSON.parse(JSON.stringify(src0)); delete cp0.id; cp0.cols = []; var o0 = refAdd(cc2.sid, cp0); v = o0.ref ? o0.ref.id : o0.dup.id; save(); } } if (cc2.sel.indexOf(v) < 0) cc2.sel.push(v); cc2.q = ''; cc2.i = 0; render(); setTimeout(function () { var e2 = root.querySelector('#citeq'); if (e2) e2.focus(); }, 10); return true; }
     case 'citebdel': { S.msCite.sel.splice(+g('i'), 1); render(); setTimeout(function () { var e3 = root.querySelector('#citeq'); if (e3) e3.focus(); }, 10); return true; }
     case 'libdel': { var used = msPapers(sid).some(function (p) { return citeOrder(sid, p.id).indexOf(v) >= 0; }); if (!confirm(used ? LL('Источник процитирован в статье. Ссылка в тексте станет «?». Удалить?', 'This reference is cited. Delete anyway?') : LL('Удалить источник из библиотеки?', 'Delete this reference?'))) return true; delete m.lib[v]; save(); render(); return true; }
     case 'papernew': paperNew(sid, v); return true;
@@ -6390,23 +6793,25 @@ function msAct(a, g) {
     case 'secmove': { var p3 = m.papers[S.paperId], i = p3.order.indexOf(v), j = i + (+g('d')); S.menu = null; if (i >= 0 && j >= 0 && j < p3.order.length) { p3.order.splice(i, 1); p3.order.splice(j, 0, v); save(); } render(); return true; }
     case 'sechist': S.msHist = { sec: v }; S.menu = null; render(); return true;
     case 'sechistx': S.msHist = null; render(); return true;
-    case 'secrestore': { var s = m.secs[v], hv = s && (s.hist || [])[+g('i')]; if (!hv || !confirm(LL('Вернуть эту версию? Текущий текст сохранится в версиях.', 'Restore this version? Current text is kept in versions.'))) return true; s.hist = (s.hist || []).concat([{ text: s.text || '', by: me(), at: nowIso() }]).slice(-10); s.text = hv.text; s.upd = { by: me(), at: nowIso() }; S.msHist = null; save(); render(); return true; }
+    case 'secrestore': { var s = m.secs[v], hv = s && (s.hist || [])[+g('i')]; if (!hv || !confirm(LL('Вернуть эту версию? Текущий текст сохранится в версиях.', 'Restore this version? Current text is kept in versions.'))) return true; s.hist = (s.hist || []).concat([{ text: s.text || '', fmt: s.fmt, by: me(), at: nowIso() }]).slice(-10); s.text = hv.text; s.fmt = hv.fmt; s.upd = { by: me(), at: nowIso() }; S.msHist = null; save(); render(); return true; }
     case 'citeopen': { var ta2 = root.querySelector('#msed'); var sec = m.secs[v]; if (ta2 && sec) sec.text = ta2.value; S.msCite = { sid: sid, sec: v, pos: ta2 ? ta2.selectionEnd : (sec.text || '').length, sel: [], q: '', i: 0 }; render(); setTimeout(function () { var e1 = root.querySelector('#citeq'); if (e1) e1.focus(); }, 10); return true; }
-    case 'citex': S.msCite = null; render(); setTimeout(function () { var t3 = root.querySelector('#msed'); if (t3) t3.focus(); }, 20); return true;
+    case 'citex': { var cx = S.msCite; if (cx && cx.rt) { var sx0 = msOf(cx.sid).secs[cx.sec]; if (sx0 && sx0.text) sx0.text = sx0.text.replace(/\u2063/g, '\u2064'); S.msCite = null; render(); setTimeout(function () { var ed = rtEd(); if (ed) { ed.focus(); if (!rtPlaceMarker(ed)) rtCaretSet(ed, 1e9); } }, 30); return true; } } S.msCite = null; render(); setTimeout(function () { var t3 = root.querySelector('#msed'); if (t3) t3.focus(); }, 20); return true;
     case 'citego': {
       var c = S.msCite, s2 = msOf(c.sid).secs[c.sec]; S.msCite = null;
+      if (c.rt && s2) { var ins0 = (c.sel || []).length ? '[@' + c.sel.join('; @') + ']' : ''; s2.text = String(s2.text || '').indexOf('\u2063') >= 0 ? s2.text.replace('\u2063', ins0 + '\u2064') : s2.text + ins0 + '\u2064'; s2.fmt = 'html'; if (s2.lock) s2.lock.at = nowIso(); save(); render(); setTimeout(function () { var ed = rtEd(); if (ed) { ed.focus(); if (!rtPlaceMarker(ed)) rtCaretSet(ed, 1e9); } }, 30); return true; }
       if (s2 && (c.sel || []).length) { var ins = '[@' + c.sel.join('; @') + ']', tx = s2.text || '', pos = Math.min(c.pos, tx.length); s2.text = tx.slice(0, pos) + (pos && !/\s$/.test(tx.slice(0, pos)) ? ' ' : '') + ins + tx.slice(pos); c.pos = pos + ins.length + 1; s2.lock.at = nowIso(); save(); }
       render(); setTimeout(function () { var t4 = root.querySelector('#msed'); if (t4) { t4.focus(); t4.selectionStart = t4.selectionEnd = Math.min(c.pos, t4.value.length); t4.style.height = t4.scrollHeight + 'px'; } }, 30); return true;
     }
     case 'cmnew': {
-      var q = '', ta3 = root.querySelector('#msed');
+      if (rtEd()) rtSync();
+      var q = '', ta3 = root.querySelector('textarea#msed');
       if (ta3 && ta3.getAttribute('data-msed') === sid + '.' + v && ta3.selectionEnd > ta3.selectionStart) q = ta3.value.slice(ta3.selectionStart, ta3.selectionEnd);
       else { var sl = window.getSelection ? String(window.getSelection()) : ''; if (sl && sl.length < 600) q = sl; }
       if (ta3) { var sx = m.secs[(ta3.getAttribute('data-msed') || '').split('.')[1]]; if (sx) sx.text = ta3.value; }
-      S.cmNew = { sid: sid, sec: v, quote: q.trim().slice(0, 400) }; S.cmFilter = 'open'; render(); setTimeout(function () { var t5 = root.querySelector('#cmtext'); if (t5) t5.focus(); }, 30); return true;
+      S.cmNew = { sid: sid, sec: v, quote: q.replace(/[\u2063\u2064]/g, '').trim().slice(0, 400), kind: 'note' }; S.cmFilter = 'open'; render(); setTimeout(function () { var t5 = root.querySelector('#cmtext'); if (t5) t5.focus(); }, 30); return true;
     }
     case 'cmx': S.cmNew = null; render(); return true;
-    case 'cmsave': { var tx2 = (root.querySelector('#cmtext') || {}).value || '', to = (root.querySelector('#cmto') || {}).value || ''; if (!tx2.trim()) { toast(LL('Напишите текст заметки', 'Write the note')); return true; } var id2 = uid('c'); m.cm[id2] = { id: id2, paper: S.paperId, sec: S.cmNew.sec, quote: S.cmNew.quote, text: tx2.trim(), to: to, by: me(), at: nowIso(), done: false }; S.cmNew = null; save(); render(); return true; }
+    case 'cmsave': { var tx2 = (root.querySelector('#cmtext') || {}).value || '', to = (root.querySelector('#cmto') || {}).value || '', isSug = S.cmNew.kind === 'sug' && S.cmNew.quote, rp = isSug ? ((root.querySelector('#cmrepl') || {}).value || '') : ''; if (!isSug && !tx2.trim()) { toast(LL('Напишите текст заметки', 'Write the note')); return true; } if (isSug && rp.trim() === S.cmNew.quote.trim()) { toast(LL('Измените текст в поле «Заменить на»', 'Edit the replacement text')); return true; } var id2 = uid('c'); m.cm[id2] = { id: id2, paper: S.paperId, sec: S.cmNew.sec, quote: S.cmNew.quote, text: tx2.trim(), to: to, by: me(), at: nowIso(), done: false }; if (isSug) { m.cm[id2].kind = 'sug'; m.cm[id2].repl = rp; } S.cmNew = null; save(); render(); return true; }
     case 'cmdone': { var cc = m.cm[v]; if (cc) { cc.done = !cc.done; cc.doneBy = me(); cc.doneAt = nowIso(); save(); render(); } return true; }
     case 'cmflt': S.cmFilter = v; render(); return true;
   }
@@ -6414,6 +6819,7 @@ function msAct(a, g) {
 }
 function msInput(tg) {
   var k = tg.getAttribute('data-msed');
+  if (k && tg.isContentEditable) { rtSync(tg); return true; }
   if (k) { var p = k.split('.'), s = msOf(p[0]).secs[p[1]]; if (s) { s.text = tg.value; if (s.lock) s.lock.at = nowIso(); tg.style.height = 'auto'; tg.style.height = tg.scrollHeight + 'px'; msSaveSoon(); } return true; }
   k = tg.getAttribute('data-psec'); if (k) { var p2 = k.split('.'), s2 = msOf(p2[0]).secs[p2[1]]; if (s2) { s2.title = tg.value; msSaveSoon(); } return true; }
   k = tg.getAttribute('data-pmeta'); if (k) { var p3 = k.split('.'), pp = msOf(p3[0]).papers[p3[1]]; if (pp) { pp[p3[2]] = tg.value; msSaveSoon(); } return true; }
@@ -6433,6 +6839,8 @@ function msInput(tg) {
   return false;
 }
 function msChange(tg) {
+  if (tg.getAttribute('data-wrsid')) { UI.wrSid = tg.value; S.paperId = null; S.cmNew = null; saveUI(); render(); return true; }
+  if (tg.getAttribute('data-zotlib')) { var zc = zotCfg(); if (zc) { zc.lib = tg.value; zotSaveCfg(zc); } return true; }
   var k = tg.getAttribute('data-pstyle'); if (k) { var p = k.split('.'), pp = msOf(p[0]).papers[p[1]]; if (pp) { pp.style = tg.value; save(); render(); } return true; }
   k = tg.getAttribute('data-libed'); if (k && tg.tagName === 'SELECT') { var q7 = k.split('.'), it7 = msOf(q7[0]).lib[q7[1]]; if (it7) { it7[q7[2]] = tg.value; save(); render(); } return true; }
   k = tg.getAttribute('data-citesel'); if (k && S.msCite) { var a = S.msCite.sel || (S.msCite.sel = []), i = a.indexOf(k); if (tg.checked && i < 0) a.push(k); if (!tg.checked && i >= 0) a.splice(i, 1); return true; }
@@ -6462,11 +6870,11 @@ function msKey(ev) {
 function msNotifs() {
   var out = [], mn = me();
   Object.keys(DB.ms || {}).forEach(function (sid) {
-    var r = regOf(sid); if (!r) return; var m = msOf(sid);
+    var r = projOf(sid); if (!r) return; var m = msOf(sid);
     Object.keys(m.cm).forEach(function (k) {
       var c = m.cm[k]; if (c.by === mn) return;
       var root0 = c.parent ? m.cm[c.parent] : c; if (!root0 || root0.done) return;
-      if (c.to === mn || (c.parent && root0.by === mn)) out.push({ id: 'ms:' + sid + ':' + c.id, ic: 'chat', lvl: 'soon', t: (c.parent ? LL('Ответ на заметку: ', 'Reply: ') : LL('Заметка по статье: ', 'Paper note: ')) + c.text.slice(0, 70), s: c.by + ' · ' + regName(r), go: ['s', sid, 'paper'] });
+      if (c.to === mn || (c.parent && root0.by === mn)) out.push({ id: 'ms:' + sid + ':' + c.id, ic: 'chat', lvl: 'soon', t: (c.parent ? LL('Ответ на заметку: ', 'Reply: ') : LL('Заметка по статье: ', 'Paper note: ')) + c.text.slice(0, 70), s: c.by + ' · ' + regName(r), go: r.kind === 'study' && regOf(sid) ? ['s', sid, 'paper'] : ['w', sid, 'paper'] });
     });
   });
   return out;
@@ -6494,7 +6902,7 @@ function navGroups() {
   (function walk(list, d) { list.forEach(function (r) { regs.push({ v: 'reg:' + r.id, icon: d ? 'dot' : (r.id === 'g_endo' ? 'scope' : r.id === 'g_surg' ? 'knife' : 'tag'), label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, false), d + 1); }); })(kids(null, false), 0);
   if (can('edit')) regs.push({ act: 'newreg', icon: 'plus', label: t('nav.newRegistry') });
   g.push({ id: 'regs', label: LL('Регистры', 'Registries'), icon: 'tag', items: regs, wide: true });
-  var sci = [{ v: 'studies', icon: 'flask', label: t('nav.studies') }];
+  var sci = [{ v: 'studies', icon: 'flask', label: t('nav.studies') }, { v: 'write', icon: 'doc', label: LL('Рукописи и литература', 'Manuscripts and library') }];
   (function walk(list, d) { list.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'dot', label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, true), d + 1); }); })(kids(null, true), 1);
   var sreg = kids(null, false, true);
   if (sreg.length) { sci.push({ sep: LL('Научные регистры', 'Research registries') }); sreg.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'dot', label: regName(r), cnt: regCount(r), depth: 1 }); }); }
