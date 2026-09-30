@@ -3979,6 +3979,7 @@ document.addEventListener('click', function (ev) {
     case 'dxrun': { var kp = root.querySelector('#dxkeep'), ag = root.querySelector('#dxagree'); S.dx.keep = kp ? kp.checked : true; S.dx.agree = ag ? ag.checked : false; dxRun(); break; }
     case 'dxback': S.dx.step = 'pick'; render(); break;
     case 'dxrules': S.dx.mode = 'rules'; dxRun(); break;
+    case 'dxanswer': { var ta = root.querySelector('#dxans-in'); if (ta) S.dx.ans = ta.value; dxAnswer(); break; }
     case 'dxundo': dxUndo(g('id')); break;
     case 'dxtake': dxTake(g('id')); break;
     case 'dxundoall': if (confirm(LL('Отменить все изменения из документа?', 'Revert all changes from the document?'))) dxUndoAll(); break;
@@ -4826,8 +4827,8 @@ function dxMerge(ai, rr) {
   return ai;
 }
 function dxSys() { return DX_SYS.replace('{PII}', 'Паспортную часть (ФИО, дата рождения, пол, ИИН, № истории болезни, телефон, адрес, национальность, рост, вес, ИМТ) заполняй обязательно, если она есть в документе. Возраст бери на дату документа; если указана дата рождения, возраст должен ей соответствовать.'); }
-function dxCall(doc, schema) {
-  var pv = AI.prov, prompt = 'СХЕМА КАРТОЧКИ (id | название | тип | варианты):\n' + schema + '\n\nДОКУМЕНТ «' + doc.name + '»' + (doc.text && !doc.scanned ? ' (текстовый слой):\n' + doc.text.slice(0, 60000) : (doc.text ? ' (текстовый слой почти пуст, смотри изображения страниц)' : ' (см. приложенный файл)')) + '\n\nВерни JSON по формату.';
+function dxCall(doc, schema, extra) {
+  var pv = AI.prov, prompt = 'СХЕМА КАРТОЧКИ (id | название | тип | варианты):\n' + schema + '\n\nДОКУМЕНТ «' + doc.name + '»' + (doc.text && !doc.scanned ? ' (текстовый слой):\n' + doc.text.slice(0, 60000) : (doc.text ? ' (текстовый слой почти пуст, смотри изображения страниц)' : ' (см. приложенный файл)')) + (extra ? '\n\n' + extra : '') + '\n\nВерни JSON по формату.';
   if (AI.coolUntil && Date.now() < AI.coolUntil) return Promise.reject(new Error(aiQuotaMsg()));
   var fail = function (r) { return r.json().then(function (j) { throw new Error(aiErrMsg(j, 'HTTP ' + r.status)); }, function () { throw new Error('HTTP ' + r.status); }); };
   if (pv === 'gemini') {
@@ -5183,7 +5184,7 @@ function dxExtract(doc, mode, log) {
   if (mode === 'ai' && !aiReady()) return Promise.reject(new Error(LL('ИИ не подключён (в шапке «ИИ выкл.» или ошибка ключа). Откройте переключатель ИИ в шапке, введите ключ Gemini и нажмите «Сохранить и проверить». Шаблоны без ИИ смысл не понимают, поэтому автоматически на них не переключаюсь.', 'AI is not connected. Set the key in the AI switch in the header.')));
   if (mode !== 'ai') return rules('');
   log(LL('Отправляю в ', 'Sending to ') + AI_PROV[AI.prov].name + ' · ' + AI.model + LL(' и жду ответ (обычно 20-60 секунд)…', ' (20-60 s)…'));
-  return dxCall(doc, dxSchemaText()).then(dxParseJSON).then(function (res) { res.fields = res.fields || []; var src = AI_PROV[AI.prov].name + ' · ' + AI.model; if (doc.text && !doc.scanned) { try { res = dxMerge(res, dxRules(doc)); src += LL(' + разбор формы', ' + form parsing'); } catch (e) {} } return { res: res, text: doc.text, src: src, local: AI.prov === 'local' }; })
+  return dxCall(doc, dxSchemaText()).then(dxParseJSON).then(function (res) { res.fields = res.fields || []; var src = AI_PROV[AI.prov].name + ' · ' + AI.model; if (doc.text && !doc.scanned) { try { res = dxMerge(res, dxRules(doc)); src += LL(' + разбор формы', ' + form parsing'); } catch (e) {} } return { res: res, text: doc.text, src: src, local: AI.prov === 'local', ai: true }; })
     .catch(function (e) { var em = (e && e.message) || String(e); throw new Error(LL('ИИ не ответил: ', 'AI failed: ') + em + LL('. Повторите через минуту или выберите другую модель. Карточка не изменена.', '. Retry later. Record unchanged.')); });
 }
 function dxAiAvail() { return aiReady() || AI.st === 'check' || (!!AI.key && AI.st !== 'err') || AI.prov === 'local'; }
@@ -5194,15 +5195,38 @@ function dxRun() {
   dx.step = 'run'; dx.log = [LL('Читаю файл «', 'Reading «') + dx.file.name + '»']; render();
   var log = function (l, repl) { if (!S.dx) return; if (repl && dx.log.length && /^OCR/.test(dx.log[dx.log.length - 1])) dx.log[dx.log.length - 1] = l; else dx.log.push(l); render(); };
   dxReadFile(dx.file).then(function (doc) {
+    dx.doc = doc;
     dx.log.push(doc.kind === 'pdf' ? LL('PDF: страниц ', 'PDF: pages ') + doc.pages + (doc.scanned ? LL(', скан без текстового слоя', ', scanned, no text layer') : LL(', текст извлечён', ', text extracted')) : doc.kind === 'image' ? LL('Изображение', 'Image') : LL('Текстовый файл', 'Text file')); render();
     return dxExtract(doc, dx.mode, log);
   }).then(function (o) {
     if (!S.dx || !S.drawer) return;
-    dx.docText = o.text || '';
+    dx.docText = o.text || ''; dx.usedAI = !!o.ai; dx.ans = ''; dx.qa = [];
     dx.rep = dxApply(o.res, dx.keep, o.local); dx.rep.src = o.src; dx.rep.fallback = o.fallback; dx.rep.file = dx.file.name; dx.rep.at = nowIso();
     var dr = S.drawer; dr.p.docsAI = (dr.p.docsAI || []).concat([{ name: dx.file.name, at: dx.rep.at, by: me(), src: o.src, n: dx.rep.filled.length }]);
     dx.step = 'rep'; render();
   }).catch(function (e) { if (!S.dx) return; dx.step = 'err'; dx.err = (e && e.message) || String(e); render(); });
+}
+function dxAnswer() {
+  var dx = S.dx, dr = S.drawer; if (!dx || !dx.rep || !dx.doc || !dr || dx.busyAns) return;
+  var ans = String(dx.ans || '').trim(); if (!ans) { toast(LL('Напишите ответы на вопросы', 'Write your answers')); return; }
+  if (!aiReady()) { dx.ansErr = LL('ИИ не подключён', 'AI not connected'); render(); return; }
+  var d = dr.p.d, cur = {}; dxFields().forEach(function (o) { var v = d[o.x.id]; if (has(v) && !(Array.isArray(v) && !v.length)) cur[o.x.id] = v; });
+  var qs = dx.rep.questions || [];
+  var extra = 'ВОПРОСЫ, КОТОРЫЕ ТЫ ЗАДАЛ ВРАЧУ ПО ЭТОМУ ДОКУМЕНТУ:\n' + qs.map(function (q, i) { return (i + 1) + '. ' + q; }).join('\n') + '\n\nОТВЕТЫ ВРАЧА:\n' + ans + '\n\nТЕКУЩИЕ ЗНАЧЕНИЯ КАРТОЧКИ (JSON, id: значение):\n' + JSON.stringify(cur) +
+    '\n\nЗАДАЧА: с учётом ответов врача (они важнее документа и текущих значений) верни JSON только с теми полями, которые нужно заполнить или исправить по этим ответам и по документу. Если врач указал, какое значение из документа верное, возьми его из документа. Для значений из ответа врача quote начинай с «врач: ». В questions оставь только то, что по-прежнему неясно и без чего нельзя заполнить поле.';
+  dx.busyAns = true; dx.ansErr = ''; render();
+  dxCall(dx.doc, dxSchemaText(), extra).then(dxParseJSON).then(function (res) {
+    if (!S.dx || S.dx !== dx || !S.drawer) return;
+    var old = dx.rep, nr = dxApply(res, false);
+    nr.filled.forEach(function (x) { x.note = (x.note ? x.note + '. ' : '') + LL('по ответу врача', 'from the doctor\'s answer'); });
+    var ids = {}; nr.filled.forEach(function (x) { ids[x.id] = 1; });
+    nr.filled = nr.filled.concat(old.filled.filter(function (x) { return !ids[x.id]; }));
+    nr.conflict = old.conflict.filter(function (x) { return !ids[x.id]; });
+    nr.same = old.same.filter(function (x) { return !ids[x.id]; });
+    nr.doc = old.doc; nr.src = old.src + LL(' + ответы врача', ' + doctor\'s answers'); nr.fallback = old.fallback; nr.file = old.file; nr.at = nowIso();
+    dx.qa.push(ans); dx.rep = nr; dx.ans = ''; dx.busyAns = false; render();
+    toast(LL('Карточка дозаполнена по вашим ответам: ', 'Updated from your answers: ') + Object.keys(ids).length + LL(' полей', ' fields'));
+  }).catch(function (e) { if (!S.dx) return; dx.busyAns = false; dx.ansErr = LL('ИИ не ответил: ', 'AI failed: ') + ((e && e.message) || e); render(); });
 }
 function dxUndo(id) { var dx = S.dx, dr = S.drawer; if (!dx || !dr) return; var row = dx.rep.filled.filter(function (r) { return r.id === id; })[0]; if (!row) return; if (has(row.prev)) dr.p.d[id] = row.prev; else delete dr.p.d[id]; delete dr.aiFilled[id]; row.undone = true; render(); }
 function dxTake(id) { var dx = S.dx, dr = S.drawer; if (!dx || !dr) return; var row = dx.rep.conflict.filter(function (r) { return r.id === id; })[0]; if (!row) return; row.prev = row.old; dr.p.d[id] = row.v; dr.aiFilled[id] = { q: row.quote, c: row.conf }; row.taken = true; render(); }
@@ -5248,6 +5272,12 @@ function renderDx() {
   if (r.conflict.length) h += '<h3 class="dxh warn">' + ico('alert', 16) + LL('Расходится с уже заполненным (не изменено)', 'Differs from existing values (not changed)') + '</h3><div class="tablewrap"><table class="grid dxtab"><thead><tr><th>' + LL('Поле', 'Field') + '</th><th>' + LL('В карточке', 'In record') + '</th><th>' + LL('В документе', 'In document') + '</th><th>' + LL('Основание', 'Evidence') + '</th><th></th></tr></thead><tbody>' + r.conflict.map(function (x) { return '<tr><td class="strong">' + esc(x.label) + '</td><td>' + dxVal(x, x.old) + '</td><td>' + dxVal(x, x.v) + ' ' + conf(x.conf) + '</td><td><q>' + esc(x.quote) + '</q></td><td>' + (x.taken ? '<span class="muted">' + LL('заменено', 'replaced') + '</span>' : '<button type="button" class="btn small" data-act="dxtake" data-id="' + x.id + '">' + LL('Заменить', 'Replace') + '</button>') + '</td></tr>'; }).join('') + '</tbody></table></div>';
   if (probs) h += '<h3 class="dxh bad">' + ico('alert', 16) + LL('Трудности: информация была, но заполнить точно не удалось', 'Difficulties: information present but could not be filled reliably') + '</h3><ul class="dxlist">' + r.rejected.map(function (x) { return '<li><b>' + esc(x.label) + '</b><span class="tag due">' + LL('не принято', 'rejected') + '</span> ' + esc(x.why) + (x.quote ? ' <q>' + esc(x.quote) + '</q>' : '') + '</li>'; }).join('') + r.issues.map(function (x) { return '<li><b>' + esc(x.label || LL('Документ', 'Document')) + '</b><span class="tag ' + (x.kind === 'conflict' || x.kind === 'inconsistent' ? 'due' : 'soon') + '">' + L(DX_KIND[x.kind] || [x.kind, x.kind]) + '</span> ' + esc(x.text) + '</li>'; }).join('') + '</ul>';
   if (r.questions.length) h += '<h3 class="dxh q">' + ico('chat', 16) + LL('Вопросы врачу', 'Questions for the doctor') + '</h3><ol class="dxlist">' + r.questions.map(function (q) { return '<li>' + esc(q) + '</li>'; }).join('') + '</ol>';
+  if (r.questions.length && dx.doc && dx.usedAI) {
+    h += '<div class="dxans"><label for="dxans-in"><b>' + LL('Ответить на вопросы', 'Answer the questions') + '</b><span>' + LL('Напишите ответы своими словами, по номерам или сплошным текстом. ИИ учтёт их вместе с документом и дозаполнит карточку. Ответы врача важнее документа.', 'Answer in your own words; the AI will use them together with the document.') + '</span></label>';
+    h += '<textarea id="dxans-in" rows="3" data-sb="dx.ans" placeholder="' + LL('Например: 1. предоперационный от 18.02.2026; 2. M0, латеральные ЛУ регионарные; 4. петлевая…', 'e.g. 1. pre-op values; 2. M0…') + '"' + (dx.busyAns ? ' disabled' : '') + '>' + esc(dx.ans || '') + '</textarea>';
+    h += '<div class="actions"><button type="button" class="btn primary small" data-act="dxanswer"' + (dx.busyAns ? ' disabled' : '') + '>' + ico('sparkle', 14) + (dx.busyAns ? LL('ИИ дозаполняет…', 'AI is updating…') : LL('Отправить ИИ и дозаполнить', 'Send and update')) + '</button>' + (dx.ansErr ? '<span class="ferr">' + esc(dx.ansErr) + '</span>' : '') + '</div></div>';
+  }
+  if (dx.qa && dx.qa.length) h += '<details class="dxqa"><summary>' + LL('Ваши ответы (', 'Your answers (') + dx.qa.length + ')</summary>' + dx.qa.map(function (z) { return '<p>' + esc(z) + '</p>'; }).join('') + '</details>';
   if (r.same.length) h += '<p class="muted dxsame">' + LL('Совпало с уже заполненным: ', 'Already matching: ') + r.same.map(function (x) { return esc(x.label); }).join(', ') + '</p>';
   if (nMiss) h += '<h3 class="dxh mut">' + LL('Остались пустыми в разделах, к которым относится документ', 'Still empty in the sections this document covers') + '</h3><div class="dxmiss">' + r.missing.map(function (s) { return '<div><b>' + esc(s.sec) + '</b><p>' + s.items.map(function (x) { return x.flagged ? '<span class="fl">' + esc(x.label) + '</span>' : esc(x.label); }).join(', ') + '</p></div>'; }).join('') + '</div>';
   if (r.otherSecs) h += '<p class="hint" style="margin-top:6px">' + LL('Остальные разделы карточки (', 'Other record sections (') + r.otherSecs + LL(') к этому документу не относятся и здесь не показаны.', ') are not covered by this document and are not listed.') + '</p>';
