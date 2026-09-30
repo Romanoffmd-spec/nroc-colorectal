@@ -1638,8 +1638,10 @@ html[data-theme="dark"] .dxtab tr.low td{background:#2a1d05}
 .csec.open{padding-bottom:16px}
 .csec-h{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;text-align:left;padding:13px 18px;font-size:14.5px;font-weight:600;color:var(--ink);cursor:pointer}
 .csec-h:hover{background:var(--surface-2,#f6f7fa)}
-.ctxbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:rgba(80,110,255,.07);font-size:13px}.ctxbar svg{color:var(--navy)}
-.csec-h.static{cursor:default}.ctxcf{border-left:3px solid var(--navy)}.ctxcf .fgrid{padding:0 18px 16px}
+.mn-split{display:flex;align-items:stretch}.mn-split>.mn-g{padding-right:6px}.mn-caret{border:0;background:transparent;color:inherit;cursor:pointer;padding:0 8px;border-radius:8px;display:flex;align-items:center}.mn-caret:hover,.mn-caret.open{background:var(--surface-2,#f1f3f8)}.mn-caret svg{transition:transform .15s}.mn-caret.open svg{transform:rotate(180deg)}
+.routec .chips{display:flex;flex-wrap:wrap;gap:6px}.rhist{margin-top:10px;font-size:13px;color:var(--muted)}.rhist p{margin:4px 0}.dxprov.ok{border-color:#ABEFC6;background:rgba(18,183,106,.08)}
+.ctxbar{flex-shrink:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:rgba(80,110,255,.07);font-size:13px}.ctxbar svg{color:var(--navy)}
+.csec-h.static{cursor:default}.ctxcf{border-left:3px solid var(--navy);flex-shrink:0}.ctxcf .fgrid{padding:0 18px 16px}
 .edfs-mode{margin:4px 0 10px}.edfs-imp{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.edfs-imp .hint{margin:0}
 .edfs-q{width:100%;box-sizing:border-box;margin:4px 0 8px;padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;font:inherit}
 .edfs{display:flex;flex-direction:column;gap:4px;max-height:420px;overflow:auto}.edfs-s{border:1px solid var(--line);border-radius:8px}
@@ -1827,6 +1829,7 @@ html[data-theme="dark"] .dxtab tr.low td{background:#2a1d05}
 @media (max-width:900px){.paperw{padding:0 12px 16px}.pp-body{grid-template-columns:1fr}.pp-notes{position:static;max-height:none}}
 /*V12-END*/
 
+.mpcard.over{outline:2px dashed var(--navy);outline-offset:-4px;background:rgba(80,110,255,.05)}.mp-drop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:var(--muted)}.mp-hint{font-size:12px;color:var(--faint,#9aa1ad);align-self:center}
 </style>
 </head>
 <body>
