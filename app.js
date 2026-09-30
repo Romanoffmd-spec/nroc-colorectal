@@ -3978,6 +3978,7 @@ document.addEventListener('click', function (ev) {
     case 'dxclose': if (S.dx && S.dx.step === 'run') break; S.dx = null; render(); break;
     case 'dxrun': { var kp = root.querySelector('#dxkeep'), ag = root.querySelector('#dxagree'); S.dx.keep = kp ? kp.checked : true; S.dx.agree = ag ? ag.checked : false; dxRun(); break; }
     case 'dxback': S.dx.step = 'pick'; render(); break;
+    case 'dxrules': S.dx.mode = 'rules'; dxRun(); break;
     case 'dxundo': dxUndo(g('id')); break;
     case 'dxtake': dxTake(g('id')); break;
     case 'dxundoall': if (confirm(LL('Отменить все изменения из документа?', 'Revert all changes from the document?'))) dxUndoAll(); break;
@@ -4721,6 +4722,7 @@ var DX_SYS = 'Ты модуль извлечения данных колорек
   '3. Даты: YYYY-MM-DD. Числа: только число без единиц, в единицах схемы (переводи при необходимости и укажи перевод в note).\n' +
   '4. Для каждого значения дай quote: дословную короткую цитату из документа (до 150 символов), на которой оно основано, и confidence от 0 до 1.\n' +
   '5. issues: всё, что мешало: неразборчиво (unreadable), двусмысленно (ambiguous), противоречия внутри документа (conflict), нет варианта в списке (not_in_options), клинически несогласованно (inconsistent: например стадия не соответствует TNM, возраст не соответствует дате рождения).\n' +
+  'Главное: понимай смысл, а не ищи слова. Документы из разных больниц формулируют одно и то же по-разному (синонимы, сокращения, казахский и русский текст, описание по блокам и флаконам, отрицания «не выявлено», «без признаков»). Рассуждай как врач-онколог: сопоставляй части документа, считай, где нужно, и в note коротко объясняй, как получено значение, если оно не написано одной фразой. Если смысл неоднозначен, не угадывай: оставь поле пустым и опиши в issues.\n' +
   '6. «ПГЗ до операции» (hist) это гистология биопсии до лечения; «ПГЗ после операции» (histPost) это заключение гистологии операционного материала (удалённого препарата). Не путай их. В histPost пиши заключение патолога целиком. Количество ЛУ (lnT) и метастатических ЛУ (lnP) считай суммой по всем блокам и флаконам микроскопического описания; pN выводи по числу метастатических ЛУ (TNM 8), если он не указан прямо.\n' +
   '7. questions: конкретные вопросы врачу, ответ на которые позволит заполнить или уточнить поля.\n' +
   '8. {PII}\n' +
@@ -4742,7 +4744,9 @@ function dxParseJSON(s) {
 /* AI result + exact form parsing: structured form values (ФИО, ИИН, адрес, даты, TNM из полей формы) win over the model */
 function dxMerge(ai, rr) {
   var byId = {}; (ai.fields || []).forEach(function (f, i) { if (f && f.id) byId[f.id] = i; });
+  var FORM = { fio: 1, iin: 1, dob: 1, address: 1, admDate: 1, disDate: 1, los: 1, ib: 1, phone: 1 };
   (rr.fields || []).forEach(function (f) {
+    if (!FORM[f.id]) return; /* смысл (гистология, ЛУ, стадии, осложнения) решает ИИ, шаблоны не вмешиваются */
     var i = byId[f.id];
     if (i === undefined) { ai.fields.push(Object.assign({}, f, { note: (f.note ? f.note + '. ' : '') + LL('найдено разбором формы', 'found by form parsing') })); return; }
     if (f.confidence >= 0.85) { var g = ai.fields[i]; if (!dxSame(String(g.value), String(f.value))) ai.fields[i] = Object.assign({}, f, { note: (f.note ? f.note + '. ' : '') + LL('ИИ предложил: ', 'AI suggested: ') + (Array.isArray(g.value) ? g.value.join(', ') : g.value) }); }
@@ -5105,10 +5109,11 @@ function dxExtract(doc, mode, log) {
     if (doc.scanned || doc.kind === 'image') { log(LL('Распознаю текст со скана на этом компьютере (OCR, 10-40 секунд на страницу)…', 'OCR on this computer…')); p = dxOCR(doc, function (pr, i, n) { if (i) log(LL('OCR: страница ', 'OCR: page ') + i + LL(' из ', ' of ') + n, true); }).then(function (t) { doc.text = t; doc.ocr = true; }); }
     return p.then(function () { log(LL('Ищу данные по медицинским шаблонам…', 'Pattern matching…')); return { text: doc.text, res: dxRules(doc), src: LL('без ИИ: ', 'no AI: ') + (doc.ocr ? 'OCR + ' : '') + LL('шаблоны', 'patterns'), local: true, fallback: why || '' }; });
   }
-  if (mode !== 'ai' || !aiReady()) return rules(mode === 'ai' ? LL('ИИ не подключён, использована обработка без ИИ.', 'AI not connected; processed without AI.') : '');
+  if (mode === 'ai' && !aiReady()) return Promise.reject(new Error(LL('ИИ не подключён (в шапке «ИИ выкл.» или ошибка ключа). Откройте переключатель ИИ в шапке, введите ключ Gemini и нажмите «Сохранить и проверить». Шаблоны без ИИ смысл не понимают, поэтому автоматически на них не переключаюсь.', 'AI is not connected. Set the key in the AI switch in the header.')));
+  if (mode !== 'ai') return rules('');
   log(LL('Отправляю в ', 'Sending to ') + AI_PROV[AI.prov].name + ' · ' + AI.model + LL(' и жду ответ (обычно 20-60 секунд)…', ' (20-60 s)…'));
   return dxCall(doc, dxSchemaText()).then(dxParseJSON).then(function (res) { res.fields = res.fields || []; var src = AI_PROV[AI.prov].name + ' · ' + AI.model; if (doc.text && !doc.scanned) { try { res = dxMerge(res, dxRules(doc)); src += LL(' + разбор формы', ' + form parsing'); } catch (e) {} } return { res: res, text: doc.text, src: src, local: AI.prov === 'local' }; })
-    .catch(function (e) { var em = (e && e.message) || String(e); log(LL('ИИ не ответил: ', 'AI failed: ') + em + LL('. Перехожу к обработке без ИИ.', '. Falling back to no-AI processing.')); return rules(LL('ИИ не ответил (', 'AI failed (') + em + LL('), поэтому документ обработан без ИИ. Можно повторить с ИИ позже.', '); processed without AI.')); });
+    .catch(function (e) { var em = (e && e.message) || String(e); throw new Error(LL('ИИ не ответил: ', 'AI failed: ') + em + LL('. Повторите через минуту или выберите другую модель. Карточка не изменена.', '. Retry later. Record unchanged.')); });
 }
 function dxOpen() { if (!S.drawer) return; S.dx = { step: 'pick', keep: true, agree: false, mode: aiReady() ? 'ai' : 'rules' }; render(); }
 function dxRun() {
@@ -5154,7 +5159,7 @@ function renderDx() {
     } else if (dx.step === 'run') {
       h += '<div class="dxrun"><span class="spin"></span><ul>' + dx.log.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul></div>';
     } else {
-      h += '<div class="errbox"><b>' + ico('alert', 16) + LL('Не получилось', 'Failed') + '</b><p>' + esc(dx.err) + '</p></div><div class="actions"><button type="button" class="btn" data-act="dxback">' + LL('Попробовать ещё раз', 'Try again') + '</button><button type="button" class="btn ghost" data-act="dxclose">' + LL('Закрыть', 'Close') + '</button></div>';
+      h += '<div class="errbox"><b>' + ico('alert', 16) + LL('Не получилось', 'Failed') + '</b><p>' + esc(dx.err) + '</p></div><div class="actions"><button type="button" class="btn primary" data-act="dxback">' + LL('Попробовать ещё раз', 'Try again') + '</button><button type="button" class="btn" data-act="dxrules">' + LL('Всё равно без ИИ (шаблоны)', 'Without AI (patterns)') + '</button><button type="button" class="btn ghost" data-act="dxclose">' + LL('Закрыть', 'Close') + '</button></div>';
     }
     return h + '</div></section>';
   }
