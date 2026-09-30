@@ -4930,6 +4930,44 @@ function dxCall(doc, schema, extra) {
     .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
     .then(function (j) { var ch = (j.choices || [])[0]; return ch && ch.message ? ch.message.content || '' : ''; });
 }
+/* пакет документов одного пациента: один запрос, ИИ видит все документы сразу и сверяет их между собой */
+var DX_BATCH = 'ЭТО ПАКЕТ ИЗ НЕСКОЛЬКИХ ДОКУМЕНТОВ ОДНОГО ПАЦИЕНТА. Работай с ними как врач, который читает всю историю болезни целиком:\n' +
+  '1. Каждое поле заполняй по всем документам вместе, а не по одному. Сведения из разных документов дополняют друг друга.\n' +
+  '2. «Нет» или «не упоминается» ставь только если ни в одном документе пакета нет сведений. Если в одном документе сказано (например «вредные привычки: отрицает» в выписке), а в другом не сказано, значение берётся из того, где сказано.\n' +
+  '3. Если документы противоречат друг другу, выбери наиболее достоверное (более поздний документ, первичный источник: гистология важнее выписки по гистологии, протокол операции важнее выписки по деталям операции) и опиши противоречие в issues с kind "conflict".\n' +
+  '4. В quote указывай, из какого документа цитата: «имя файла: цитата». В note кратко объясняй, как сведения из разных документов сведены вместе.\n' +
+  '5. questions задавай только если ответа нет ни в одном документе.';
+function dxCallMany(docs, schema, extra) {
+  var pv = AI.prov, inline = function (d) { return d.kind === 'image' || (d.kind === 'pdf' && (d.scanned || !d.text || d.text.replace(/\s/g, '').length < 400)); };
+  var body = docs.map(function (d, i) { return '=== ДОКУМЕНТ ' + (i + 1) + ' из ' + docs.length + ': «' + d.name + '» ===\n' + (inline(d) ? '(см. приложенный файл ' + (i + 1) + ')' : String(d.text || '').slice(0, Math.floor(150000 / docs.length))); }).join('\n\n');
+  var prompt = DX_BATCH + '\n\nСХЕМА КАРТОЧКИ (id | название | тип | варианты):\n' + schema + '\n\n' + body + (extra ? '\n\n' + extra : '') + '\n\nВерни один JSON по формату для всего пакета.';
+  if (AI.coolUntil && Date.now() < AI.coolUntil) return Promise.reject(new Error(aiQuotaMsg()));
+  var fail = function (r) { return r.json().then(function (j) { throw new Error(aiErrMsg(j, 'HTTP ' + r.status)); }, function () { throw new Error('HTTP ' + r.status); }); };
+  if (pv === 'gemini') {
+    var parts = [];
+    docs.forEach(function (d) { if (!inline(d)) return; if (d.kind === 'pdf') parts.push({ inline_data: { mime_type: 'application/pdf', data: d.b64 } }); else parts.push({ inline_data: { mime_type: d.imgType, data: d.images[0] } }); });
+    parts.push({ text: prompt });
+    return fetch(AI_BASE + '/models/' + AI.model + ':generateContent?key=' + encodeURIComponent(AI.key), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ systemInstruction: { parts: [{ text: dxSys() }] }, contents: [{ role: 'user', parts: parts }], generationConfig: { temperature: 0.1, maxOutputTokens: 32768, responseMimeType: 'application/json' } }) })
+      .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
+      .then(function (j) { var c = (j.candidates || [])[0] || {}; return ((c.content || {}).parts || []).filter(function (p) { return p.text && !p.thought; }).map(function (p) { return p.text; }).join(''); });
+  }
+  if (pv === 'anthropic') {
+    var content = [];
+    docs.forEach(function (d, i) { if (!inline(d)) return; if (d.kind === 'pdf') content.push({ type: 'document', title: d.name, source: { type: 'base64', media_type: 'application/pdf', data: d.b64 } }); else content.push({ type: 'image', source: { type: 'base64', media_type: d.imgType, data: d.images[0] } }); });
+    content.push({ type: 'text', text: prompt });
+    return fetch(AI_URL.anthropic + '/messages', { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify({ model: AI.model, max_tokens: 32000, system: dxSys(), messages: [{ role: 'user', content: content }] }) })
+      .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
+      .then(function (j) { return (j.content || []).map(function (c) { return c.text || ''; }).join(''); });
+  }
+  var imgs = []; docs.forEach(function (d) { if (inline(d)) (d.images || []).forEach(function (b) { imgs.push({ b: b, t: d.imgType || 'image/jpeg' }); }); });
+  var visual = pv !== 'deepseek' && imgs.length;
+  var uc = visual ? [{ type: 'text', text: prompt }].concat(imgs.map(function (x) { return { type: 'image_url', image_url: { url: 'data:' + x.t + ';base64,' + x.b } }; })) : prompt;
+  var ob = { model: AI.model, messages: [{ role: 'system', content: dxSys() }, { role: 'user', content: uc }], response_format: { type: 'json_object' } };
+  if (!/^o\d|gpt-5/.test(AI.model)) ob.temperature = 0.1;
+  return fetch(aiUrl(pv) + '/chat/completions', { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify(ob) })
+    .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
+    .then(function (j) { var ch = (j.choices || [])[0]; return ch && ch.message ? ch.message.content || '' : ''; });
+}
 /* ---------- extraction without AI: OCR in the browser + medical text patterns ---------- */
 function dxAbs(p) { return new URL(p, location.href).href; }
 function dxOCR(doc, onProg) {
@@ -5298,6 +5336,7 @@ function dxRunMany() {
   if (dx.mode === 'ai' && dxAiAvail() && AI.prov !== 'local' && !dx.agree) { toast(LL('Подтвердите отправку документов во внешний сервис ИИ или выберите обработку без ИИ', 'Confirm sending, or choose no-AI processing')); return; }
   dx.step = 'run'; dx.log = [LL('Документов в пакете: ', 'Documents: ') + n]; render();
   var log = function (l, repl) { if (!S.dx) return; if (repl && dx.log.length && /^OCR/.test(dx.log[dx.log.length - 1])) dx.log[dx.log.length - 1] = l; else dx.log.push(l); render(); };
+  if (dx.mode === 'ai') return dxRunManyAI(files, log);
   var all = { doc: { type: LL('Пакет документов: ', 'Document batch: ') + n, summary: '' }, filled: [], same: [], conflict: [], rejected: [], issues: [], questions: [], missing: [] };
   var texts = [], types = [], srcs = [], anyAI = false, fails = 0, seq = Promise.resolve();
   files.forEach(function (file, i) {
@@ -5306,7 +5345,6 @@ function dxRunMany() {
       log(LL('Документ ', 'Document ') + (i + 1) + LL(' из ', ' of ') + n + ': «' + file.name + '»');
       return dxReadFile(file).then(function (doc) { return dxExtract(doc, dx.mode, log); }).then(function (o) {
         if (!S.dx || S.dx !== dx || !S.drawer) return;
-        o.res = dxDefaultNo(o.res, o.text, S.drawer.p.d);
         var r = dxApply(o.res, dx.keep, o.local), tag = function (x) { x.note = (x.note ? x.note + '. ' : '') + file.name; x.file = file.name; return x; };
         all.filled = all.filled.concat(r.filled.map(tag)); all.conflict = all.conflict.concat(r.conflict.map(tag)); all.rejected = all.rejected.concat(r.rejected.map(tag));
         r.same.forEach(function (x) { if (!all.same.some(function (y) { return y.id === x.id; })) all.same.push(x); });
@@ -5322,6 +5360,8 @@ function dxRunMany() {
   });
   seq.then(function () {
     if (!S.dx || S.dx !== dx || !S.drawer) return;
+    var dn = dxDefaultNo({ fields: [] }, texts.join('\n\n'), S.drawer.p.d, true);
+    if (dn.fields.length) { var rn = dxApply(dn, true, true); all.filled = all.filled.concat(rn.filled.map(function (x) { x.note = LL('ни в одном документе пакета не упоминается', 'not mentioned in any document'); return x; })); }
     var d = S.drawer.p.d, ids = {}; all.filled.concat(all.same, all.conflict).forEach(function (x) { ids[x.id] = 1; });
     var tail = dxApply({ fields: Object.keys(ids).filter(function (k) { return has(d[k]); }).map(function (k) { return { id: k, value: d[k], confidence: 1, quote: '' }; }) }, true, true);
     all.missing = tail.missing; all.otherSecs = tail.otherSecs;
@@ -5332,13 +5372,37 @@ function dxRunMany() {
     if (anyAI && aiReady()) aiSummary(S.drawer, dx.docText, true);
   });
 }
+function dxRunManyAI(files, log) {
+  var dx = S.dx, n = files.length, docs = [], seq = Promise.resolve(), fails = [];
+  if (!dxAiAvail()) { dx.step = 'err'; dx.err = LL('ИИ не подключён. Откройте переключатель ИИ в шапке и введите ключ.', 'AI is not connected.'); render(); return; }
+  files.forEach(function (file, i) { seq = seq.then(function () { log(LL('Читаю ', 'Reading ') + (i + 1) + LL(' из ', ' of ') + n + ': «' + file.name + '»'); return dxReadFile(file).then(function (doc) { docs.push(doc); }).catch(function (e) { fails.push(file.name + ': ' + ((e && e.message) || e)); log(LL('  не прочитан: ', '  unreadable: ') + ((e && e.message) || e)); }); }); });
+  seq.then(function () {
+    if (!S.dx || S.dx !== dx || !S.drawer) return;
+    if (!docs.length) throw new Error(LL('Ни один документ не прочитан', 'No document could be read'));
+    log(LL('Отправляю весь пакет (', 'Sending the whole batch (') + docs.length + LL(' док.) в ', ' docs) to ') + AI_PROV[AI.prov].name + ' · ' + AI.model + LL(': ИИ сверит документы между собой (обычно 30-90 секунд)…', ': cross-checking documents (30-90 s)…'));
+    return dxCallMany(docs, dxSchemaText()).then(dxParseJSON).then(function (res) {
+      if (!S.dx || S.dx !== dx || !S.drawer) return;
+      res.fields = res.fields || [];
+      docs.forEach(function (d) { if (d.text && !d.scanned) { try { res = dxMerge(res, dxRules(d)); } catch (e) {} } });
+      var allText = docs.map(function (d) { return '=== ДОКУМЕНТ «' + d.name + '» ===\n' + (d.text || ''); }).join('\n\n');
+      res = dxDefaultNo(res, allText, S.drawer.p.d, true);
+      var r = dxApply(res, dx.keep, AI.prov === 'local');
+      r.src = AI_PROV[AI.prov].name + ' · ' + AI.model + LL(' · пакет, документы сверены между собой', ' · batch, cross-checked');
+      r.file = LL('документов: ', 'documents: ') + docs.length; r.at = nowIso();
+      if (fails.length) { r.fallback = LL('Не прочитаны: ', 'Unreadable: ') + fails.join('; '); r.issues = r.issues.concat(fails.map(function (f) { return { id: '', label: '', kind: 'unreadable', text: f }; })); }
+      S.drawer.p.docsAI = (S.drawer.p.docsAI || []).concat(docs.map(function (d) { return { name: d.name, at: r.at, by: me(), src: r.src, n: 0 }; }));
+      dx.rep = r; dx.docs = docs; dx.doc = null; dx.docText = allText; dx.usedAI = true; dx.ans = ''; dx.qa = []; dx.step = 'rep'; render();
+      if (aiReady()) aiSummary(S.drawer, allText, true);
+    });
+  }).catch(function (e) { if (!S.dx) return; dx.step = 'err'; dx.err = LL('ИИ не ответил: ', 'AI failed: ') + ((e && e.message) || String(e)) + LL('. Карточка не изменена.', '. Record unchanged.'); render(); });
+}
 /* правило врача: если в документе с анамнезом заболевание или привычка нигде не упоминаются, считаем «Нет» */
-function dxDefaultNo(res, text, d) {
+function dxDefaultNo(res, text, d, many) {
   res = res || {}; res.fields = res.fields || [];
   var got = {}; res.fields.forEach(function (f) { if (f && f.id) got[f.id] = f; });
   var anam = !!text && /сопутствующ|анамнез|anamnesis|жалоб|объективн|эпикриз|осмотр|консультаци|вредные\s+привычки/i.test(text || '') || ['comorb', 'hx'].some(function (sid) { var sc = SECTIONS.filter(function (z) { return z.id === sid; })[0]; return sc && sc.fields.some(function (x) { return got[x.id]; }); });
   if (!anam) return res;
-  var note = LL('в документе не упоминается: по правилу «не указано = Нет»', 'not mentioned: treated as No');
+  var note = many ? LL('ни в одном документе пакета не упоминается: по правилу «не указано = Нет»', 'not mentioned in any document: treated as No') : LL('в документе не упоминается: по правилу «не указано = Нет»', 'not mentioned: treated as No');
   var d2 = {}; Object.keys(d).forEach(function (k) { d2[k] = d[k]; }); res.fields.forEach(function (f) { if (f && f.id && has(f.value)) d2[f.id] = f.value; });
   var SKIP = { primary: 1, adjComplete: 1, comorb: 1 };
   var TOUCH = {}; SECTIONS.forEach(function (sc) { var nh = sc.fields.filter(function (x) { return got[x.id]; }).length; TOUCH[sc.id] = (sc.id === 'comorb' || sc.id === 'hx') ? anam : (nh >= 2 || (nh && nh >= sc.fields.length / 3)); });
@@ -5350,14 +5414,14 @@ function dxDefaultNo(res, text, d) {
       if (x.show && !x.show(d2)) return;
       if (/^s(Liver|Bladder|Gyn|Lnd|LndPelv|LndIng|Gi|Other)$/.test(id) && d2.simult !== 'Да') return;
       if (id === 'ecig' && d2.smoke === 'Да') return; if (id === 'famCrc' && d2.famCa === 'Да') return;
-      res.fields.push({ id: id, value: 'Нет', confidence: 0.6, quote: LL('не упоминается', 'not mentioned'), note: note }); got[id] = res.fields[res.fields.length - 1]; d2[id] = 'Нет';
+      res.fields.push({ id: id, value: 'Нет', confidence: 0.6, quote: many ? LL('нет ни в одном документе', 'in no document') : LL('не упоминается', 'not mentioned'), note: note }); got[id] = res.fields[res.fields.length - 1]; d2[id] = 'Нет';
     });
   });
   if (!got.comorb && !has(d.comorb)) { var any = ['diab', 'htn', 'cvd', 'lung', 'cvb', 'liverDz'].some(function (id) { return (got[id] && got[id].value === 'Да') || d[id] === 'Да'; }) || !!got.comorbOther || has(d.comorbOther); res.fields.push({ id: 'comorb', value: any ? 'Да' : 'Нет', confidence: 0.7, quote: any ? LL('есть сопутствующие заболевания', 'comorbidities present') : LL('сопутствующие не упоминаются', 'none mentioned'), note: any ? '' : note }); }
   return res;
 }
 function dxAnswer() {
-  var dx = S.dx, dr = S.drawer; if (!dx || !dx.rep || !dx.doc || !dr || dx.busyAns) return;
+  var dx = S.dx, dr = S.drawer; if (!dx || !dx.rep || !(dx.doc || dx.docs) || !dr || dx.busyAns) return;
   var ans = String(dx.ans || '').trim(); if (!ans) { toast(LL('Напишите ответы на вопросы', 'Write your answers')); return; }
   if (!aiReady()) { dx.ansErr = LL('ИИ не подключён', 'AI not connected'); render(); return; }
   var d = dr.p.d, cur = {}; dxFields().forEach(function (o) { var v = d[o.x.id]; if (has(v) && !(Array.isArray(v) && !v.length)) cur[o.x.id] = v; });
@@ -5365,7 +5429,7 @@ function dxAnswer() {
   var extra = 'ВОПРОСЫ, КОТОРЫЕ ТЫ ЗАДАЛ ВРАЧУ ПО ЭТОМУ ДОКУМЕНТУ:\n' + qs.map(function (q, i) { return (i + 1) + '. ' + q; }).join('\n') + '\n\nОТВЕТЫ ВРАЧА:\n' + ans + '\n\nТЕКУЩИЕ ЗНАЧЕНИЯ КАРТОЧКИ (JSON, id: значение):\n' + JSON.stringify(cur) +
     '\n\nЗАДАЧА: с учётом ответов врача (они важнее документа и текущих значений) верни JSON только с теми полями, которые нужно заполнить или исправить по этим ответам и по документу. Если врач указал, какое значение из документа верное, возьми его из документа. Для значений из ответа врача quote начинай с «врач: ». В questions оставь только то, что по-прежнему неясно и без чего нельзя заполнить поле.';
   dx.busyAns = true; dx.ansErr = ''; render();
-  dxCall(dx.doc, dxSchemaText(), extra).then(dxParseJSON).then(function (res) {
+  (dx.docs ? dxCallMany(dx.docs, dxSchemaText(), extra) : dxCall(dx.doc, dxSchemaText(), extra)).then(dxParseJSON).then(function (res) {
     if (!S.dx || S.dx !== dx || !S.drawer) return;
     var old = dx.rep, nr = dxApply(res, false);
     nr.filled.forEach(function (x) { x.note = (x.note ? x.note + '. ' : '') + LL('по ответу врача', 'from the doctor\'s answer'); });
@@ -5423,7 +5487,7 @@ function renderDx() {
   if (r.conflict.length) h += '<h3 class="dxh warn">' + ico('alert', 16) + LL('Расходится с уже заполненным (не изменено)', 'Differs from existing values (not changed)') + '</h3><div class="tablewrap"><table class="grid dxtab"><thead><tr><th>' + LL('Поле', 'Field') + '</th><th>' + LL('В карточке', 'In record') + '</th><th>' + LL('В документе', 'In document') + '</th><th>' + LL('Основание', 'Evidence') + '</th><th></th></tr></thead><tbody>' + r.conflict.map(function (x) { return '<tr><td class="strong">' + esc(x.label) + '</td><td>' + dxVal(x, x.old) + '</td><td>' + dxVal(x, x.v) + ' ' + conf(x.conf) + '</td><td><q>' + esc(x.quote) + '</q></td><td>' + (x.taken ? '<span class="muted">' + LL('заменено', 'replaced') + '</span>' : '<button type="button" class="btn small" data-act="dxtake" data-id="' + x.id + '">' + LL('Заменить', 'Replace') + '</button>') + '</td></tr>'; }).join('') + '</tbody></table></div>';
   if (probs) h += '<h3 class="dxh bad">' + ico('alert', 16) + LL('Трудности: информация была, но заполнить точно не удалось', 'Difficulties: information present but could not be filled reliably') + '</h3><ul class="dxlist">' + r.rejected.map(function (x) { return '<li><b>' + esc(x.label) + '</b><span class="tag due">' + LL('не принято', 'rejected') + '</span> ' + esc(x.why) + (x.quote ? ' <q>' + esc(x.quote) + '</q>' : '') + '</li>'; }).join('') + r.issues.map(function (x) { return '<li><b>' + esc(x.label || LL('Документ', 'Document')) + '</b><span class="tag ' + (x.kind === 'conflict' || x.kind === 'inconsistent' ? 'due' : 'soon') + '">' + L(DX_KIND[x.kind] || [x.kind, x.kind]) + '</span> ' + esc(x.text) + '</li>'; }).join('') + '</ul>';
   if (r.questions.length) h += '<h3 class="dxh q">' + ico('chat', 16) + LL('Вопросы врачу', 'Questions for the doctor') + '</h3><ol class="dxlist">' + r.questions.map(function (q) { return '<li>' + esc(q) + '</li>'; }).join('') + '</ol>';
-  if (r.questions.length && dx.doc && dx.usedAI) {
+  if (r.questions.length && (dx.doc || dx.docs) && dx.usedAI) {
     h += '<div class="dxans"><label for="dxans-in"><b>' + LL('Ответить на вопросы', 'Answer the questions') + '</b><span>' + LL('Напишите ответы своими словами, по номерам или сплошным текстом. ИИ учтёт их вместе с документом и дозаполнит карточку. Ответы врача важнее документа.', 'Answer in your own words; the AI will use them together with the document.') + '</span></label>';
     h += '<textarea id="dxans-in" rows="3" data-sb="dx.ans" placeholder="' + LL('Например: 1. предоперационный от 18.02.2026; 2. M0, латеральные ЛУ регионарные; 4. петлевая…', 'e.g. 1. pre-op values; 2. M0…') + '"' + (dx.busyAns ? ' disabled' : '') + '>' + esc(dx.ans || '') + '</textarea>';
     h += '<div class="actions"><button type="button" class="btn primary small" data-act="dxanswer"' + (dx.busyAns ? ' disabled' : '') + '>' + ico('sparkle', 14) + (dx.busyAns ? LL('ИИ дозаполняет…', 'AI is updating…') : LL('Отправить ИИ и дозаполнить', 'Send and update')) + '</button>' + (dx.ansErr ? '<span class="ferr">' + esc(dx.ansErr) + '</span>' : '') + '</div></div>';
