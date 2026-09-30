@@ -696,7 +696,7 @@ function tagsOf(match) {
   return match.filter(function (r) { return !match.some(function (o) { return o.parent === r.id; }); });
 }
 function regOf(id) { return DB.registries.filter(function (r) { return r.id === id; })[0]; }
-function canApprove(r) { return !!SESSION && r.appr && r.appr.st === 'pending' && (SESSION.role === 'doctor' || isAdmin()) && (!CLOUD.on || r.appr.uid !== SESSION.id); }
+function canApprove(r) { return !!SESSION && r.appr && r.appr.st === 'pending' && true && (!CLOUD.on || r.appr.uid !== SESSION.id); }
 function apprMine() { return (DB.pending || []).filter(canApprove); }
 function renderAppr() {
   var list = (DB.pending || []).slice().sort(function (a, b) { return String(b.appr.at).localeCompare(String(a.appr.at)); });
@@ -2796,11 +2796,11 @@ var CLOUD = { cfg: null, on: false, ready: false, err: '', fb: null, db: null, c
   if (!c) { try { c = JSON.parse(localStorage.getItem('crr.fbconfig') || 'null'); } catch (e) { c = null; } }
   if (c && c.apiKey && c.projectId) { CLOUD.cfg = c; CLOUD.on = true; }
 })();
-function roleName(r) { return L(ROLES[r] || ['', '']); }
+function roleName(r) { return LL('Пользователь', 'User'); }
 function isAdmin() { return !!(SESSION && SESSION.admin); }
 var PERM = { edit: ['doctor', 'resident'], comment: ['doctor', 'resident', 'student'], delete: ['doctor'], rand: ['doctor'], unlock: ['doctor'], admin: [] };
-function can(what) { if (!SESSION) return false; if (SESSION.admin) return true; return (PERM[what] || []).indexOf(SESSION.role) >= 0; }
-function isStudent() { return SESSION && SESSION.role === 'student' && !SESSION.admin; }
+function can(what) { if (!SESSION) return false; if (SESSION.admin) return true; return what !== 'admin'; }
+function isStudent() { return false; }
 function sha256(s) { return crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)).then(function (b) { return [].map.call(new Uint8Array(b), function (x) { return x.toString(16).padStart(2, '0'); }).join(''); }); }
 function localUsers() { try { return JSON.parse(localStorage.getItem('crr.users') || '[]'); } catch (e) { return []; } }
 function saveLocalUsers(u) { try { localStorage.setItem('crr.users', JSON.stringify(u)); } catch (e) {} }
@@ -2812,7 +2812,7 @@ function authErr(code) {
 }
 function doRegister() {
   var a = S.auth, email = String(a.email || '').trim().toLowerCase(), name = String(a.name || '').trim();
-  if (!name || !/^\S+@\S+\.\S+$/.test(email) || String(a.pass || '').length < 6 || !a.role) { a.err = LL('Заполните ФИО, почту, пароль (от 6 символов) и выберите роль', 'Fill in name, email, password (6+ characters) and choose a role'); render(); return; }
+  if (!name || !/^\S+@\S+\.\S+$/.test(email) || String(a.pass || '').length < 6) { a.err = LL('Заполните ФИО, почту и пароль (от 6 символов)', 'Fill in name, email and password (6+ characters)'); render(); return; }
   if (a.pass !== a.pass2) { a.err = LL('Пароли не совпадают', 'Passwords do not match'); render(); return; }
   a.busy = true; a.err = ''; render();
   if (CLOUD.on) { cloudRegister(email, a.pass, name, a.role); return; }
@@ -2947,12 +2947,12 @@ function setUser(id, patch) {
 function renderUsers() {
   if (!isAdmin()) return '<div class="page"><div class="empty">' + LL('Раздел доступен только администратору', 'Administrators only') + '</div></div>';
   if (!S.users) { cloudUsers(function (a) { S.users = a; render(); }); return '<div class="page"><div class="empty">' + LL('Загрузка…', 'Loading…') + '</div></div>'; }
-  var h = pageHead(LL('Администрирование', 'Administration'), LL('Пользователи и роли', 'Users and roles'), LL('Новые регистрации ждут подтверждения. Роль определяет права: студент только просматривает обезличенные данные, резидент вносит и правит, врач также удаляет, рандомизирует и разблокирует защищённые поля.', 'New sign-ups wait for approval. Students view anonymised data, residents edit, doctors also delete, randomise and unlock protected fields.'), '');
+  var h = pageHead(LL('Администрирование', 'Administration'), LL('Пользователи', 'Users'), LL('Новые регистрации ждут подтверждения администратором. У всех подтверждённых пользователей одинаковые права, отдельные права только у администратора.', 'New sign-ups wait for admin approval. All approved users have the same rights; only the admin has extra rights.'), '');
   var list = S.users.slice().sort(function (a, b) { return (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1); });
-  h += '<div class="tablewrap"><table class="grid"><thead><tr><th>' + LL('Пользователь', 'User') + '</th><th>' + LL('Почта', 'Email') + '</th><th>' + LL('Роль', 'Role') + '</th><th>' + LL('Статус', 'Status') + '</th><th></th></tr></thead><tbody>';
+  h += '<div class="tablewrap"><table class="grid"><thead><tr><th>' + LL('Пользователь', 'User') + '</th><th>' + LL('Почта', 'Email') + '</th><th>' + LL('Права', 'Rights') + '</th><th>' + LL('Статус', 'Status') + '</th><th></th></tr></thead><tbody>';
   list.forEach(function (u) {
     var st = u.status === 'active' ? '<span class="st st-done">' + LL('Активен', 'Active') + '</span>' : u.status === 'pending' ? '<span class="st st-prog">' + LL('Ждёт подтверждения', 'Pending') + '</span>' : '<span class="st st-cancel">' + LL('Отклонён', 'Rejected') + '</span>';
-    h += '<tr><td class="strong"><span class="av sm">' + esc(initials(u.name)) + '</span> ' + esc(u.name) + (u.admin ? ' <span class="tag">admin</span>' : '') + '</td><td>' + esc(u.email) + '</td><td><select class="sel-sm" data-urole="' + u.id + '"' + (u.admin ? ' disabled' : '') + '>' + Object.keys(ROLES).map(function (r) { return '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + roleName(r) + '</option>'; }).join('') + '</select></td><td>' + st + '</td><td class="ra">' + (u.admin ? '' : (u.status !== 'active' ? '<button type="button" class="btn small primary" data-act="uok" data-id="' + u.id + '">' + LL('Подтвердить', 'Approve') + '</button>' : '') + (u.status !== 'rejected' ? '<button type="button" class="btn small ghost" data-act="uno" data-id="' + u.id + '">' + LL('Отключить', 'Disable') + '</button>' : '')) + '</td></tr>';
+    h += '<tr><td class="strong"><span class="av sm">' + esc(initials(u.name)) + '</span> ' + esc(u.name) + (u.admin ? ' <span class="tag">admin</span>' : '') + '</td><td>' + esc(u.email) + '</td><td>' + (u.admin ? LL('Администратор', 'Admin') : LL('Пользователь', 'User')) + '</td><td>' + st + '</td><td class="ra">' + (u.admin ? '' : (u.status !== 'active' ? '<button type="button" class="btn small primary" data-act="uok" data-id="' + u.id + '">' + LL('Подтвердить', 'Approve') + '</button>' : '') + (u.status !== 'rejected' ? '<button type="button" class="btn small ghost" data-act="uno" data-id="' + u.id + '">' + LL('Отключить', 'Disable') + '</button>' : '')) + '</td></tr>';
   });
   h += '</tbody></table></div>';
   h += '<div class="page-sec"><div class="panel wipe-p"><div class="ph"><h2>' + LL('Очистка данных', 'Data wipe') + '</h2></div>' + (DB.mig && DB.mig.w1 && !wipeStats().p && !wipeStats().c && !wipeStats().r ? '<p class="muted">' + LL('Данные очищены. В базе нет карточек и записей журналов.', 'Data has been wiped.') + '</p>' : wipeBlock(false)) + '</div></div>';
@@ -3011,7 +3011,7 @@ function wipeGo() {
 
 /* portal (public page) and auth forms */
 function renderAuthCard() {
-  var a = S.auth || (S.auth = { mode: 'login', role: 'resident' });
+  var a = S.auth || (S.auth = { mode: 'login', role: 'doctor' });
   var h = '';
   h += '<div class="pt-card">';
   if (a.mode === 'wait') {
@@ -3025,7 +3025,6 @@ function renderAuthCard() {
     h += '<label class="af"><span>' + LL('Пароль', 'Password') + '</span><input type="password" data-sb="auth.pass" data-enter="' + (reg ? 'reg' : 'login') + '" autocomplete="' + (reg ? 'new-password' : 'current-password') + '"></label>';
     if (reg) {
       h += '<label class="af"><span>' + LL('Повторите пароль', 'Repeat password') + '</span><input type="password" data-sb="auth.pass2" data-enter="reg" autocomplete="new-password"></label>';
-      h += '<div class="af"><span>' + LL('Роль', 'Role') + '</span><div class="roles">' + [['doctor', 'stethoscope', LL('Врач', 'Doctor'), LL('ввод, правка, рандомизация', 'entry, edit, randomise')], ['resident', 'users', LL('Резидент', 'Resident'), LL('ввод и правка данных', 'data entry and edit')], ['student', 'cap', LL('Студент', 'Student'), LL('просмотр обезличенных данных', 'view anonymised data')]].map(function (r) { return '<button type="button" class="role' + (a.role === r[0] ? ' on' : '') + '" data-act="arole" data-v="' + r[0] + '">' + ico(r[1], 18) + '<b>' + r[2] + '</b><em>' + r[3] + '</em></button>'; }).join('') + '</div></div>';
     }
     if (a.err) h += '<div class="aerr">' + ico('alert', 15) + esc(a.err) + '</div>';
     h += '<button type="button" class="btn primary wide" data-act="' + (reg ? 'aregister' : 'alogin') + '"' + (a.busy ? ' disabled' : '') + '>' + (a.busy ? LL('Подождите…', 'Please wait…') : reg ? LL('Отправить заявку', 'Request access') : LL('Войти', 'Sign in')) + '</button>';
@@ -3797,10 +3796,10 @@ function renderTop() {
   h += '<button type="button" class="aibtn' + (UI.aip ? ' on' : '') + '" data-act="aitoggle" title="' + LL('ИИ-ассистент по открытому экрану', 'AI assistant for this screen') + '">' + ico('sparkle', 16) + '<span>' + LL('Ассистент', 'Assistant') + '</span></button>';
   h += renderBell();
   h += themeBtn() + langSeg();
-  h += '<div class="dd"><button type="button" class="user" data-act="menu" data-id="top" aria-expanded="' + (S.menu === 'top') + '"><span class="av">' + esc(initials(me())) + '</span><span class="un"><b>' + esc(me()) + '</b><em>' + (SESSION.admin ? LL('Администратор', 'Admin') : roleName(SESSION.role)) + '</em></span>' + ico('down', 14) + '</button>';
+  h += '<div class="dd"><button type="button" class="user" data-act="menu" data-id="top" aria-expanded="' + (S.menu === 'top') + '"><span class="av">' + esc(initials(me())) + '</span><span class="un"><b>' + esc(me()) + '</b><em>' + (SESSION.admin ? LL('Администратор', 'Admin') : LL('Пользователь', 'User')) + '</em></span>' + ico('down', 14) + '</button>';
   if (S.menu === 'top') {
     h += '<div class="pop right" role="menu"><div class="pop-user"><span class="av">' + esc(initials(me())) + '</span><div><b>' + esc(me()) + '</b><em>' + esc(SESSION.email) + '</em><span class="tag">' + (SESSION.admin ? LL('Администратор', 'Admin') + ' · ' : '') + roleName(SESSION.role) + '</span></div></div>';
-    if (isAdmin()) h += '<button type="button" class="opt" data-act="view" data-v="users">' + ico('users', 16) + LL('Пользователи и роли', 'Users and roles') + '</button><button type="button" class="opt" data-act="cloudsetup">' + ico('cloud', 16) + LL('Облако (Firebase)', 'Cloud (Firebase)') + '</button>';
+    if (isAdmin()) h += '<button type="button" class="opt" data-act="view" data-v="users">' + ico('users', 16) + LL('Пользователи', 'Users') + '</button><button type="button" class="opt" data-act="cloudsetup">' + ico('cloud', 16) + LL('Облако (Firebase)', 'Cloud (Firebase)') + '</button>';
     h += '<button type="button" class="opt" data-act="backup">' + ico('download', 16) + t('menu.backup') + '</button>';
     if (isAdmin()) h += '<button type="button" class="opt" data-act="restore">' + ico('upload', 16) + t('menu.restore') + '</button><button type="button" class="opt danger" data-act="reset">' + ico('alert', 16) + t('menu.reset') + '</button>';
     h += '<button type="button" class="opt" data-act="logout">' + ico('logout', 16) + LL('Выйти', 'Sign out') + '</button></div>';
@@ -4620,7 +4619,7 @@ function renderLandPop() {
   return h + '</section>';
 }
 function renderPortal() {
-  var a = S.auth || (S.auth = { mode: 'login', role: 'resident' }), open = a.show || a.mode === 'wait';
+  var a = S.auth || (S.auth = { mode: 'login', role: 'doctor' }), open = a.show || a.mode === 'wait';
   var h = '<div class="land l2">';
   h += '<header class="l-top"><div class="l-wrap l-top-in"><a class="l-brand" href="#top"><img src="media/nroc-logo.png" alt="NROC"><span><b>' + LL('Колоректальный сектор', 'Colorectal unit') + '</b><em>' + LL('Национальный научный онкологический центр', 'National Research Oncology Center') + '</em></span></a>';
   h += '<nav class="l-nav">' + [['route', 'Госпитализация'], ['prep', 'Подготовка'], ['bag', 'В стационар'], ['after', 'После операции'], ['stoma', 'Стома'], ['diet', 'Питание'], ['contacts', 'Контакты']].map(function (x) { return '<button type="button" data-act="lpop" data-id="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</nav>';
@@ -4668,7 +4667,7 @@ function dxReadFile(file) {
         for (var i = 1; i <= pdf.numPages; i++) (function (i) {
           seq = seq.then(function () { return pdf.getPage(i).then(function (pg) {
             return pg.getTextContent().then(function (tc) {
-              var t = '', lastY = null; tc.items.forEach(function (it) { var y = it.transform ? Math.round(it.transform[5]) : 0; if (lastY !== null && Math.abs(y - lastY) > 2) t += '\n'; else if (t && !/\s$/.test(t)) t += ' '; t += it.str; lastY = y; });
+              var t = '', lastY = null, lastEnd = null; tc.items.forEach(function (it) { var tr = it.transform || [0,0,0,0,0,0], y = Math.round(tr[5]), x = tr[4], fs = Math.abs(tr[3]) || Math.abs(tr[0]) || 10; if (lastY !== null && Math.abs(y - lastY) > 2) t += '\n'; else if (t && !/\s$/.test(t) && !/^\s/.test(it.str)) { if (lastEnd === null || x - lastEnd > fs * 0.18 || x < lastEnd - fs) t += ' '; } t += it.str; lastY = y; lastEnd = x + (it.width || 0); if (it.hasEOL) { t += '\n'; lastY = null; lastEnd = null; } });
               texts.push('--- Страница ' + i + ' ---\n' + t.trim());
               if (t.replace(/\s/g, '').length < 40 && out.images.length < 8) {
                 var vp = pg.getViewport({ scale: 1.6 }), cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
@@ -4717,7 +4716,24 @@ var DX_SYS = 'Ты модуль извлечения данных колорек
 function dxParseJSON(s) {
   s = String(s || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
   var a = s.indexOf('{'), b = s.lastIndexOf('}'); if (a < 0 || b < a) throw new Error(LL('ИИ вернул ответ не в формате JSON', 'AI did not return JSON'));
-  return JSON.parse(s.slice(a, b + 1));
+  var js = s.slice(a, b + 1);
+  try { return JSON.parse(js); } catch (e0) {
+    /* truncated answer: keep every complete field object */
+    var fi = s.indexOf('"fields"'), cut = s.lastIndexOf('}', s.length - 1);
+    while (fi >= 0 && cut > fi) { try { return JSON.parse(s.slice(a, cut + 1) + ']}'); } catch (e1) { cut = s.lastIndexOf('}', cut - 1); } }
+    throw e0;
+  }
+}
+/* AI result + exact form parsing: structured form values (ФИО, ИИН, адрес, даты, TNM из полей формы) win over the model */
+function dxMerge(ai, rr) {
+  var byId = {}; (ai.fields || []).forEach(function (f, i) { if (f && f.id) byId[f.id] = i; });
+  (rr.fields || []).forEach(function (f) {
+    var i = byId[f.id];
+    if (i === undefined) { ai.fields.push(Object.assign({}, f, { note: (f.note ? f.note + '. ' : '') + LL('найдено разбором формы', 'found by form parsing') })); return; }
+    if (f.confidence >= 0.85) { var g = ai.fields[i]; if (!dxSame(String(g.value), String(f.value))) ai.fields[i] = Object.assign({}, f, { note: (f.note ? f.note + '. ' : '') + LL('ИИ предложил: ', 'AI suggested: ') + (Array.isArray(g.value) ? g.value.join(', ') : g.value) }); }
+  });
+  ai.fields = ai.fields || []; ai.questions = (ai.questions || []).concat((rr.questions || []).filter(function (q) { return (ai.questions || []).indexOf(q) < 0; }));
+  return ai;
 }
 function dxSys() { return DX_SYS.replace('{PII}', 'Паспортную часть (ФИО, дата рождения, пол, ИИН, № истории болезни, телефон, адрес, национальность, рост, вес, ИМТ) заполняй обязательно, если она есть в документе. Возраст бери на дату документа; если указана дата рождения, возраст должен ей соответствовать.'); }
 function dxCall(doc, schema) {
@@ -4729,7 +4745,7 @@ function dxCall(doc, schema) {
     if (doc.kind === 'pdf') parts.push({ inline_data: { mime_type: 'application/pdf', data: doc.b64 } });
     else if (doc.kind === 'image') parts.push({ inline_data: { mime_type: doc.imgType, data: doc.images[0] } });
     parts.push({ text: prompt });
-    var body = { systemInstruction: { parts: [{ text: dxSys() }] }, contents: [{ role: 'user', parts: parts }], generationConfig: { temperature: 0.1, maxOutputTokens: 16384, responseMimeType: 'application/json' } };
+    var body = { systemInstruction: { parts: [{ text: dxSys() }] }, contents: [{ role: 'user', parts: parts }], generationConfig: { temperature: 0.1, maxOutputTokens: 32768, responseMimeType: 'application/json' } };
     return fetch(AI_BASE + '/models/' + AI.model + ':generateContent?key=' + encodeURIComponent(AI.key), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
       .then(function (j) { var c = (j.candidates || [])[0] || {}; return ((c.content || {}).parts || []).filter(function (p) { return p.text && !p.thought; }).map(function (p) { return p.text; }).join(''); });
@@ -4775,11 +4791,76 @@ function dxRules(doc) {
   function dt(s) { var m = /(\d{1,2})[.\/](\d{1,2})[.\/](\d{2,4})/.exec(s); if (!m) return ''; var y = m[3].length === 2 ? '20' + m[3] : m[3]; return y + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2); }
   function numv(s) { return parseFloat(String(s).replace(',', '.')); }
   var m, low = tx.toLowerCase();
+  /* стандартная выписка из КМИС / Damumed (Выписной эпикриз, форма с пунктами 1-7): сначала поля по якорям формы */
+  (function () {
+    var U = 'А-ЯЁӘІҢҒҮҰҚӨҺ', mm, tc = function (s) { return String(s).toLowerCase().replace(/(^|[\s\-])([а-яёәіңғүұқөһa-z])/g, function (a, b, c) { return b + c.toUpperCase(); }); };
+    if ((mm = new RegExp('отчество\\s+больного\\)\\s*([' + U + '][' + U + '\\-]+(?:\\s+[' + U + '][' + U + '\\-]+){1,3})\\s*(\\d{12})?').exec(tx))) {
+      add('fio', tc(mm[1].replace(/\s+/g, ' ').trim()), LL('п. 1 выписки: Фамилия, имя, отчество', 'item 1: full name'), 0.95);
+      if (mm[2]) add('iin', mm[2], LL('п. 1 выписки, рядом с ФИО', 'item 1, next to name'), 0.95);
+    }
+    if ((mm = /\(Дата\s+рождения\)\s*(\d{1,2}[.\/]\d{1,2}[.\/]\d{4})/i.exec(tx))) add('dob', dt(mm[1]), mm[0], 0.95);
+    if ((mm = /\(Домашний\s+адрес\)\s*([\s\S]{5,300}?)\s*(?:\n\s*)?4\.\s*/i.exec(tx))) {
+      var A = { 'РЕСПУБЛИКА': '%', 'ОБЛАСТЬ': '% обл.', 'ГОРОД ОБЛ.ЗНАЧ.': 'г. %', 'ГОРОД РЕСП.ЗНАЧ.': 'г. %', 'ГОРОД РАЙ.ЗНАЧ.': 'г. %', 'ГОРОД': 'г. %', 'РАЙОН': '% р-н', 'СЕЛО': 'с. %', 'ПОСЕЛОК': 'пос. %', 'МИКРОРАЙОН': 'мкр. %', 'УЛИЦА': 'ул. %', 'ПРОСПЕКТ': 'пр. %', 'ПЕРЕУЛОК': 'пер. %', 'ДОМ': 'д. %', 'КОРПУС': 'корп. %', 'КВАРТИРА': 'кв. %' };
+      var parts = [], re2 = /([А-ЯЁ][А-ЯЁ.\s]*?[А-ЯЁ.])\s*:\s*([^,:\n]+?(?:\n(?![А-ЯЁ][А-ЯЁ.\s]*:)[^,:\n]*)?)\s*(?:,|$)/g, x2, body = mm[1].replace(/\s*\n\s*/g, ' ');
+      while ((x2 = re2.exec(body))) { var k2 = x2[1].replace(/\s+/g, ' ').trim(), v2 = x2[2].replace(/\s+/g, ' ').trim(); if (!v2) continue; var tpl = A[k2] || (/ГОРОД/.test(k2) ? 'г. %' : '%'); parts.push(tpl.replace('%', v2)); }
+      add('address', parts.length ? parts.join(', ') : body.replace(/\s+/g, ' ').trim(), LL('п. 3 выписки: Домашний адрес', 'item 3: home address'), parts.length ? 0.9 : 0.7);
+    }
+    if ((mm = /поступления\)\s*(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i.exec(tx))) add('admDate', dt(mm[1]), mm[0], 0.95);
+    if ((mm = /\(выбытия\)\s*(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i.exec(tx))) add('disDate', dt(mm[1]), mm[0], 0.95);
+    if (F.admDate && F.disDate) { var dd = Math.round((new Date(F.disDate.value) - new Date(F.admDate.value)) / 86400000); if (dd >= 0 && dd < 365) add('los', String(dd), fmtDate(F.admDate.value) + ' - ' + fmtDate(F.disDate.value), 0.85, LL('рассчитано по датам поступления и выбытия', 'computed from admission and discharge dates')); }
+    var ICD = { 'C18.0': 'Слепая кишка', 'C18.2': 'Восходящая ободочная', 'C18.3': 'Печёночный изгиб', 'C18.4': 'Поперечная ободочная', 'C18.5': 'Селезёночный изгиб', 'C18.6': 'Нисходящая ободочная', 'C18.7': 'Сигмовидная кишка', 'C19': 'Ректосигмоидный отдел', 'C20': 'Прямая кишка', 'C21': 'Анальный канал', 'C21.0': 'Анальный канал', 'C21.1': 'Анальный канал' };
+    if ((mm = /Локализация\s+опухоли\s*:?\s*\n?\s*([CС]\d{2}(?:\.\d)?)/i.exec(tx)) || (mm = /заключительный\s+диагноз\)?\s*:?\s*\(?\s*([CС]\d{2}(?:\.\d)?)/i.exec(tx))) { var code = mm[1].replace('С', 'C'); var lc = ICD[code] || ICD[code.slice(0, 3)]; if (lc) add('loc', lc, mm[0], 0.9, LL('по коду МКБ-10 ', 'from ICD-10 ') + code); }
+    var tnm = /Стадия\s+по\s+системе\s+TNMG?\s*:?\s*[\s\S]{0,20}?T\s*:\s*(T[0-4xXis]+[a-d]?)\s*N\s*:\s*(N[0-3xX][a-c]?)\s*M\s*:\s*(M[01xX][a-c]?)(?:\s*G\s*:\s*(G[1-4xX]))?/i.exec(tx);
+    if (tnm) {
+      var nT = 'c' + tnm[1].replace(/x/i, 'x').replace(/^t/i, 'T'), nN = 'c' + tnm[2].replace(/X/, 'x').replace(/^n/i, 'N'), nM = 'c' + tnm[3].replace(/^m/i, 'M');
+      if (fo('cT').indexOf(nT) >= 0) add('cT', nT, tnm[0], 0.9); if (fo('cN').indexOf(nN) >= 0) add('cN', nN, tnm[0], 0.9); if (fo('cM').indexOf(nM) >= 0) add('cM', nM, tnm[0], 0.9);
+    }
+    var MORPH = { '8140/3': 'Аденокарцинома', '8480/3': 'Муцинозная аденокарцинома', '8490/3': 'Перстневидноклеточный рак', '8070/3': 'Плоскоклеточный рак', '8246/3': 'Нейроэндокринная карцинома', '8210/3': 'Аденокарцинома в аденоматозном полипе' };
+    if ((mm = /Морфологический\s+тип\s+опухоли\s*:?\s*\n?\s*(\d{4}\/\d)/i.exec(tx))) { var hv = (MORPH[mm[1]] || LL('Код МКБ-О ', 'ICD-O ') + mm[1]) + (tnm && tnm[4] && !/x/i.test(tnm[4]) ? ', ' + tnm[4].toUpperCase() : '') + ' (' + mm[1] + ')'; add('hist', hv, mm[0], 0.85); }
+    /* операция: блок «Операции» */
+    if ((mm = /Начало\s+операции\s*:?\s*(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i.exec(tx))) add('date', dt(mm[1]), mm[0], 0.95);
+    if ((mm = /Длительность\s+операции\s*:?\s*(\d{2,4})/i.exec(tx))) add('opTime', mm[1], mm[0], 0.9);
+    if ((mm = /Объем\s+кровопотери\s*:?\s*(\d{1,5})/i.exec(tx))) add('ebl', mm[1], mm[0], 0.9);
+    if ((mm = new RegExp('Хирург\\s*\\(опер\\.?\\)\\s*:?\\s*([' + U + '][' + U + '\\-]+)').exec(tx))) { var sn = tc(mm[1]); var sg = SURGEONS.filter(function (x) { return x.toLowerCase() === sn.toLowerCase(); })[0]; if (sg) add('surgeon', sg, mm[0].replace(/\s+/g, ' '), 0.9); }
+    if (/в\s+плановом\s+порядке/i.test(tx)) add('urg', 'Плановая', ctx(/в\s+плановом\s+порядке/i), 0.8);
+    else if (/в\s+экстренном\s+порядке/i.test(tx)) add('urg', 'Экстренная', ctx(/в\s+экстренном\s+порядке/i), 0.8);
+    if (/(?<![А-Яа-яЁё])конверси/i.test(tx)) { add('conv', 'Да', ctx(/(?<![А-Яа-яЁё])конверси/i), 0.85); if (/лапароскопи/i.test(tx)) add('access', 'Лапароскопический', ctx(/лапароскопи/i), 0.75, LL('начата лапароскопически, затем конверсия', 'started laparoscopically, then converted')); }
+    if (/гемотрансфузи[\wА-Яа-яЁё]*\s+не\s+(?:по)?требовал|гемотрансфузи[\wА-Яа-яЁё]*\s*[-:–]\s*нет/i.test(tx)) add('transf', 'Нет', ctx(/гемотрансфузи[\wА-Яа-яЁё]*\s+не\s+(?:по)?требовал|гемотрансфузи[\wА-Яа-яЁё]*\s*[-:–]\s*нет/i), 0.8);
+    if (/нижн[\wА-Яа-яЁё]+\s+брыжеечн[\wА-Яа-яЁё]+\s+артери[\wА-Яа-яЁё]+[^.]{0,80}у\s+основани/i.test(tx)) add('imaHigh', 'Да', ctx(/нижн[\wА-Яа-яЁё]+\s+брыжеечн[\wА-Яа-яЁё]+\s+артери[\wА-Яа-яЁё]+[^.]{0,80}у\s+основани/i), 0.75);
+    if (/латеральн[\wА-Яа-яЁё]*\s+(?:тазов[\wА-Яа-яЁё]*\s+)?лимфодиссекци|тазов[\wА-Яа-яЁё]*\s+лимфодиссекци/i.test(tx)) add('llnd', 'Да', ctx(/латеральн[\wА-Яа-яЁё]*\s+(?:тазов[\wА-Яа-яЁё]*\s+)?лимфодиссекци|тазов[\wА-Яа-яЁё]*\s+лимфодиссекци/i), 0.85);
+    var an = [];
+    if (/аппаратн[\wА-Яа-яЁё]*[^.]{0,60}циркулярн|циркулярн[\wА-Яа-яЁё]*\s+сшивающ/i.test(tx)) an.push('Аппаратный циркулярный');
+    if (/конец\s+в\s+конец/i.test(tx)) an.push('Конец в конец'); else if (/бок\s+в\s+бок/i.test(tx)) an.push('Бок в бок'); else if (/конец\s+в\s+бок/i.test(tx)) an.push('Конец в бок');
+    if (an.length) add('anDet', an, ctx(/анастомоз[^.]{0,80}(?:конец|бок|циркулярн)/i) || an.join(', '), 0.75);
+    if (/перевед[\wА-Яа-яЁё]*\s+в\s+(?:отделение\s+)?(?:хирургическ[\wА-Яа-яЁё]*\s+)?реанимаци[\s\S]{0,60}на\s+следующ[\wА-Яа-яЁё]*\s+сутки/i.test(tx)) add('icuDays', '1', ctx(/на\s+следующ[\wА-Яа-яЁё]*\s+сутки\s+был\s+перевед/i) || ctx(/реанимаци/i), 0.6, LL('«на следующие сутки переведён в профильное отделение»', 'moved to the ward the next day'));
+    /* анализы по датам: СРБ на 3 и 5 сутки, Hb до и после операции */
+    var opD = F.date ? new Date(F.date.value) : null, blocks = tx.split(/Дата\s+завершения\s+заказа\s*:\s*/i).slice(1);
+    var labs = blocks.map(function (b) { var d0 = /^(\d{2}\.\d{2}\.\d{4})/.exec(b); return d0 ? { d: dt(d0[1]), b: b } : null; }).filter(Boolean);
+    function labVal(b, re) { var x = re.exec(b); return x ? parseFloat(String(x[1]).replace(/\s/g, '').replace(',', '.')) : null; }
+    var reCRP = /С[\s-]*реактивн[\wА-Яа-яЁё"«»\s]*?белка\s*\(СРБ\)\s*в\s+сыворотке\s+крови\s+количественно\s*-\s*([\d.,]+)\s*мг/i, reHb = /Гемоглобин\s*\(HGB\)\s*-\s*([\d][\d\s]*[.,]?\d*)\s*g\/L/i;
+    if (opD) {
+      labs.forEach(function (l) {
+        var pod = Math.round((new Date(l.d) - opD) / 86400000), c = labVal(l.b, reCRP);
+        if (c !== null && pod === 3) add('crp3', String(c), LL('анализ от ', 'test of ') + fmtDate(l.d) + LL(', 3 сутки после операции', ', day 3'), 0.85);
+        if (c !== null && pod === 5) add('crp5', String(c), LL('анализ от ', 'test of ') + fmtDate(l.d) + LL(', 5 сутки после операции', ', day 5'), 0.85);
+      });
+      var hbs = labs.map(function (l) { return { d: l.d, v: labVal(l.b, reHb) }; }).filter(function (x) { return x.v !== null && x.v > 30 && x.v < 250; }).sort(function (a, b) { return a.d.localeCompare(b.d); });
+      var pre = hbs.filter(function (x) { return new Date(x.d) < opD; }).pop(), post = hbs.filter(function (x) { return new Date(x.d) > opD; }).pop();
+      if (pre) add('hb0', String(pre.v), LL('ОАК от ', 'CBC of ') + fmtDate(pre.d), 0.8); if (post) add('hb1', String(post.v), LL('последний ОАК после операции, ', 'last post-op CBC, ') + fmtDate(post.d), 0.75);
+    }
+    /* неоадъювантная ХЛТ */
+    if ((mm = /(?:ХЛТ|химио-?лучев[\wА-Яа-яЁё]*\s+терап[\wА-Яа-яЁё]*)[\s\S]{0,200}?(?<![А-Яа-яЁё])[Сс]\s+(\d{1,2}\.\d{1,2}\.\d{2,4})\s+по\s+(\d{1,2}\.\d{1,2}\.\d{2,4})[\s\S]{0,120}?СОД\s*([\d.,]+)\s*Гр/i.exec(tx))) { add('neoCrt', 'Да', mm[0].slice(0, 140), 0.85); add('rtStart', dt(mm[1]), mm[0].slice(0, 140), 0.8); add('rtEnd', dt(mm[2]), mm[0].slice(0, 140), 0.8); add('sod', String(numv(mm[3])), mm[0].slice(-60), 0.85); }
+    if ((mm = /РЭА\s*[=:]\s*([\d.,]+)\s*нг/i.exec(tx))) add('cea0', String(numv(mm[1])), mm[0], 0.75, LL('проверьте дату анализа', 'check the test date'));
+    if ((mm = /(?:С\s?А|CA)\s*19[-\s]?9\s*[-=:]\s*([\d.,]+)/i.exec(tx))) add('ca199_0', String(numv(mm[1])), mm[0], 0.75, LL('проверьте дату анализа', 'check the test date'));
+    if (/Вредные\s+привычки\s*:?\s*отрицает/i.test(tx)) { add('smoke', 'Нет', ctx(/Вредные\s+привычки\s*:?\s*отрицает/i), 0.8); add('alcohol', 'Нет', ctx(/Вредные\s+привычки\s*:?\s*отрицает/i), 0.7); }
+    if ((mm = /Операции\s*:\s*отрицает/i.exec(tx))) add('prevOps', LL('Отрицает', 'Denies'), mm[0], 0.8);
+    if (/гастропарез/i.test(tx) && F.date) Q.push(LL('В послеоперационном периоде описан гастропарез (назогастральный зонд, парентеральное питание). Укажите степень по Clavien-Dindo в разделе осложнений.', 'Post-op gastroparesis described: set the Clavien-Dindo grade.'));
+  })();
   /* identity */
   var NM = '[А-ЯЁӘІҢҒҮҰҚӨҺ][А-ЯЁӘІҢҒҮҰҚӨҺа-яёәіңғүұқөһ\-]+';
   var fioRe = new RegExp('(?:Пациент(?:ка)?|Ф\\.?\\s?И\\.?\\s?О\\.?(?:\\s+(?:пациента|больного|больной))?|Больн(?:ой|ая)|Гр(?:-н|ажданин|ажданка)\\.?)\\s*[:：]?\\s*(' + NM + '(?:\\s+' + NM + '){1,2})');
   if ((m = fioRe.exec(tx))) add('fio', m[1].replace(/\s+/g, ' ').trim().split(' ').map(function (w) { return w.charAt(0) + w.slice(1).toLowerCase(); }).join(' '), m[0], 0.8);
-  else if ((m = new RegExp('(' + NM + '\\s+' + NM + '\\s+' + NM + '(?:вич|вна|ұлы|қызы|улы|кызы|ВИЧ|ВНА|ҰЛЫ|ҚЫЗЫ))(?![А-Яа-яЁё])').exec(tx))) add('fio', m[1].split(/\s+/).map(function (w) { return w.charAt(0) + w.slice(1).toLowerCase(); }).join(' '), m[0], 0.6, LL('найдено по отчеству, без подписи «ФИО»', 'found by patronymic'));
+  else if ((m = (function () { var re = new RegExp('(' + NM + '\\s+' + NM + '\\s+' + NM + '(?:вич|вна|ұлы|қызы|улы|кызы|ВИЧ|ВНА|ҰЛЫ|ҚЫЗЫ))(?![А-Яа-яЁё])', 'g'), r; while ((r = re.exec(tx))) { if (!/республик|казахстан|қазақстан|министерств|денсаул|здравоохран|больниц|центр|клиник|университет|институт/i.test(r[1])) return r; } return null; })())) add('fio', m[1].split(/\s+/).map(function (w) { return w.charAt(0) + w.slice(1).toLowerCase(); }).join(' '), m[0], 0.6, LL('найдено по отчеству, без подписи «ФИО»', 'found by patronymic'));
   if ((m = m1(/(?:Дата\s+рождения|Д\.?\s?р\.?|г\.?\s?р\.?)\s*[:：]?\s*(\d{1,2}[.\/]\d{1,2}[.\/]\d{4})/i)) || (m = m1(/(\d{2}\.\d{2}\.\d{4})\s*г\.?\s*р\.?/i))) add('dob', dt(m[1]), m[0], 0.85);
   if ((m = m1(/Возраст\s*[:：]?\s*(\d{2,3})/i)) || (m = m1(/(?:в\s+возрасте|возрастом)\s+(\d{2,3})/i))) { var ag = +m[1]; if (ag > 14 && ag < 105) add('age', String(ag), m[0], 0.75); }
   if ((m = m1(/Пол\s*[:：]?\s*(муж|жен|м(?![А-Яа-яЁёA-Za-z0-9])|ж(?![А-Яа-яЁёA-Za-z0-9]))/i))) add('sex', /^м/i.test(m[1]) ? 'М' : 'Ж', m[0], 0.9);
@@ -4787,13 +4868,13 @@ function dxRules(doc) {
   if ((m = m1(/ИИН\s*[:：]?\s*(\d{12})/))) add('iin', m[1], 'ИИН: ***', 0.95);
   if ((m = m1(/(?:№\s*(?:ИБ|истории\s+болезни|и\/б|медицинской\s+карты)|(?:ИБ|История\s+болезни|Медицинская\s+карта)\s*№?)\s*[:：]?\s*([0-9][0-9\/\-]{2,15})/i))) add('ib', m[1], m[0], 0.8);
   if ((m = m1(/(?:тел(?:ефон)?(?:\s+(?:моб|сот|дом)[а-яё]*\.?)?|моб\.?|контакт[а-яё]*)\s*[:：.]*\s*(\+?[78][\s\-()]*7?\d{2}[\s\-()]*\d{3}[\s\-]*\d{2}[\s\-]*\d{2})/i))) add('phone', m[1].replace(/\s+/g, ' '), m[0], 0.85);
-  if ((m = m1(/(?:Адрес(?:\s+(?:проживания|места\s+жительства|прописки|регистрации|фактического\s+проживания))?|Место\s+жительства|Проживает(?:\s+по\s+адресу)?|Домашний\s+адрес|Местожительство)\s*[:：]?\s*([^\n]{5,160})/i))) add('address', m[1].replace(/\s*(?:Тел|Телефон|Место\s+работы|Национальность)[\s\S]*$/i, '').trim(), m[0], 0.75);
+  if ((m = m1(/(?:Адрес(?:\s+(?:проживания|места\s+жительства|прописки|регистрации|фактического\s+проживания))?|Место\s+жительства|Проживает(?:\s+по\s+адресу)?|Домашний\s+адрес|Местожительство)(?!\s+(?:организации|учреждения|медицинской|МО\b|куда))\s*[:：]?\s*([^\n]{5,160})/i))) add('address', m[1].replace(/\s*(?:Тел|Телефон|Место\s+работы|Национальность)[\s\S]*$/i, '').trim(), m[0], 0.75);
   if ((m = m1(/Национальность\s*[:：]?\s*([А-Яа-яЁёӘәІіҢңҒғҮүҰұҚқӨөҺһ]{3,20})/i))) add('nation', m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase(), m[0], 0.85);
   if ((m = m1(/(?:Дата\s+регистрации|Зарегистрирован[аы]?)\s*[:：]?\s*(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i))) add('regDate', dt(m[1]), m[0], 0.7);
   /* hospital stay */
   if ((m = m1(/(?:Дата\s+(?:поступления|госпитализации)|Поступил[аи]?|Госпитализирован[аы]?)\s*[:：]?\s*(?:в\s+стационар\s*)?(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i))) add('admDate', dt(m[1]), m[0], 0.85);
   if ((m = m1(/(?:Дата\s+выписки|Выписан[аы]?)\s*[:：]?\s*(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i))) add('disDate', dt(m[1]), m[0], 0.85);
-  if ((m = m1(/(?:Находил(?:ся|ась)\s+(?:на\s+(?:стационарном\s+)?лечении\s+)?)?с\s+(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})\s*(?:г\.?)?\s*по\s+(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i))) { add('admDate', dt(m[1]), m[0], 0.75); add('disDate', dt(m[2]), m[0], 0.75); }
+  if ((m = m1(/(?:Находил(?:ся|ась)\s+(?:на\s+(?:стационарном\s+)?лечении\s+)?)с\s+(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})\s*(?:г\.?)?\s*по\s+(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i))) { add('admDate', dt(m[1]), m[0], 0.75); add('disDate', dt(m[2]), m[0], 0.75); }
   if ((m = m1(/(?:койко[-\s]?дн(?:ей|я|и)|к\/д)\s*[:：]?\s*(\d{1,3})/i)) || (m = m1(/(\d{1,3})\s*койко[-\s]?дн/i))) add('los', m[1], m[0], 0.8);
   if ((m = m1(/(?:в\s+)?(?:ОАРИТ|реанимаци[ии])\s*[:：]?\s*(\d{1,2})\s*(?:сут|дн|к\/д|койко)/i))) add('icuDays', m[1], m[0], 0.6);
   /* anthropometry */
@@ -4812,7 +4893,7 @@ function dxRules(doc) {
   yn('cvb', /(?<![А-Яа-яЁёA-Za-z0-9])ОНМК(?![А-Яа-яЁёA-Za-z0-9])|инсульт|(?<![А-Яа-яЁёA-Za-z0-9])ЦВБ(?![А-Яа-яЁёA-Za-z0-9])|цереброваскул/i);
   yn('liverDz', /цирроз|гепатит\s*[BCВС]|жировой\s+гепатоз|стеатоз/i);
   if (F.diab || F.htn || F.cvd || F.lung || F.cvb || F.liverDz) add('comorb', [F.diab, F.htn, F.cvd, F.lung, F.cvb, F.liverDz].some(function (x) { return x && x.value === 'Да'; }) ? 'Да' : 'Нет', LL('по списку сопутствующих', 'from comorbidities'), 0.6);
-  if ((m = m1(/(?:Сопутствующ[\wА-Яа-яЁё]+(?:\s+заболевани[\wА-Яа-яЁё]+)?|Сопут\.)\s*[:：]\s*([^\n]{5,400})/i))) add('comorbOther', m[1].trim(), m[0].slice(0, 150), 0.55, LL('полный текст сопутствующих, разнесите по полям при необходимости', 'full comorbidity text'));
+  if ((m = m1(/(?:Сопутствующ[\wА-Яа-яЁё]+(?:\s+заболевани[\wА-Яа-яЁё]+)?|Сопут\.)[ \t]*[:：][ \t]*([^\n]{5,400})/i)) && !/[әіңғүұқөһӘІҢҒҮҰҚӨҺ]/.test(m[1]) && !/^(?:нет|отрицает|не\s+выявлен)/i.test(m[1].trim())) add('comorbOther', m[1].trim(), m[0].slice(0, 150), 0.55, LL('полный текст сопутствующих, разнесите по полям при необходимости', 'full comorbidity text'));
   if (/не\s+кури|курени[\wА-Яа-яЁё]+\s+отрица|некурящ/i.test(tx)) add('smoke', 'Нет', ctx(/не\s+кури|курени[\wА-Яа-яЁё]+\s+отрица|некурящ/i), 0.75);
   else if (/бросил[\wА-Яа-яЁё]*\s+курить|бывш[\wА-Яа-яЁё]+\s+курильщ|курил[\wА-Яа-яЁё]*\s+(?:ранее|до)/i.test(tx)) add('smoke', 'Нет', ctx(/бросил[\wА-Яа-яЁё]*\s+курить|бывш[\wА-Яа-яЁё]+\s+курильщ|курил[\wА-Яа-яЁё]*\s+(?:ранее|до)/i), 0.7);
   else if (/(?<![А-Яа-яЁёA-Za-z0-9])курит(?![А-Яа-яЁёA-Za-z0-9])|курильщик/i.test(tx)) add('smoke', 'Да', ctx(/(?<![А-Яа-яЁёA-Za-z0-9])курит(?![А-Яа-яЁёA-Za-z0-9])|курильщик/i), 0.7);
@@ -4976,7 +5057,7 @@ function dxExtract(doc, mode, log) {
   }
   if (mode !== 'ai' || !aiReady()) return rules(mode === 'ai' ? LL('ИИ не подключён, использована обработка без ИИ.', 'AI not connected; processed without AI.') : '');
   log(LL('Отправляю в ', 'Sending to ') + AI_PROV[AI.prov].name + ' · ' + AI.model + LL(' и жду ответ (обычно 20-60 секунд)…', ' (20-60 s)…'));
-  return dxCall(doc, dxSchemaText()).then(dxParseJSON).then(function (res) { return { res: res, text: doc.text, src: AI_PROV[AI.prov].name + ' · ' + AI.model, local: AI.prov === 'local' }; })
+  return dxCall(doc, dxSchemaText()).then(dxParseJSON).then(function (res) { res.fields = res.fields || []; var src = AI_PROV[AI.prov].name + ' · ' + AI.model; if (doc.text && !doc.scanned) { try { res = dxMerge(res, dxRules(doc)); src += LL(' + разбор формы', ' + form parsing'); } catch (e) {} } return { res: res, text: doc.text, src: src, local: AI.prov === 'local' }; })
     .catch(function (e) { var em = (e && e.message) || String(e); log(LL('ИИ не ответил: ', 'AI failed: ') + em + LL('. Перехожу к обработке без ИИ.', '. Falling back to no-AI processing.')); return rules(LL('ИИ не ответил (', 'AI failed (') + em + LL('), поэтому документ обработан без ИИ. Можно повторить с ИИ позже.', '); processed without AI.')); });
 }
 function dxOpen() { if (!S.drawer) return; S.dx = { step: 'pick', keep: true, agree: false, mode: aiReady() ? 'ai' : 'rules' }; render(); }
