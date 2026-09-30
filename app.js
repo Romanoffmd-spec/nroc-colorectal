@@ -3553,7 +3553,7 @@ function aiProtocol() {
 function locTs(ts) { var z = new Date(ts); if (isNaN(z)) return ''; return ('0' + z.getDate()).slice(-2) + '.' + ('0' + (z.getMonth() + 1)).slice(-2) + '.' + z.getFullYear() + ' ' + ('0' + z.getHours()).slice(-2) + ':' + ('0' + z.getMinutes()).slice(-2); }
 function drNotesHTML(dr) {
   var p = dr.p, list = p.drNotes || [], busy = !!dr.noteBusy, h = '<div class="drn"><div class="drn-h"><b>' + ico('chat', 15) + LL('Комментарии врача', 'Doctor\'s notes') + '</b><span>' + LL('Напишите уточнение или исправление своими словами. ИИ запомнит его, исправит поля карточки и обновит резюме. Ваши комментарии важнее документов.', 'Write a correction; the AI will remember it, fix the fields and update the summary.') + '</span></div>';
-  if (list.length) h += '<div class="drn-list">' + list.slice(-6).map(function (n) { return '<div class="drn-i"><div class="drn-m">' + esc(n.by || '') + ' · ' + esc(locTs(n.ts)) + '</div><p>' + esc(n.text) + '</p>' + (n.ch && n.ch.length ? '<div class="drn-ch">' + n.ch.map(function (c) { return '<span class="' + (c.undone ? 'undone' : '') + '"><b>' + esc(c.label) + '</b>: ' + (has(c.prev) ? esc(fmtVal(FIELD[c.id], c.prev)) + ' → ' : '') + esc(fmtVal(FIELD[c.id], c.v)) + (c.undone || !dr.noteIds || !dr.noteIds[n.id] ? '' : ' <button type="button" class="linkbtn" data-act="drnundo" data-id="' + n.id + '" data-f="' + c.id + '">' + LL('отменить', 'undo') + '</button>') + '</span>'; }).join('') + '</div>' : '') + '</div>'; }).join('') + '</div>';
+  if (list.length) h += '<div class="drn-list">' + list.slice(-6).map(function (n) { return '<div class="drn-i"><div class="drn-m">' + esc(n.by || '') + ' · ' + esc(locTs(n.ts)) + '</div><p>' + esc(n.text) + '</p>' + (n.reply ? '<div class="drn-r">' + ico('sparkle', 13) + '<span>' + esc(n.reply) + '</span></div>' : '') + (n.ch && n.ch.length ? '<div class="drn-ch">' + n.ch.map(function (c) { return '<span class="' + (c.undone ? 'undone' : '') + '"><b>' + esc(c.label) + '</b>: ' + (has(c.prev) ? esc(fmtVal(FIELD[c.id], c.prev)) + ' → ' : '') + esc(fmtVal(FIELD[c.id], c.v)) + (c.undone || !dr.noteIds || !dr.noteIds[n.id] ? '' : ' <button type="button" class="linkbtn" data-act="drnundo" data-id="' + n.id + '" data-f="' + c.id + '">' + LL('отменить', 'undo') + '</button>') + '</span>'; }).join('') + '</div>' : '') + '</div>'; }).join('') + '</div>';
   h += '<div class="drn-in"><textarea id="drn-in" rows="2" data-sb="drawer.noteDraft" placeholder="' + LL('Например: МДГ 01.04 был после операции, латеральные ЛУ слева это рецидив; стадия по препарату ypT3N2bM0; курит 20 лет', 'e.g. corrections…') + '"' + (busy ? ' disabled' : '') + '>' + esc(dr.noteDraft || '') + '</textarea><button type="button" class="btn primary small" data-act="drnote"' + (busy ? ' disabled' : '') + '>' + ico('sparkle', 14) + (busy ? LL('Вношу…', 'Applying…') : LL('Внести', 'Apply')) + '</button></div>' + (dr.noteErr ? '<p class="ferr">' + esc(dr.noteErr) + '</p>' : '') + '</div>';
   return h;
 }
@@ -3566,11 +3566,14 @@ function drNoteApply() {
   dr.noteBusy = true; render();
   var d = p.d, cur = {}; dxFields().forEach(function (o) { var v = d[o.x.id]; if (has(v) && !(Array.isArray(v) && !v.length)) cur[o.x.id] = v; });
   var doc = { name: LL('комментарий врача', 'doctor note'), kind: 'text', text: text, images: [], scanned: false };
-  var extra = 'ЭТО НЕ ДОКУМЕНТ, А КОММЕНТАРИЙ ЛЕЧАЩЕГО ВРАЧА К КАРТОЧКЕ. Он важнее любых документов и текущих значений. Пойми смысл: врач может исправлять ошибку, уточнять время событий, добавлять новые сведения.\n\nТЕКУЩИЕ ЗНАЧЕНИЯ КАРТОЧКИ (JSON, id: значение):\n' + JSON.stringify(cur) + '\n\nЗАДАЧА: верни JSON только с теми полями, которые по смыслу комментария нужно заполнить или исправить (включая поля, которые логически следуют из сказанного). Не трогай поля, о которых комментарий ничего не говорит. quote: цитата из комментария. questions оставь пустым, если всё понятно.';
+  var ar = archText(p), sm0 = (p.summary && p.summary.text) || '';
+  var extra = 'ЭТО НЕ ДОКУМЕНТ, А КОММЕНТАРИЙ ИЛИ ВОПРОС ЛЕЧАЩЕГО ВРАЧА К КАРТОЧКЕ. Он важнее любых документов и текущих значений. Пойми смысл: врач может исправлять ошибку, уточнять время событий, добавлять сведения или спрашивать, почему что-то отражено не так.\n\nТЕКУЩИЕ ЗНАЧЕНИЯ КАРТОЧКИ (JSON, id: значение):\n' + JSON.stringify(cur) + (sm0 ? '\n\nТЕКУЩЕЕ РЕЗЮМЕ:\n' + sm0 : '') + (ar ? '\n\nВСЕ ЗАГРУЖЕННЫЕ ДОКУМЕНТЫ ПАЦИЕНТА:\n' + ar : '\n\n(Тексты ранее загруженных документов в карточке не сохранены.)') +
+    '\n\nЗАДАЧА: 1) верни в fields только те поля, которые по смыслу комментария и документов нужно заполнить или исправить (включая то, что логически следует из сказанного); остальные не трогай; quote: цитата из комментария или документа. 2) Добавь в JSON поле "reply": короткий ответ врачу по-русски (2-5 предложений): что понял, что исправил; если это вопрос, ответь на него по документам; если нужного документа нет среди загруженных, прямо скажи, что его нет и его нужно загрузить через «Из документа». questions оставь пустым.';
   dxCall(doc, dxSchemaText(), extra).then(dxParseJSON).then(function (res) {
     if (S.drawer !== dr) return;
     var r = dxApply(res, false);
     note.ch = r.filled.map(function (x) { return { id: x.id, label: x.label, v: x.v, prev: x.prev }; });
+    note.reply = String(res.reply || '').trim();
     dr.noteBusy = false; render();
     toast(note.ch.length ? LL('Исправлено полей: ', 'Fields changed: ') + note.ch.length + LL('. Не забудьте сохранить карточку.', '. Remember to save.') : LL('Поля не изменились, комментарий учтён в резюме', 'No field changes; note used in the summary'));
     sumLater(dr, LL('комментарий врача', 'doctor note'), text);
@@ -3641,12 +3644,23 @@ function sumOrder(txt) {
 function sumPrompt(p, extra) {
   var sm = p.summary && p.summary.text ? p.summary.text : '';
   var nts = (p.drNotes || []).map(function (n) { return locTs(n.ts) + ' (' + (n.by || '') + '): ' + n.text; }).join('\n');
-  return 'ДАННЫЕ КАРТОЧКИ:\n' + patText(p, true) + (nts ? '\n\nКОММЕНТАРИИ ЛЕЧАЩЕГО ВРАЧА (важнее документов и старого резюме, обязательно учти каждый):\n' + nts : '') + (sm ? '\n\nПРЕДЫДУЩАЯ ВЕРСИЯ РЕЗЮМЕ (сохрани правки врача):\n' + sm : '') + (extra ? '\n\nНОВЫЙ ДОКУМЕНТ ИЛИ ИНФОРМАЦИЯ:\n' + String(extra).slice(0, 40000) : '') + '\n\nСначала мысленно датируй каждый документ и каждый факт, затем напиши обновлённое резюме истории болезни.';
+  var ar = archText(p);
+  return 'ДАННЫЕ КАРТОЧКИ:\n' + patText(p, true) + (ar ? '\n\nВСЕ ЗАГРУЖЕННЫЕ ДОКУМЕНТЫ ПАЦИЕНТА (первоисточник: каждый документ датируй и отрази в хронологии):\n' + ar : '') + (nts ? '\n\nКОММЕНТАРИИ ЛЕЧАЩЕГО ВРАЧА (важнее документов и старого резюме, обязательно учти каждый):\n' + nts : '') + (sm ? '\n\nПРЕДЫДУЩАЯ ВЕРСИЯ РЕЗЮМЕ (сохрани правки врача):\n' + sm : '') + (extra ? '\n\nНОВЫЙ ДОКУМЕНТ ИЛИ ИНФОРМАЦИЯ:\n' + String(extra).slice(0, 40000) : '') + '\n\nСначала мысленно датируй каждый документ и каждый факт, затем напиши обновлённое резюме истории болезни.';
 }
 /* облачный ИИ платный: резюме пишется только по кнопке, а новые сведения копятся в очереди; ИИ центра (локальный) обновляет сам */
 function sumAuto() { return AI.prov === 'local'; }
 function sumQueue(p, kind, text) { text = String(text || '').trim(); if (!text) return; var q = p.sumQueue || []; q.push({ at: nowIso(), kind: kind, text: text.slice(0, 40000) }); var tot = 0; for (var i = q.length - 1; i >= 0; i--) { tot += q[i].text.length; if (tot > 80000) { q = q.slice(i + 1); break; } } p.sumQueue = q; }
 function sumQueueText(p) { return (p.sumQueue || []).map(function (x) { return '--- ' + x.kind + ' (' + locTs(x.at) + ') ---\n' + x.text; }).join('\n\n'); }
+/* архив текстов всех загруженных документов пациента: из него пишется резюме и отвечает ИИ на вопросы врача */
+var ARCH_DOC = 30000, ARCH_ALL = 200000;
+function docArchive(p, name, text, sum) {
+  text = String(text || '').trim(); if (!text && !sum) return;
+  var a = (p.docArch || []).filter(function (x) { return x.name !== name; });
+  a.push({ id: uid('d'), name: name, at: nowIso(), text: text.slice(0, ARCH_DOC), sum: sum || '' });
+  var tot = 0; for (var i = a.length - 1; i >= 0; i--) { tot += (a[i].text || '').length; if (tot > ARCH_ALL) a[i].text = ''; }
+  p.docArch = a;
+}
+function archText(p) { return (p.docArch || []).map(function (x, i) { return '=== ДОКУМЕНТ ' + (i + 1) + ': «' + x.name + '» (загружен ' + locTs(x.at) + ') ===\n' + (x.text || (x.sum ? 'Краткое содержание: ' + x.sum : '(текст не сохранён)')); }).join('\n\n'); }
 function sumLater(dr, kind, text) { if (!dr) return; sumQueue(dr.p, kind, text); if (sumAuto() && aiReady()) aiSummary(dr, '', true); else if (S.drawer === dr) render(); }
 function aiSummary(dr, extra, auto) {
   if (!dr || dr.sumAI) return;
@@ -5463,7 +5477,8 @@ function dxRun() {
     dx.rep = dxApply(o.res, dx.keep, o.local); dx.rep.src = o.src; dx.rep.fallback = o.fallback; dx.rep.file = dx.file.name; dx.rep.at = nowIso();
     var dr = S.drawer; dr.p.docsAI = (dr.p.docsAI || []).concat([{ name: dx.file.name, at: dx.rep.at, by: me(), src: o.src, n: dx.rep.filled.length }]);
     dx.step = 'rep'; render();
-    sumLater(S.drawer, LL('документ «', 'document «') + dx.file.name + '»', dx.docText || '');
+    docArchive(S.drawer.p, dx.file.name, dx.docText || '', (o.res && o.res.doc && o.res.doc.summary) || '');
+    sumLater(S.drawer, LL('документ «', 'document «') + dx.file.name + '»', '(в архиве документов)');
   }).catch(function (e) { if (!S.dx) return; dx.step = 'err'; dx.err = (e && e.message) || String(e); render(); });
 }
 /* пакетная загрузка: документы разбираются по очереди, результат складывается в одну сводку */
@@ -5505,7 +5520,8 @@ function dxRunMany() {
     all.src = srcs.join(' + ') || LL('без ИИ', 'no AI'); all.file = LL('документов: ', 'documents: ') + n; all.at = nowIso(); all.fallback = fails ? LL('Не обработано документов: ', 'Failed documents: ') + fails + LL('. Подробности в «Трудностях».', '. See difficulties.') : '';
     dx.rep = all; dx.docText = texts.join('\n\n'); dx.doc = { name: LL('пакет из ', 'batch of ') + n, kind: 'text', text: dx.docText.slice(0, 120000), images: [], scanned: false };
     dx.usedAI = anyAI; dx.ans = ''; dx.qa = []; dx.step = 'rep'; render();
-    sumLater(S.drawer, LL('пакет документов', 'document batch'), dx.docText);
+    texts.forEach(function (t0) { var mm0 = /^=== ДОКУМЕНТ «([^»]*)» ===\n([\s\S]*)$/.exec(t0); if (mm0) docArchive(S.drawer.p, mm0[1], mm0[2], ''); });
+    sumLater(S.drawer, LL('пакет документов', 'document batch'), '(в архиве документов)');
   });
 }
 function dxRunManyAI(files, log) {
@@ -5528,7 +5544,8 @@ function dxRunManyAI(files, log) {
       if (fails.length) { r.fallback = LL('Не прочитаны: ', 'Unreadable: ') + fails.join('; '); r.issues = r.issues.concat(fails.map(function (f) { return { id: '', label: '', kind: 'unreadable', text: f }; })); }
       S.drawer.p.docsAI = (S.drawer.p.docsAI || []).concat(docs.map(function (d) { return { name: d.name, at: r.at, by: me(), src: r.src, n: 0 }; }));
       dx.rep = r; dx.docs = docs; dx.doc = null; dx.docText = allText; dx.usedAI = true; dx.ans = ''; dx.qa = []; dx.step = 'rep'; render();
-      sumLater(S.drawer, LL('пакет документов', 'document batch'), allText);
+      docs.forEach(function (d) { docArchive(S.drawer.p, d.name, d.text || '', ''); });
+      sumLater(S.drawer, LL('документы: ', 'documents: ') + docs.map(function (d) { return d.name; }).join(', '), '(в архиве документов)');
     });
   }).catch(function (e) { if (!S.dx) return; dx.step = 'err'; dx.err = LL('ИИ не ответил: ', 'AI failed: ') + ((e && e.message) || String(e)) + LL('. Карточка не изменена.', '. Record unchanged.'); render(); });
 }
