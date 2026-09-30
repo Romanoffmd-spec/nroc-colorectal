@@ -761,11 +761,11 @@ function tagsOf(match) {
   return match.filter(function (r) { return !match.some(function (o) { return o.parent === r.id; }); });
 }
 function regOf(id) { return DB.registries.filter(function (r) { return r.id === id; })[0]; }
-function canApprove(r) { return !!SESSION && r.appr && r.appr.st === 'pending' && true && (!CLOUD.on || r.appr.uid !== SESSION.id); }
+function canApprove(r) { if (!SESSION || !r.appr) return false; if (isAdmin()) return r.appr.st === 'pending' || r.appr.st === 'rejected'; return r.appr.st === 'pending' && (!CLOUD.on || r.appr.uid !== SESSION.id); }
 function apprMine() { return (DB.pending || []).filter(canApprove); }
 function renderAppr() {
   var list = (DB.pending || []).slice().sort(function (a, b) { return String(b.appr.at).localeCompare(String(a.appr.at)); });
-  var h = pageHead(LL('Наука', 'Research'), LL('На одобрении', 'Awaiting approval'), LL('Новые исследования и регистры появляются для всех только после одобрения врачом, который их не создавал.', 'New studies and registries go live after approval by a doctor other than the author.'));
+  var h = pageHead(LL('Наука', 'Research'), LL('На одобрении', 'Awaiting approval'), LL('Новые исследования и регистры появляются для всех только после одобрения врачом, который их не создавал, или администратором (он может одобрить любую заявку, в том числе свою и ранее отклонённую).', 'New studies and registries go live after approval by a doctor other than the author, or by the admin (who can approve any request, including their own or a rejected one).'));
   if (!list.length) return h + '<div class="empty">' + LL('Нет заявок на одобрение', 'Nothing awaiting approval') + '</div>';
   h += '<div class="apl">' + list.map(function (r) {
     var pr = r.kind === 'study' ? stProto(r) : null, a = r.appr, mine = SESSION && a.uid === SESSION.id;
@@ -775,8 +775,8 @@ function renderAppr() {
     x += '<dl class="dls">' + det.filter(function (d) { return has(d[1]); }).map(function (d) { return '<dt>' + d[0] + '</dt><dd>' + esc(String(d[1])) + '</dd>'; }).join('') + '</dl>';
     if (a.st === 'rejected') x += '<p class="aerr">' + ico('alert', 14) + esc((a.noBy || '') + ': ' + (a.reason || LL('без комментария', 'no comment'))) + '</p>';
     x += '<div class="actions">';
-    if (canApprove(r)) x += '<button type="button" class="btn primary" data-act="approk" data-id="' + r.id + '">' + ico('check', 15) + LL('Одобрить', 'Approve') + '</button><button type="button" class="btn" data-act="apprno" data-id="' + r.id + '">' + LL('Отклонить', 'Reject') + '</button>';
-    else if (a.st === 'pending') x += '<span class="muted">' + (mine ? LL('Ждёт одобрения другого врача', 'Waiting for another doctor') : LL('Одобрить может врач', 'A doctor can approve')) + '</span>';
+    if (canApprove(r)) x += '<button type="button" class="btn primary" data-act="approk" data-id="' + r.id + '">' + ico('check', 15) + LL('Одобрить', 'Approve') + (isAdmin() && (mine || a.st === 'rejected') ? LL(' как администратор', ' as admin') : '') + '</button>' + (a.st === 'pending' ? '<button type="button" class="btn" data-act="apprno" data-id="' + r.id + '">' + LL('Отклонить', 'Reject') + '</button>' : '');
+    else if (a.st === 'pending') x += '<span class="muted">' + (mine ? LL('Ждёт одобрения другого врача или администратора', 'Waiting for another doctor or the admin') : LL('Одобрить может врач', 'A doctor can approve')) + '</span>';
     if (mine || isAdmin()) x += '<button type="button" class="btn ghost danger" data-act="apprdel" data-id="' + r.id + '">' + LL('Удалить заявку', 'Delete request') + '</button>';
     return x + '</div></section>';
   }).join('') + '</div>';
@@ -803,7 +803,7 @@ function ruleText(reg) {
   if (reg.kind === 'study' && reg.desc) return reg.desc;
   if (reg.mode === 'manual') return t('rule.manual');
   var all = [];
-  ancestors(reg).concat([reg]).forEach(function (x) { if (x.mode !== 'manual') all = all.concat(x.rules); });
+  ancestors(reg).concat([reg]).forEach(function (x) { if (x.mode !== 'manual') all = all.concat(x.rules || []); });
   if (!all.length) return t('rule.all');
   return all.map(function (r) {
     var x = FIELD[r.f]; if (!x) return '';
@@ -3162,7 +3162,7 @@ function renderUsers() {
   h += '<div class="tablewrap"><table class="grid"><thead><tr><th>' + LL('Пользователь', 'User') + '</th><th>' + LL('Почта', 'Email') + '</th><th>' + LL('Права', 'Rights') + '</th><th>' + LL('Статус', 'Status') + '</th><th></th></tr></thead><tbody>';
   list.forEach(function (u) {
     var st = u.status === 'active' ? '<span class="st st-done">' + LL('Активен', 'Active') + '</span>' : u.status === 'pending' ? '<span class="st st-prog">' + LL('Ждёт подтверждения', 'Pending') + '</span>' : '<span class="st st-cancel">' + LL('Отклонён', 'Rejected') + '</span>';
-    h += '<tr><td class="strong"><span class="av sm">' + esc(initials(u.name)) + '</span> ' + esc(u.name) + (u.admin ? ' <span class="tag">admin</span>' : '') + '</td><td>' + esc(u.email) + '</td><td>' + (u.admin ? LL('Администратор', 'Admin') : LL('Пользователь', 'User')) + '</td><td>' + st + '</td><td class="ra">' + (u.admin ? '' : (u.status !== 'active' ? '<button type="button" class="btn small primary" data-act="uok" data-id="' + u.id + '">' + LL('Подтвердить', 'Approve') + '</button>' : '') + (u.status !== 'rejected' ? '<button type="button" class="btn small ghost" data-act="uno" data-id="' + u.id + '">' + LL('Отключить', 'Disable') + '</button>' : '')) + '</td></tr>';
+    h += '<tr><td class="strong"><span class="av sm">' + esc(initials(u.name)) + '</span> ' + esc(u.name) + (u.admin ? ' <span class="tag">admin</span>' : '') + '</td><td>' + esc(u.email) + '</td><td>' + (u.admin ? LL('Администратор', 'Admin') : LL('Пользователь', 'User')) + '</td><td>' + st + '</td><td class="ra">' + (u.admin ? (u.status !== 'active' ? '<button type="button" class="btn small primary" data-act="uok" data-id="' + u.id + '">' + LL('Подтвердить', 'Approve') + '</button>' : '') : (u.status !== 'active' ? '<button type="button" class="btn small primary" data-act="uok" data-id="' + u.id + '">' + LL('Подтвердить', 'Approve') + '</button>' : '') + (u.status !== 'rejected' ? '<button type="button" class="btn small ghost" data-act="uno" data-id="' + u.id + '">' + LL('Отключить', 'Disable') + '</button>' : '')) + '</td></tr>';
   });
   h += '</tbody></table></div>';
   h += '<div class="page-sec"><div class="panel wipe-p"><div class="ph"><h2>' + LL('Очистка данных', 'Data wipe') + '</h2></div>' + (DB.mig && DB.mig.w1 && !wipeStats().p && !wipeStats().c && !wipeStats().r ? '<p class="muted">' + LL('Данные очищены. В базе нет карточек и записей журналов.', 'Data has been wiped.') + '</p>' : wipeBlock(false)) + '</div></div>';
