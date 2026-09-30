@@ -3534,9 +3534,10 @@ function buildHistory(p) {
 function sumCard(dr) {
   var p = dr.p, sm = p.summary || null, busy = !!dr.sumAI, txt = dr.sumEdit != null ? dr.sumEdit : (sm && sm.text) || buildHistory(p);
   var stale = sm && sm.hash !== sumHash(p);
-  var h = '<section class="card proto" id="sec-proto"><h3>' + t('pr.title') + '<span class="h3-r">' + (aiReady() ? '<button type="button" class="btn small ai" data-act="aisum"' + (busy ? ' disabled' : '') + '>' + ico('sparkle', 15) + (busy ? LL('Пишу…', 'Writing…') : LL('Обновить с ИИ', 'Update with AI')) + '</button>' : '') + '<button type="button" class="btn small primary" data-act="copysum">' + ico('file', 15) + LL('Копировать', 'Copy') + '</button></span></h3>';
+  var h = '<section class="card proto" id="sec-proto"><h3>' + t('pr.title') + '<span class="h3-r">' + (dxAiAvail() ? '<button type="button" class="btn small ai" data-act="aisum"' + (busy ? ' disabled' : '') + '>' + ico('sparkle', 15) + (busy ? LL('Пишу…', 'Writing…') : LL('Обновить с ИИ', 'Update with AI')) + '</button>' : '') + '<button type="button" class="btn small primary" data-act="copysum">' + ico('file', 15) + LL('Копировать', 'Copy') + '</button></span></h3>';
   h += '<p class="hint">' + (sm ? LL('Обновлено ', 'Updated ') + (function (z) { return ('0' + z.getDate()).slice(-2) + '.' + ('0' + (z.getMonth() + 1)).slice(-2) + '.' + z.getFullYear() + ' ' + ('0' + z.getHours()).slice(-2) + ':' + ('0' + z.getMinutes()).slice(-2); })(new Date(sm.at)) + (sm.ai ? LL(' · ИИ', ' · AI') : LL(' · вручную', ' · manual')) + (stale ? LL(' · в карточке есть новые данные, резюме обновится после сохранения', ' · new data, will update after saving') : '') + '. ' : LL('Черновик собран из полей карточки. ', 'Draft built from the record fields. ')) + LL('Резюме обновляется само после загрузки документа и после сохранения карточки. Текст можно править: ваши правки ИИ сохранит.', 'Updates automatically after a document upload and after saving; your edits are kept.') + '</p>';
-  h += '<textarea id="sumText" class="protoText' + (busy ? ' gen' : '') + '" data-sum="1" spellcheck="false">' + esc(txt) + '</textarea></section>';
+  h += '<textarea id="sumText" class="protoText' + (busy ? ' gen' : '') + '" data-sum="1" spellcheck="false">' + esc(txt) + '</textarea>';
+  h += '<div class="actions" style="margin-top:10px">' + (dxAiAvail() ? '<button type="button" class="btn small ai" data-act="aisum"' + (busy ? ' disabled' : '') + '>' + ico('sparkle', 15) + (busy ? LL('Пишу…', 'Writing…') : LL('Обновить с ИИ', 'Update with AI')) + '</button>' : '<span class="muted small">' + LL('Подключите ИИ в шапке, чтобы резюме писал ИИ', 'Connect AI in the header') + '</span>') + '<button type="button" class="btn small" data-act="copysum">' + ico('file', 15) + LL('Копировать', 'Copy') + '</button></div></section>';
   return h;
 }
 var SUM_SYS = 'Ты онколог-колопроктолог и ведёшь резюме истории болезни пациента колоректального сектора ННОЦ (Астана). Резюме читает врач, который видит пациента впервые: из него он должен за минуту понять, что с пациентом происходило и в каком порядке, почему, чем закончилось и что сейчас.\n\n' +
@@ -3564,7 +3565,8 @@ function sumPrompt(p, extra) {
   return 'ДАННЫЕ КАРТОЧКИ:\n' + patText(p, true) + (sm ? '\n\nПРЕДЫДУЩАЯ ВЕРСИЯ РЕЗЮМЕ (сохрани правки врача):\n' + sm : '') + (extra ? '\n\nНОВЫЙ ДОКУМЕНТ ИЛИ ИНФОРМАЦИЯ:\n' + String(extra).slice(0, 40000) : '') + '\n\nСначала мысленно датируй каждый документ и каждый факт, затем напиши обновлённое резюме истории болезни.';
 }
 function aiSummary(dr, extra, auto) {
-  if (!dr || !aiReady() || dr.sumAI) return;
+  if (!dr || dr.sumAI) return;
+  if (!aiReady()) { if (!auto) toast(AI.st === 'check' ? LL('ИИ ещё подключается, нажмите через пару секунд', 'AI is connecting, try again in a moment') : LL('ИИ не подключён: откройте переключатель ИИ в шапке', 'AI not connected')); return; }
   var p = dr.p; if (dr.sumEdit != null) p.summary = { text: dr.sumEdit, at: nowIso(), by: me(), ai: false, edited: true, hash: '' };
   dr.sumAI = true; render();
   aiStream({ system: SUM_SYS, contents: [{ role: 'user', parts: [{ text: sumPrompt(p, extra) }] }], search: false, temp: 0.2,
