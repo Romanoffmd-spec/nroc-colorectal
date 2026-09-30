@@ -3172,7 +3172,7 @@ function aiCheck() {
 function aiStreamOther(o) {
   var pv = AI.prov, msgs = (o.contents || []).map(function (c) { return { role: c.role === 'model' ? 'assistant' : 'user', content: (c.parts || []).map(function (x) { return x.text || ''; }).join('\n') }; });
   var url, body;
-  if (pv === 'anthropic') { url = AI_URL.anthropic + '/messages'; body = { model: o.model || AI.model, max_tokens: 4096, temperature: o.temp === undefined ? 0.4 : o.temp, system: o.system || '', messages: msgs, stream: true }; }
+  if (pv === 'anthropic') { url = AI_URL.anthropic + '/messages'; body = { model: o.model || AI.model, max_tokens: 4096, system: o.system || '', messages: msgs, stream: true }; }
   else { url = aiUrl(pv) + '/chat/completions'; body = { model: o.model || AI.model, stream: true, messages: (o.system ? [{ role: 'system', content: o.system }] : []).concat(msgs) }; if (!/^o\d|gpt-5/.test(body.model)) body.temperature = o.temp === undefined ? 0.4 : o.temp; }
   var text = '', ctrl = new AbortController(); if (!o.bg) AI.ctrl = ctrl;
   fetch(url, { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify(body), signal: ctrl.signal })
@@ -4774,7 +4774,7 @@ function dxCall(doc, schema) {
     if (doc.kind === 'pdf') content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: doc.b64 } });
     else if (doc.kind === 'image') content.push({ type: 'image', source: { type: 'base64', media_type: doc.imgType, data: doc.images[0] } });
     content.push({ type: 'text', text: prompt });
-    return fetch(AI_URL.anthropic + '/messages', { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify({ model: AI.model, max_tokens: 32000, temperature: 0.1, system: dxSys(), messages: [{ role: 'user', content: content }] }) })
+    return fetch(AI_URL.anthropic + '/messages', { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify({ model: AI.model, max_tokens: 32000, system: dxSys(), messages: [{ role: 'user', content: content }] }) })
       .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
       .then(function (j) { return (j.content || []).map(function (c) { return c.text || ''; }).join(''); });
   }
