@@ -4774,7 +4774,7 @@ function dxCall(doc, schema) {
     if (doc.kind === 'pdf') content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: doc.b64 } });
     else if (doc.kind === 'image') content.push({ type: 'image', source: { type: 'base64', media_type: doc.imgType, data: doc.images[0] } });
     content.push({ type: 'text', text: prompt });
-    return fetch(AI_URL.anthropic + '/messages', { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify({ model: AI.model, max_tokens: 8192, temperature: 0.1, system: dxSys(), messages: [{ role: 'user', content: content }] }) })
+    return fetch(AI_URL.anthropic + '/messages', { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify({ model: AI.model, max_tokens: 32000, temperature: 0.1, system: dxSys(), messages: [{ role: 'user', content: content }] }) })
       .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
       .then(function (j) { return (j.content || []).map(function (c) { return c.text || ''; }).join(''); });
   }
@@ -5115,7 +5115,8 @@ function dxExtract(doc, mode, log) {
   return dxCall(doc, dxSchemaText()).then(dxParseJSON).then(function (res) { res.fields = res.fields || []; var src = AI_PROV[AI.prov].name + ' · ' + AI.model; if (doc.text && !doc.scanned) { try { res = dxMerge(res, dxRules(doc)); src += LL(' + разбор формы', ' + form parsing'); } catch (e) {} } return { res: res, text: doc.text, src: src, local: AI.prov === 'local' }; })
     .catch(function (e) { var em = (e && e.message) || String(e); throw new Error(LL('ИИ не ответил: ', 'AI failed: ') + em + LL('. Повторите через минуту или выберите другую модель. Карточка не изменена.', '. Retry later. Record unchanged.')); });
 }
-function dxOpen() { if (!S.drawer) return; S.dx = { step: 'pick', keep: true, agree: false, mode: aiReady() ? 'ai' : 'rules' }; render(); }
+function dxAiAvail() { return aiReady() || AI.st === 'check' || (!!AI.key && AI.st !== 'err') || AI.prov === 'local'; }
+function dxOpen() { if (!S.drawer) return; S.dx = { step: 'pick', keep: true, agree: false, mode: dxAiAvail() ? 'ai' : 'rules' }; render(); }
 function dxRun() {
   var dx = S.dx; if (!dx || !dx.file) return;
   if (dx.mode === 'ai' && aiReady() && AI.prov !== 'local' && !dx.agree) { toast(LL('Подтвердите отправку документа во внешний сервис ИИ или выберите обработку без ИИ', 'Confirm sending, or choose no-AI processing')); return; }
@@ -5138,7 +5139,7 @@ function dxUndoAll() { var dx = S.dx; if (!dx || !dx.rep) return; dx.rep.filled.
 function dxVal(r, v) { var x = FIELD[r.id]; return esc(fmtVal(x, v)); }
 var DX_KIND = { ambiguous: ['Двусмысленно', 'Ambiguous'], conflict: ['Противоречие в документе', 'Conflict in document'], unreadable: ['Неразборчиво', 'Unreadable'], not_in_options: ['Нет подходящего варианта', 'No matching option'], inconsistent: ['Клиническая несогласованность', 'Clinically inconsistent'] };
 function dxModeHTML(o, pfx) {
-  var h = '<div class="dxmode" role="radiogroup"><button type="button" class="dxmo' + (o.mode === 'ai' ? ' on' : '') + '" data-act="' + pfx + 'mode" data-v="ai"' + (aiReady() ? '' : ' disabled') + '>' + ico('sparkle', 18) + '<b>' + LL('С помощью ИИ', 'With AI') + '</b><span>' + (aiReady() ? esc(AI_PROV[AI.prov].name) + ' · ' + esc(AI.model) + LL(': понимает контекст, сокращения, отрицания', ': understands context') : LL('ИИ не подключён', 'AI not connected')) + '</span></button>';
+  var h = '<div class="dxmode" role="radiogroup"><button type="button" class="dxmo' + (o.mode === 'ai' ? ' on' : '') + '" data-act="' + pfx + 'mode" data-v="ai"' + (dxAiAvail() ? '' : ' disabled') + '>' + ico('sparkle', 18) + '<b>' + LL('С помощью ИИ', 'With AI') + '</b><span>' + (aiReady() ? esc(AI_PROV[AI.prov].name) + ' · ' + esc(AI.model) + LL(': понимает контекст, сокращения, отрицания', ': understands context') : LL('ИИ не подключён', 'AI not connected')) + '</span></button>';
   h += '<button type="button" class="dxmo' + (o.mode !== 'ai' ? ' on' : '') + '" data-act="' + pfx + 'mode" data-v="rules">' + ico('lock', 18) + '<b>' + LL('Без ИИ, на этом компьютере', 'Without AI, on this computer') + '</b><span>' + LL('Распознавание текста и сканов (OCR) и медицинские шаблоны. Документ никуда не отправляется. Точность ниже.', 'Text and scan recognition (OCR) plus medical patterns. Nothing leaves the computer. Less accurate.') + '</span></button></div>';
   if (o.mode === 'ai' && aiReady()) {
     var loc = AI.prov === 'local';
