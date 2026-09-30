@@ -4672,6 +4672,73 @@ function dxPdfLib() {
   return dxLoadScript('lib/pdf.worker.min.js').then(function () { return dxLoadScript('lib/pdf.min.js'); }).then(function () { return window.pdfjsLib; });
 }
 function dxB64(buf) { var b = new Uint8Array(buf), s = '', i, n = 0x8000; for (i = 0; i < b.length; i += n) s += String.fromCharCode.apply(null, b.subarray(i, i + n)); return btoa(s); }
+/* Word / OpenDocument / RTF: достаём текст прямо в браузере */
+function dxUnzip(buf, want) {
+  var u8 = new Uint8Array(buf), dv = new DataView(buf), eocd = -1;
+  for (var i = u8.length - 22; i >= Math.max(0, u8.length - 70000); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) return Promise.reject(new Error('zip'));
+  var n = dv.getUint16(eocd + 10, true), off = dv.getUint32(eocd + 16, true), dec = new TextDecoder('utf-8');
+  for (var k = 0; k < n; k++) {
+    var method = dv.getUint16(off + 10, true), csize = dv.getUint32(off + 20, true), nl = dv.getUint16(off + 28, true), el = dv.getUint16(off + 30, true), cl = dv.getUint16(off + 32, true), loff = dv.getUint32(off + 42, true);
+    var fname = dec.decode(u8.subarray(off + 46, off + 46 + nl));
+    if (fname === want) {
+      var start = loff + 30 + dv.getUint16(loff + 26, true) + dv.getUint16(loff + 28, true), data = u8.slice(start, start + csize);
+      if (method === 0) return Promise.resolve(dec.decode(data));
+      if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error(LL('Браузер не умеет распаковывать Word-файлы, сохраните документ как PDF', 'Browser cannot unzip; save as PDF')));
+      return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+    }
+    off += 46 + nl + el + cl;
+  }
+  return Promise.reject(new Error('no ' + want));
+}
+function dxXmlText(x) {
+  return x.replace(/<w:tab\/>|<text:tab\/>/g, '\t').replace(/<w:br[^>]*\/>|<text:line-break\/>/g, '\n').replace(/<\/w:p>|<\/text:p>|<\/text:h>|<\/w:tr>/g, '\n').replace(/<\/w:tc>/g, '\t').replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+function dxRtf(r) {
+  var SKIP = /^(fonttbl|colortbl|stylesheet|info|listtable|listoverridetable|rsidtbl|generator|xmlnstbl|themedata|colorschememapping|latentstyles|datastore|pgdsctbl|mmathPr|filetbl|revtbl|pict|object|header|footer|headerl|headerr|footerl|footerr)$/;
+  var out = '', stack = [], skip = false, uc = 1, pend = 0, i = 0, n = r.length, cp = 'windows-1251', bytes = [];
+  function flush() { if (bytes.length) { if (!skip) out += new TextDecoder(cp).decode(new Uint8Array(bytes)); bytes = []; } }
+  while (i < n) {
+    var c = r[i];
+    if (c === '{') { flush(); stack.push(skip); i++; if (r.substr(i, 2) === '\\*') skip = true; continue; }
+    if (c === '}') { flush(); skip = stack.pop() || false; i++; continue; }
+    if (c === '\\') {
+      var m = /^\\([a-zA-Z]+)(-?\d+)? ?/.exec(r.substr(i, 40));
+      if (m) {
+        i += m[0].length; var w = m[1], arg = m[2];
+        if (SKIP.test(w)) { skip = true; continue; }
+        if (w === 'ansicpg' && arg) cp = 'windows-' + arg;
+        if (w === 'uc') uc = +arg;
+        else if (w === 'u') { flush(); var cc = +arg; if (cc < 0) cc += 65536; if (!skip) out += String.fromCharCode(cc); pend = uc; }
+        else if (w === 'par' || w === 'line' || w === 'row') { flush(); if (!skip) out += '\n'; }
+        else if (w === 'tab' || w === 'cell') { flush(); if (!skip) out += '\t'; }
+        continue;
+      }
+      if (r[i + 1] === "'") { var hx = parseInt(r.substr(i + 2, 2), 16); i += 4; if (pend > 0) { pend--; continue; } bytes.push(hx); continue; }
+      flush(); if (!skip && /[\\{}]/.test(r[i + 1])) out += r[i + 1]; i += 2; continue;
+    }
+    if (c === '\r' || c === '\n') { i++; continue; }
+    if (pend > 0) { pend--; i++; continue; }
+    flush(); if (!skip) out += c; i++;
+  }
+  flush();
+  return out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+function dxOfficeText(buf, name) {
+  if (/\.docx$/i.test(name) || (new Uint8Array(buf)[0] === 0x50 && !/\.odt$/i.test(name))) return dxUnzip(buf, 'word/document.xml').then(dxXmlText);
+  if (/\.odt$/i.test(name)) return dxUnzip(buf, 'content.xml').then(dxXmlText);
+  var u8 = new Uint8Array(buf);
+  if (/\.rtf$/i.test(name) || (u8[0] === 0x7b && u8[1] === 0x5c)) return Promise.resolve(dxRtf(new TextDecoder('latin1').decode(u8)));
+  /* старый .doc (Word 97-2003): вытаскиваем читаемые фрагменты текста в UTF-16 и cp1251 */
+  var out = [], cur = '';
+  for (var i = 0; i + 1 < u8.length; i += 2) { var c = u8[i] | (u8[i + 1] << 8); if ((c >= 0x20 && c < 0x7f) || (c >= 0x400 && c < 0x4ff) || c === 0xab || c === 0xbb || c === 0x2116 || c === 0x2013 || c === 0x2014 || c === 13 || c === 9) cur += c === 13 ? '\n' : String.fromCharCode(c); else { if (cur.replace(/[^А-Яа-яЁёA-Za-z]/g, '').length > 8) out.push(cur); cur = ''; } }
+  if (cur.replace(/[^А-Яа-яЁёA-Za-z]/g, '').length > 8) out.push(cur);
+  var cyr = out.filter(function (z) { return /[А-Яа-яЁё]{3}/.test(z); }); if (cyr.join('').length > 40) out = cyr;
+  var t16 = out.join('\n');
+  if (t16.replace(/[^А-Яа-яЁё]/g, '').length < 30) { var t8 = new TextDecoder('windows-1251').decode(u8).split(/[\x00-\x08\x0e-\x1f]+/).filter(function (z) { return z.replace(/[^А-Яа-яЁё]/g, '').length > 8; }).join('\n'); if (t8.length > t16.length) t16 = t8; }
+  return Promise.resolve(t16.replace(/\r/g, '\n').replace(/\n{3,}/g, '\n\n').trim());
+}
 function dxReadFile(file) {
   return file.arrayBuffer().then(function (buf) {
     var name = file.name || 'document', type = file.type || '', out = { name: name, type: type, size: file.size, text: '', pages: 0, images: [], b64: '' };
@@ -4693,6 +4760,10 @@ function dxReadFile(file) {
         })(i);
         return seq.then(function () { out.text = texts.join('\n\n'); out.scanned = out.text.replace(/---[^\n]*---/g, '').replace(/\s/g, '').length < 40 * out.pages; return out; });
       });
+    }
+    if (/\.(docx|odt|doc|rtf)$/i.test(name) || /wordprocessingml|msword|opendocument\.text|rtf/i.test(type)) {
+      out.kind = 'text';
+      return dxOfficeText(buf, name).then(function (t) { out.text = t; if (t.replace(/\s/g, '').length < 20) throw new Error(LL('Не удалось прочитать текст из файла «', 'Could not read text from «') + name + LL('». Сохраните его как PDF и загрузите ещё раз.', '». Save it as PDF and try again.')); return out; });
     }
     if (/^image\//.test(type) || /\.(jpe?g|png|webp)$/i.test(name)) { out.kind = 'image'; out.images = [dxB64(buf)]; out.imgType = type || 'image/jpeg'; out.scanned = true; return out; }
     out.kind = 'text'; out.text = new TextDecoder('utf-8').decode(buf); return out;
@@ -4717,7 +4788,7 @@ function dxSchemaText() {
 }
 var DX_SYS = 'Ты модуль извлечения данных колоректального регистра ННОЦ (Астана). На вход: медицинский документ (выписной эпикриз, первичный осмотр, консультативный лист, протокол операции, гистология, заключение МРТ/КТ, эндоскопия) и схема карточки пациента. ' +
   'Задача: найти в документе значения для полей карточки и вернуть СТРОГО один JSON-объект без пояснений и без markdown.\n' +
-  'Правила:\n1. Заполняй поле только если значение прямо следует из документа. Не додумывай и не выводи по косвенным признакам. Если поле требует вывода (например стадия по TNM), укажи это в note и снизь confidence.\n' +
+  'Правила:\n1. Заполняй поле, если значение следует из документа прямо или однозначно по смыслу (как понял бы врач). Не придумывай того, чего в документе нет. Если значение получено логическим выводом или расчётом, объясни это в note.\n' +
   '2. Для полей со списком значение должно ТОЧНО совпадать с одним из вариантов (для multi: массив вариантов). Если в документе есть информация, но она не укладывается в варианты, не заполняй поле, а добавь issue с kind "not_in_options".\n' +
   '3. Даты: YYYY-MM-DD. Числа: только число без единиц, в единицах схемы (переводи при необходимости и укажи перевод в note).\n' +
   '4. Для каждого значения дай quote: дословную короткую цитату из документа (до 150 символов), на которой оно основано, и confidence от 0 до 1.\n' +
@@ -5153,7 +5224,7 @@ function renderDx() {
   if (dx.step !== 'rep') {
     h += '<section class="modal dxm" role="dialog" aria-modal="true"><div class="dhead"><div><div class="dh-title">' + ico('sparkle', 18) + LL('Заполнить карточку из документа', 'Fill the record from a document') + '</div><div class="hint">' + LL('Выписка, первичный осмотр, консультативный лист, протокол операции, гистология, МРТ/КТ', 'Discharge summary, consultation, operative note, pathology, MRI/CT') + '</div></div><button type="button" class="iconbtn" data-act="dxclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
     if (dx.step === 'pick') {
-      h += '<label class="dxdrop' + (dx.file ? ' on' : '') + '"><input type="file" id="dxfile" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,application/pdf,image/*,text/plain" hidden>' + ico(dx.file ? 'doc' : 'upload', 28) + '<b>' + (dx.file ? esc(dx.file.name) + ' · ' + Math.max(1, Math.round(dx.file.size / 1024)) + ' КБ' : LL('Выберите или перетащите файл', 'Choose or drop a file')) + '</b><span>' + LL('PDF (в том числе скан), фото документа или текст', 'PDF (incl. scans), photo or text') + '</span></label>';
+      h += '<label class="dxdrop' + (dx.file ? ' on' : '') + '"><input type="file" id="dxfile" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx,.rtf,.odt,application/pdf,image/*,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/rtf,application/vnd.oasis.opendocument.text" hidden>' + ico(dx.file ? 'doc' : 'upload', 28) + '<b>' + (dx.file ? esc(dx.file.name) + ' · ' + Math.max(1, Math.round(dx.file.size / 1024)) + ' КБ' : LL('Выберите или перетащите файл', 'Choose or drop a file')) + '</b><span>' + LL('PDF (в том числе скан), Word, фото документа или текст', 'PDF (incl. scans), Word, photo or text') + '</span></label>';
       h += '<label class="chk"><input type="checkbox" id="dxkeep"' + (dx.keep ? ' checked' : '') + '><span>' + LL('Не перезаписывать уже заполненные поля (расхождения покажу отдельно)', 'Keep fields that are already filled (differences listed separately)') + '</span></label>';
       h += dxModeHTML(dx, 'dx');
       h += '<div class="actions"><button type="button" class="btn primary" data-act="dxrun"' + (dx.file ? '' : ' disabled') + '>' + ico('sparkle', 16) + LL('Распознать и заполнить', 'Extract and fill') + '</button><button type="button" class="btn ghost" data-act="dxclose">' + t('b.cancel') + '</button></div>';
@@ -5234,7 +5305,7 @@ function retroOpen(id) {
 function renderRetro() {
   var st = { wait: [LL('В очереди', 'Queued'), ''], read: [LL('Читаю файл', 'Reading'), 'prog'], ai: [LL('ИИ извлекает данные', 'AI extracting'), 'prog'], rules: [LL('Обработка без ИИ', 'Processing without AI'), 'prog'], done: [LL('Готово', 'Done'), 'done'], err: [LL('Ошибка', 'Error'), 'cancel'] };
   var h = pageHead(LL('Пациенты', 'Patients'), LL('Ретро-загрузка документов', 'Retrospective document import'), LL('Загрузите пачку выписок, протоколов операций, гистологий, консультативных листов. ИИ по очереди извлечёт данные, найдёт карточку пациента по ФИО, дате рождения или № ИБ (или предложит новую), а вы откроете каждую, проверите сводку и сохраните.', 'Upload a batch of documents; AI extracts data, matches patients, you review and save each.'), '');
-  h += '<div class="retro"><label class="dxdrop"><input type="file" id="retrofiles" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,application/pdf,image/*,text/plain" hidden>' + ico('upload', 28) + '<b>' + LL('Выберите или перетащите файлы', 'Choose or drop files') + '</b><span>' + LL('Можно сразу много: PDF, сканы, фото, текст', 'Many at once: PDF, scans, photos, text') + '</span></label>';
+  h += '<div class="retro"><label class="dxdrop"><input type="file" id="retrofiles" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx,.rtf,.odt,application/pdf,image/*,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/rtf,application/vnd.oasis.opendocument.text" hidden>' + ico('upload', 28) + '<b>' + LL('Выберите или перетащите файлы', 'Choose or drop files') + '</b><span>' + LL('Можно сразу много: PDF, сканы, фото, текст', 'Many at once: PDF, scans, photos, text') + '</span></label>';
   h += '<div class="retro-opts"><label class="chk"><input type="checkbox" id="retrokeep"' + (RETRO.keep ? ' checked' : '') + '><span>' + LL('Не перезаписывать уже заполненные поля', 'Keep fields already filled') + '</span></label>';
   if (!RETRO.mode) RETRO.mode = aiReady() ? 'ai' : 'rules';
   h += dxModeHTML(RETRO, 'retro');
