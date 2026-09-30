@@ -675,14 +675,18 @@ function kids(pid, study, sci) {
 }
 /* date filters: admission / discharge (from Planner stays), all-stages-done */
 function inRange(v, f, t2) { if (!f && !t2) return true; if (!v) return false; return (!f || v >= f) && (!t2 || v <= t2); }
-function dfltOn() { var d = UI.dflt || {}; return !!(d.aF || d.aT || d.dF || d.dT); }
-function dfltStay(r) { var d = UI.dflt || {}; return inRange(r.date, d.aF, d.aT) && inRange(r.discharge, d.dF, d.dT); }
+/* фильтры хранятся отдельно для каждого раздела, чтобы фильтр одного реестра не прятал пациентов в другом */
+function stabOf(id) { return UI.stabFor === id ? (UI.stab || 'pts') : 'pts'; }
+function fltOf() { UI.fltBy = UI.fltBy || {}; return UI.fltBy[S.view] || (UI.fltBy[S.view] = {}); }
+function dfltOf() { UI.dfltBy = UI.dfltBy || {}; return UI.dfltBy[S.view] || (UI.dfltBy[S.view] = {}); }
+function dfltOn() { var d = dfltOf(); return !!(d.aF || d.aT || d.dF || d.dT); }
+function dfltStay(r) { var d = dfltOf(); return inRange(r.date, d.aF, d.aT) && inRange(r.discharge, d.dF, d.dT); }
 function patStays(p) { var sn = nameTokens(p.d.fio)[0]; return (DB.cols.planner || []).filter(function (r) { return r.status !== 'Отменено' && (r.pid ? r.pid === p.id : !!sn && nameTokens(r.fio)[0] === sn); }); }
 function dfltPat(p) { return !dfltOn() || patStays(p).some(dfltStay) || ((p.d.admDate || p.d.disDate) && dfltStay({ date: p.d.admDate, discharge: p.d.disDate })); }
 function dfltRec(k, r) { if (!dfltOn()) return true; if (k === 'planner') return dfltStay(r); var p = r.pid ? DB.patients.filter(function (x) { return x.id === r.pid; })[0] : null; if (!p && r.fio) { var sn = nameTokens(r.fio)[0]; p = DB.patients.filter(function (x) { return nameTokens(x.d.fio)[0] === sn; })[0]; } return p ? dfltPat(p) : false; }
 function stagesDone(p) { var f = fuList(p); return f.length > 0 && f.every(function (x) { return x.st === 'done'; }) && !(p.q || []).some(function (e) { return !e.date; }); }
 function renderDateFilters(withStage) {
-  var d = UI.dflt || {}, fl = UI.flt || {}, any = dfltOn() || (withStage && fl.stg);
+  var d = dfltOf(), fl = fltOf(), any = dfltOn() || (withStage && fl.stg);
   function di(id, ph) { return '<input type="date" class="fdate-i' + (d[id] ? ' on' : '') + '" data-act="dflt" data-id="' + id + '" value="' + esc(d[id] || '') + '" aria-label="' + ph + '" title="' + ph + '">'; }
   var h = '<div class="filters fdates" role="group" aria-label="' + LL('Фильтры по датам', 'Date filters') + '"><span class="flabel">' + ico('cal', 15) + LL('Даты', 'Dates') + '</span>';
   h += '<span class="fdate"><b>' + LL('Поступление', 'Admission') + '</b>' + di('aF', LL('с', 'from')) + '<i>–</i>' + di('aT', LL('по', 'to')) + '</span>';
@@ -793,7 +797,7 @@ function listForReg() {
   var id = S.view.slice(4), reg = id === 'all' ? null : regOf(id);
   var list = DB.patients.slice();
   if (reg) list = list.filter(function (p) { return inReg(p, reg); });
-  var fl = UI.flt || {};
+  var fl = fltOf();
   FILTERS.forEach(function (g) { var v = fl[g.id]; if (!v) return; var o = g.opts.filter(function (x) { return x[0] === v; })[0]; if (o) list = list.filter(function (p) { return o[2](p.d); }); });
   if (dfltOn()) list = list.filter(dfltPat);
   if (fl.stg) list = list.filter(function (p) { return stagesDone(p) === (fl.stg === 'done'); });
@@ -808,7 +812,7 @@ var FILTERS = [
   { id: 'urg', label: 'flt.urg', opts: [['el', 'flt.elective', function (d) { return d.urg === 'Плановая'; }], ['em', 'flt.emergency', function (d) { return d.urg === 'Экстренная'; }]] }
 ];
 function renderFilters() {
-  var fl = UI.flt || {}, any = false;
+  var fl = fltOf(), any = false;
   var h = '<div class="filters" role="group" aria-label="' + t('flt.title') + '"><span class="flabel">' + ico('filter', 15) + t('flt.title') + '</span>';
   FILTERS.forEach(function (g) {
     var v = fl[g.id] || ''; if (v) any = true;
@@ -830,7 +834,7 @@ function renderRegistry() {
     if (an !== null && bn !== null && s.k === 'age') return (an - bn) * s.d;
     return String(av).localeCompare(String(bv), locale()) * s.d;
   });
-  if (reg && reg.kind === 'study' && (UI.stab || 'pts') !== 'pts') return studyHead(reg) + studyTabBody(reg);
+  if (reg && reg.kind === 'study' && stabOf(reg.id) !== 'pts') return studyHead(reg) + studyTabBody(reg);
   var crumbs = reg ? ancestors(reg).map(function (a) { return '<button type="button" class="crumb" data-act="view" data-v="reg:' + a.id + '">' + esc(regName(a)) + '</button>'; }).join('<span class="csep">/</span>') : '';
   if (reg && reg.kind === 'study') crumbs = '<span class="crumb">' + t('nav.studies') + '</span>';
   var isSt = reg && reg.kind === 'study', h;
@@ -1691,7 +1695,7 @@ function saveEditor() {
     render(); return;
   }
   DB.registries = DB.registries.map(function (r) { return r.id === e.id ? e : r; });
-  S.edit = null; S.view = 'reg:' + e.id; UI.view = S.view; if (e.kind === 'study' && isNew) UI.stab = 'pts'; saveUI();
+  S.edit = null; S.view = 'reg:' + e.id; UI.view = S.view; if (e.kind === 'study' && isNew) { UI.stab = 'pts'; UI.stabFor = e.id; } saveUI();
   if (save()) toast(e.kind === 'study' ? (isNew ? LL('Исследование создано: ', 'Study created: ') + e.proto.no : LL('Протокол сохранён', 'Protocol saved')) : isNew ? t('toast.regCreated') : t('toast.regSaved')); render();
 }
 function download(name, text, type) { var b = new Blob([text], { type: type }), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
@@ -2621,13 +2625,13 @@ function studyHead(r) {
   var h = '<div class="shead"><div class="sh-l"><div class="crumbs"><button type="button" class="crumb" data-act="view" data-v="studies">' + t('nav.studies') + '</button><span class="csep">/</span><span class="mono">' + esc(pr.no || '') + '</span></div><h1>' + esc(regName(r)) + '</h1><div class="sh-tags">' + stStatusPill(pr) + '<span class="pill">' + esc(ov(pr.type || '')) + '</span>' + (pr.syn && pr.syn.design ? '<span class="pill">' + esc(ov(pr.syn.design)) + '</span>' : '') + (pr.rand.on === 'Да' ? '<span class="pill">' + ico('shuffle', 13) + LL('рандомизация', 'randomised') + '</span>' : '') + '</div>' + ((pr.syn && pr.syn.aim) || r.desc ? '<p class="sub">' + esc((pr.syn && pr.syn.aim) || r.desc) + '</p>' : '') + '</div>';
   h += '<div class="actions"><button type="button" class="btn" data-act="editreg" data-id="' + r.id + '">' + ico('doc', 16) + LL('Протокол', 'Protocol') + '</button><button type="button" class="btn" data-act="csv">' + ico('download', 16) + LL('Экспорт', 'Export') + '</button><button type="button" class="btn primary" data-act="enroll" data-id="' + r.id + '">' + ico('plus', 16) + LL('Включить пациента', 'Enrol patient') + '</button></div></div>';
   h += '<div class="smeta"><div class="smi"><span>' + LL('Набор', 'Recruitment') + '</span><b>' + n + (tg ? '<i> / ' + tg + '</i>' : '') + '</b>' + (tg ? progressBar(n, tg) : '') + '</div><div class="smi"><span>' + LL('Дедлайн', 'Deadline') + '</span><b>' + (pr.deadline ? fmtDate(pr.deadline) : LL('не указан', 'not set')) + '</b><em class="' + (dl !== null && dl < 0 ? 'due' : '') + '">' + daysLabel(dl) + '</em></div><div class="smi"><span>' + LL('Ближайшая точка', 'Next checkpoint') + '</span><b>' + (cp ? esc(cp.title) : LL('нет', 'none')) + '</b><em>' + (cp ? fmtDate(cp.date) + ', ' + daysLabel(daysTo(cp.date)) : '') + '</em></div><div class="smi"><span>' + LL('Руководитель', 'Lead') + '</span><b>' + esc(lead || LL('не указан', 'not set')) + '</b><em>' + (pr.start ? LL('с ', 'since ') + fmtDate(pr.start) + ', ' + plural(Math.max(0, -daysTo(pr.start)), 'pl.day') : '') + '</em></div></div>';
-  var tab = UI.stab || 'pts';
+  var tab = stabOf(r.id);
   h += '<div class="tabs pad">' + [['pts', LL('Пациенты', 'Patients'), n], ['proto', LL('Протокол', 'Protocol'), null], ['rand', LL('Рандомизация', 'Randomisation'), pr.rand.on === 'Да' ? (pr.log || []).length : null], ['cps', LL('Контрольные точки', 'Checkpoints'), (pr.cps || []).length], ['paper', LL('Статьи', 'Papers'), msPapers(r.id).length], ['lib', LL('Литература', 'Library'), msLib(r.id).length]].filter(function (x) { return x[0] !== 'rand' || pr.rand.on === 'Да'; }).map(function (x) { return '<button type="button" class="tab' + (tab === x[0] ? ' on' : '') + '" data-act="stab" data-v="' + x[0] + '">' + x[1] + (x[2] !== null ? '<span class="cnt">' + x[2] + '</span>' : '') + '</button>'; }).join('') + (tab === 'pts' ? '<span class="tabs-r"><input class="search" type="search" data-act="search" placeholder="' + t('reg.search') + '" aria-label="' + t('reg.search') + '" value="' + esc(S.q) + '"></span>' : '') + '</div>';
   return h;
 }
 function dl2(k, v) { return has(v) ? '<div class="dl"><dt>' + esc(k) + '</dt><dd>' + esc(v).replace(/\n/g, '<br>') + '</dd></div>' : ''; }
 function studyTabBody(r) {
-  var pr = stProto(r), tab = UI.stab || 'pts', s = pr.syn || {};
+  var pr = stProto(r), tab = stabOf(r.id), s = pr.syn || {};
   if (tab === 'paper') return renderPapers(r);
   if (tab === 'lib') return renderLibrary(r);
   if (tab === 'proto') {
@@ -2769,7 +2773,7 @@ function goNotif(i) {
   if (n.go[0] === 'v') setView(n.go[1]);
   else if (n.go[0] === 'p') openPatient(n.go[1]);
   else if (n.go[0] === 'r') openRec(n.go[1], n.go[2]);
-  else if (n.go[0] === 's') { UI.stab = n.go[2]; setView('reg:' + n.go[1]); }
+  else if (n.go[0] === 's') { UI.stab = n.go[2]; UI.stabFor = n.go[1]; setView('reg:' + n.go[1]); }
 }
 
 /* ======================= Home dashboard ======================= */
@@ -4098,8 +4102,8 @@ document.addEventListener('click', function (ev) {
     case 'newreg': openEditor(null); break;
     case 'newstudy': openEditor(null, 'study'); break;
     case 'tog': UI.open = UI.open || {}; UI.open[g('id')] = !(g('id') === 'studies' ? UI.open.studies !== false : isOpen(g('id'))); saveUI(); render(); break;
-    case 'fltreset': var stg0 = (UI.flt || {}).stg; UI.flt = {}; if (stg0) UI.flt.stg = stg0; saveUI(); render(); break;
-    case 'dfltreset': UI.dflt = {}; if (UI.flt) delete UI.flt.stg; saveUI(); render(); break;
+    case 'fltreset': var stg0 = fltOf().stg; UI.fltBy[S.view] = {}; if (stg0) fltOf().stg = stg0; saveUI(); render(); break;
+    case 'dfltreset': UI.dfltBy = UI.dfltBy || {}; UI.dfltBy[S.view] = {}; delete fltOf().stg; saveUI(); render(); break;
     case 'editreg': openEditor(g('id')); break;
     case 'eclose': S.edit = null; render(); break;
     case 'esave': saveEditor(); break;
@@ -4172,7 +4176,7 @@ document.addEventListener('click', function (ev) {
     case 'unenroll': ev.stopPropagation(); unenroll(g('sid'), g('pid')); break;
     case 'rand': ev.stopPropagation(); if (confirm(LL('Рандомизировать пациента? Результат нельзя будет изменить.', 'Randomise this patient? The result cannot be changed.'))) randomize(g('sid'), g('pid')); break;
     case 'rsclose': S.randShow = null; render(); break;
-    case 'stab': UI.stab = g('v'); saveUI(); render(); break;
+    case 'stab': UI.stab = g('v'); UI.stabFor = S.view.slice(4); saveUI(); render(); break;
     case 'sflt': UI.sflt = g('v'); saveUI(); render(); break;
     case 'nseen': { UI.seen = UI.seen || {}; notifs().forEach(function (n) { UI.seen[n.id] = 1; }); saveUI(); render(); break; }
     case 'ngo': goNotif(g('i')); break;
@@ -4277,8 +4281,8 @@ document.addEventListener('change', function (ev) {
   if (tg.id === 'retrofiles') { retroAdd(tg.files); tg.value = ''; return; }
   if (tg.getAttribute('data-act') === 'retropick') { var rp = RETRO.items.filter(function (x) { return x.id === tg.getAttribute('data-id'); })[0]; if (rp) rp.pid = tg.value || null; render(); return; }
   if (tg.id === 'dxfile' && S.dx) { var kp0 = root.querySelector('#dxkeep'), ag0 = root.querySelector('#dxagree'); if (kp0) S.dx.keep = kp0.checked; if (ag0) S.dx.agree = ag0.checked; S.dx.files = tg.files ? Array.prototype.slice.call(tg.files) : []; S.dx.file = S.dx.files[0] || null; render(); return; }
-  if (tg.getAttribute('data-act') === 'dflt') { UI.dflt = UI.dflt || {}; if (tg.value) UI.dflt[tg.getAttribute('data-id')] = tg.value; else delete UI.dflt[tg.getAttribute('data-id')]; saveUI(); render(); return; }
-  if (tg.getAttribute('data-act') === 'flt') { UI.flt = UI.flt || {}; if (tg.value) UI.flt[tg.getAttribute('data-id')] = tg.value; else delete UI.flt[tg.getAttribute('data-id')]; saveUI(); render(); return; }
+  if (tg.getAttribute('data-act') === 'dflt') { if (tg.value) dfltOf()[tg.getAttribute('data-id')] = tg.value; else delete dfltOf()[tg.getAttribute('data-id')]; saveUI(); render(); return; }
+  if (tg.getAttribute('data-act') === 'flt') { if (tg.value) fltOf()[tg.getAttribute('data-id')] = tg.value; else delete fltOf()[tg.getAttribute('data-id')]; saveUI(); render(); return; }
   if (b) { bind(b, tg.type === 'checkbox' ? tg.checked : tg.value); if (tg.tagName === 'SELECT' || tg.type === 'checkbox' || tg.type === 'date') render(); return; }
   var e = tg.getAttribute('data-ebind');
   if (e) {
@@ -5660,7 +5664,7 @@ function libQuickAdd(sid, q) {
 /* ---------- вкладка «Литература»: раскладка как в Zotero ---------- */
 var ZTYPES = [['journal-article', 'Журнальная статья', 'Journal Article'], ['book', 'Книга', 'Book'], ['chapter', 'Глава книги', 'Book Section'], ['conference', 'Материалы конференции', 'Conference Paper'], ['thesis', 'Диссертация', 'Thesis'], ['webpage', 'Веб-страница', 'Web Page'], ['report', 'Отчёт', 'Report']];
 function ztype(k) { var x = ZTYPES.filter(function (z) { return z[0] === k; })[0] || ZTYPES[0]; return LL(x[1], x[2]); }
-function zst() { return S.z || (S.z = { col: 'all', sel: null, q: '', sort: { k: 'at', d: -1 }, tag: null, open: {} }); }
+function zst() { S.zBy = S.zBy || {}; return S.zBy[S.view] || (S.zBy[S.view] = { col: 'all', sel: null, q: '', sort: { k: 'at', d: -1 }, tag: null, open: {} }); }
 function zCols(sid) { var m = msOf(sid); m.zcols = m.zcols || {}; return Object.keys(m.zcols).map(function (k) { return m.zcols[k]; }).sort(function (a, b) { return String(a.name).localeCompare(String(b.name), locale()); }); }
 function zCreator(x) { var au = refAuthors(x); return !au.length ? '' : au.length === 1 ? au[0].family : au.length === 2 ? au[0].family + LL(' и ', ' and ') + au[1].family : au[0].family + ' et al.'; }
 function zItems(sid) {
