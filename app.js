@@ -1087,8 +1087,25 @@ function fdb(cb) {
 function filePut(file, cb) { fdb(function (db) { var id = uid('f'), tx = db.transaction('f', 'readwrite'); tx.objectStore('f').put(file, id); tx.oncomplete = function () { cb(id); }; tx.onerror = function () { toast(t('f.storeFail')); }; }); }
 function fileGet(id, cb) { fdb(function (db) { var rq = db.transaction('f').objectStore('f').get(id); rq.onsuccess = function () { cb(rq.result); }; }); }
 function fileDelBlob(id) { fdb(function (db) { db.transaction('f', 'readwrite').objectStore('f').delete(id); }); }
+/* ---------- корзина файлов: добавление несколькими заходами перед разбором ---------- */
+function filesAcc(cur, add) { var out = (cur || []).slice(); (add || []).forEach(function (f) { if (!f) return; if (!out.some(function (x) { return (f._fid && x._fid === f._fid) || (x.name === f.name && +x.size === +f.size); })) out.push(f); }); return out; }
+function stageList(files, k) {
+  files = files || []; if (!files.length) return '';
+  return '<div class="stage-l"><div class="stage-h">' + LL('Выбрано файлов: ', 'Files selected: ') + '<b>' + files.length + '</b>' + (files.length > 1 ? '<button type="button" class="linkbtn" data-act="stgclr" data-k="' + k + '">' + LL('убрать все', 'clear') + '</button>' : '') + '</div>' + files.map(function (f, i) { return '<span class="filechip">' + ico(f._fid ? 'clip' : 'file', 14) + '<span class="fn">' + esc(f.name) + '</span><em>' + fmtSize(f.size) + (f._fid ? LL(' · из файлов пациента', ' · patient files') : '') + '</em><button type="button" class="pfx" data-act="stgrm" data-k="' + k + '" data-i="' + i + '" aria-label="' + LL('Убрать', 'Remove') + '">' + ico('x', 13) + '</button></span>'; }).join('') + '</div>';
+}
+function stageFiles(k) { return k === 'mp' ? (S.mpStage ? S.mpStage.files : null) : (S.dx ? S.dx.files : null); }
+function stageSet(k, files) { if (k === 'mp') { if (S.mpStage) S.mpStage.files = files; } else if (S.dx) { S.dx.files = files; S.dx.file = files[0] || null; } }
+function pfStoreTo(p, files, src) {
+  if (!p) return; p.files = p.files || [];
+  (files || []).filter(Boolean).forEach(function (f) {
+    if (f._fid || p.files.some(function (x) { return x.name === f.name && +x.size === +f.size; })) return;
+    var ent = { fid: '', name: f.name, size: f.size, type: f.type || '', at: nowIso(), by: me(), src: src || '' }; p.files.push(ent);
+    filePut(f, function (id) { ent.fid = id; });
+  });
+}
 /* ---------- файлы пациента: хранятся в браузере этого устройства, в карточке список ---------- */
-function pfStore(files, src) {
+function pfStore(files, src) { if (S.drawer) pfStoreTo(S.drawer.p, files, src); }
+function pfStore0(files, src) {
   var dr = S.drawer; if (!dr) return; var p = dr.p; p.files = p.files || [];
   (files || []).filter(Boolean).forEach(function (f) {
     if (f._fid || p.files.some(function (x) { return x.name === f.name && +x.size === +f.size; })) return;
@@ -1765,7 +1782,7 @@ function savePatient() {
   if (needSum) aiSummaryBg(p.id);
 }
 function openRec(k, id, preset) {
-  S.linkPick = false;
+  S.linkPick = false; S.mpStage = null;
   var r = id ? DB.cols[k].filter(function (x) { return x.id === id; })[0] : null;
   S.rec = { k: k, r: r ? clone(r) : (preset || {}), isNew: !r, orig: r ? clone(r) : null }; S.menu = null; S.inline = null; S.cdraft = ''; S.histAll = false; render();
 }
@@ -4057,7 +4074,7 @@ function mpFromDocs(files) {
       MP.forEach(function (sec) { sec[2].forEach(function (x) { var v = res[x.id]; if (!has(v)) return; if (x.type === 'date') { var nv = dxNorm(x, v); if (nv.err) return; v = nv.v; } else if (x.type === 'num') v = String(v); else if (x.type === 'sel' || x.type === 'seg') { if (x.options.indexOf(String(v)) < 0) return; v = String(v); } else v = String(v).trim(); mp[x.id] = v; n++; }); });
       if (!r.fio && (res.fam || res.nam)) r.fio = [res.fam, res.nam, res.otc].filter(Boolean).join(' ');
       if (!r.dx && res.refDx) r.dx = String(res.refDx).split('\n')[0].slice(0, 300);
-      var pt = r.pid ? DB.patients.filter(function (x) { return x.id === r.pid; })[0] : null; if (pt) docs.forEach(function (d) { docArchive(pt, d.name, d.text || '', ''); });
+      var pt = r.pid ? DB.patients.filter(function (x) { return x.id === r.pid; })[0] : null; if (pt) { docs.forEach(function (d) { docArchive(pt, d.name, d.text || '', ''); }); pfStoreTo(pt, files, LL('протокол МДГ', 'MDT protocol')); }
       S.mpBusy = false; S.mpShow = true; render(); toast(LL('Протокол МДГ сформирован по форме: заполнено полей ', 'MDT protocol built: fields ') + n + LL('. Проверьте и скачайте Word.', '. Check and download Word.'));
     });
   }).catch(function (e) { S.mpBusy = false; render(); toast(LL('ИИ не ответил: ', 'AI failed: ') + ((e && e.message) || e)); });
@@ -4105,9 +4122,19 @@ function mdtProtoText(r, deid) {
   });
   return out.join('\n');
 }
+function mpStageHTML(r) {
+  var st = S.mpStage, pt = r.pid ? DB.patients.filter(function (x) { return x.id === r.pid; })[0] : null, pfs = pt ? (pt.files || []).filter(function (f) { return f.fid; }) : [];
+  var picked = {}; st.files.forEach(function (f) { if (f._fid) picked[f._fid] = 1; });
+  var h = '<div class="stage"><div class="stage-t"><b>' + ico('upload', 15) + LL('Документы для протокола МДГ', 'Documents for the MDT protocol') + '</b><span>' + LL('Добавляйте файлы несколькими заходами: с компьютера из разных папок, перетаскиванием на эту карточку, из файлов пациента. Потом нажмите «Сформировать»: все документы разберутся вместе.', 'Add files in several rounds, then press Build: all documents are processed together.') + '</span></div>';
+  h += stageList(st.files, 'mp');
+  if (pfs.length) h += '<div class="dxpf"><b>' + ico('clip', 15) + LL('Файлы пациента', 'Patient files') + '</b>' + pfs.slice().reverse().map(function (f) { return '<label class="chk"><input type="checkbox" data-stgpf="' + esc(f.fid) + '" data-pid="' + pt.id + '"' + (picked[f.fid] ? ' checked' : '') + '><span>' + esc(f.name) + ' <em>' + fmtSize(f.size) + (f.at ? ' · ' + fmtDate(String(f.at).slice(0, 10)) : '') + '</em></span></label>'; }).join('') + '</div>';
+  h += '<div class="actions"><button type="button" class="btn small" data-act="stgadd" data-k="mp">' + ico('plus', 14) + LL('Добавить с компьютера', 'Add from computer') + '</button><button type="button" class="btn small primary" data-act="mpgo"' + (st.files.length ? '' : ' disabled') + '>' + ico('sparkle', 14) + LL('Сформировать протокол', 'Build protocol') + (st.files.length ? ' (' + st.files.length + ')' : '') + '</button><button type="button" class="btn small ghost" data-act="mpstx">' + t('b.cancel') + '</button></div>';
+  return h + '</div>';
+}
 function mpCard(r) {
   var mp = r.mp || {}, filled = Object.keys(mp).filter(function (k) { return has(mp[k]); }).length, open = S.mpShow || filled > 0;
   var h = '<section class="card mpcard" id="sec-mp"><h3>' + ico('doc', 18) + LL('Протокол МДГ', 'MDT protocol') + '<span class="h3-note">' + (filled ? LL('заполнено полей: ', 'fields filled: ') + filled : LL('по шаблону центра', 'centre template')) + '</span></h3>';
+  if (S.mpStage) h += mpStageHTML(r);
   if (!open) return h + '<button type="button" class="mp-open" data-act="mpshow">' + ico('plus', 18) + '<span><b>' + LL('Открыть шаблон протокола МДГ', 'Open MDT protocol template') + '</b><em>' + LL('Паспортные данные, диагноз, анамнез, обследования, лечение, причина вынесения, заключение', 'Details, diagnosis, history, work-up, treatment, reason, conclusion') + '</em></span></button><div class="mp-drop"><button type="button" class="btn small ai" data-act="mpdocs">' + ico('upload', 14) + (S.mpBusy ? LL('Формирую…', 'Building…') : LL('Сформировать из документов', 'Build from documents')) + '</button><span>' + LL('или перетащите сюда файлы обследования (PDF, фото, Word): протокол заполнится по форме центра', 'or drop work-up files here to fill the centre form') + '</span></div></section>';
   h += '<div class="mp-bar"><button type="button" class="btn small" data-act="mpfill"' + (r.pid ? '' : ' disabled title="' + LL('Сначала свяжите запись с карточкой пациента', 'Link a patient record first') + '"') + '>' + ico('users', 14) + LL('Заполнить из карточки пациента', 'Fill from patient record') + '</button><button type="button" class="btn small ai" data-act="mpdocs">' + ico('upload', 14) + (S.mpBusy ? LL('Формирую…', 'Building…') : LL('Сформировать из документов', 'Build from documents')) + '</button><button type="button" class="btn small" data-act="mpword">' + ico('doc', 14) + LL('Скачать Word по форме', 'Download Word (official form)') + '</button><button type="button" class="btn small" data-act="mpcopy">' + ico('copy', 14) + LL('Копировать протокол', 'Copy protocol') + '</button><button type="button" class="btn small ai" data-act="mpai">' + ico('sparkle', 14) + LL('Разбор ИИ', 'AI review') + '</button><span class="mp-hint">' + LL('Можно перетащить файлы прямо на карточку', 'You can drop files onto this card') + '</span></div>';
   MP.forEach(function (sec, i) {
@@ -4498,7 +4525,7 @@ document.addEventListener('click', function (ev) {
     case 'cview': UI.colView[g('k')] = g('v'); saveUI(); S.inline = null; render(); break;
     case 'newrec': { var k = g('k'), pre = {}; if (COLS[k].statusField) pre[COLS[k].statusField] = COLS[k].F[COLS[k].statusField].options[0]; openRec(k, null, pre); break; }
     case 'openrec': if (tg.classList.contains('dragging')) return; openRec(g('k'), g('id')); break;
-    case 'closerec': S.rec = null; render(); break;
+    case 'closerec': S.rec = null; S.mpStage = null; render(); break;
     case 'addlinked': {
       var ak = g('k'), ac = COLS[ak], pp = S.drawer.p, pre2 = { pid: pp.id };
       if (ac.statusField) pre2[ac.statusField] = ac.F[ac.statusField].options[0];
@@ -4665,7 +4692,11 @@ document.addEventListener('click', function (ev) {
     case 'mpshow': S.mpShow = true; render(); break;
     case 'mptog': S.mpClosed = S.mpClosed || {}; S.mpClosed[g('id')] = !S.mpClosed[g('id')]; render(); break;
     case 'mpfill': mpFill(); break;
-    case 'mpdocs': { if (S.mpBusy) break; var fi4 = document.createElement('input'); fi4.type = 'file'; fi4.multiple = true; fi4.accept = '.pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx,.rtf,.odt,application/pdf,image/*'; fi4.onchange = function () { if (fi4.files.length) mpFromDocs(Array.prototype.slice.call(fi4.files)); }; fi4.click(); break; }
+    case 'mpdocs': case 'stgadd': { if (S.mpBusy) break; var sk = g('k') || 'mp'; if (sk === 'mp' && !S.mpStage) { S.mpStage = { files: [] }; S.mpShow = true; render(); } var fi4 = document.createElement('input'); fi4.type = 'file'; fi4.multiple = true; fi4.accept = '.pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx,.rtf,.odt,application/pdf,image/*'; fi4.onchange = function () { if (fi4.files.length) { stageSet(sk, filesAcc(stageFiles(sk), Array.prototype.slice.call(fi4.files))); render(); } }; fi4.click(); break; }
+    case 'stgrm': { var k1 = g('k'), arr1 = (stageFiles(k1) || []).slice(); arr1.splice(+g('i'), 1); stageSet(k1, arr1); render(); break; }
+    case 'stgclr': stageSet(g('k'), []); render(); break;
+    case 'mpgo': { var stf = S.mpStage && S.mpStage.files; if (!stf || !stf.length) { toast(LL('Добавьте файлы', 'Add files')); break; } if (!aiReady()) { toast(LL('Подключите ИИ в шапке: протокол МДГ собирает ИИ. Файлы остаются в списке.', 'Connect AI first; files are kept.')); break; } S.mpStage = null; mpFromDocs(stf); break; }
+    case 'mpstx': S.mpStage = null; render(); break;
     case 'mpword': if (S.rec) mpWord(S.rec.r); break;
     case 'mpcopy': { var mt = mdtProtoText(S.rec.r, false); if (navigator.clipboard) navigator.clipboard.writeText(mt).then(function () { toast(LL('Протокол МДГ скопирован', 'MDT protocol copied')); }); break; }
     case 'mpai': { UI.aip = true; saveUI(); if (!aiReady()) { render(); break; } var cx1 = aiCtx(); aiRun(cx1, null, LL('Разбор протокола МДГ', 'MDT protocol review'), 'Проанализируй протокол МДГ целиком. Структура ответа:\n1) Резюме случая (3-4 строки).\n2) Недостающие обследования и данные для принятия решения (по стандарту стадирования колоректального рака: колоноскопия с биопсией, МРТ малого таза для рака прямой кишки с CRM/EMVI, КТ ОГК и ОБП, РЭА, MMR/MSI, RAS/BRAF при метастазах и т.д.) с пометкой, почему важно.\n3) Доступные варианты дальнейшего лечения по NCCN/ESMO/протоколам МЗ РК с уровнем доказательности и ссылками.\n4) Подходящие клинические исследования сектора или международные.\n5) Вопросы для обсуждения на МДГ.\n6) Черновик формулировки заключения МДГ (помеченный как черновик).'); break; }
@@ -4731,13 +4762,19 @@ document.addEventListener('change', function (ev) {
   if (tg.id === 'retrofiles') { retroAdd(tg.files); tg.value = ''; return; }
   if (tg.getAttribute('data-retrogp')) { var rg0 = RETRO.groups.filter(function (x) { return x.id === tg.getAttribute('data-retrogp'); })[0]; if (rg0) { rg0.pid = tg.value || null; rg0.pidManual = true; } render(); return; }
   if (tg.getAttribute('data-retromv')) { if (tg.value) retroMove(tg.getAttribute('data-retromv'), tg.value); return; }
+  if (tg.getAttribute && tg.getAttribute('data-stgpf') && S.mpStage) {
+    var sfid = tg.getAttribute('data-stgpf'), spt = DB.patients.filter(function (x) { return x.id === tg.getAttribute('data-pid'); })[0], sf0 = spt && (spt.files || []).filter(function (f) { return f.fid === sfid; })[0];
+    if (!tg.checked) { S.mpStage.files = S.mpStage.files.filter(function (f) { return f._fid !== sfid; }); render(); return; }
+    if (sf0) fileGet(sfid, function (blob) { if (!blob) { toast(LL('Файл «', 'File «') + sf0.name + LL('» хранится на другом устройстве', '» is stored on another device')); render(); return; } var fo = new File([blob], sf0.name, { type: sf0.type || blob.type || '' }); fo._fid = sfid; S.mpStage.files = filesAcc(S.mpStage.files, [fo]); render(); });
+    return;
+  }
   if (tg.getAttribute && tg.getAttribute('data-dxpf') && S.dx && S.drawer) {
     var pfid = tg.getAttribute('data-dxpf'), pf0 = (S.drawer.p.files || []).filter(function (f) { return f.fid === pfid; })[0], kpx = root.querySelector('#dxkeep'), agx = root.querySelector('#dxagree'); if (kpx) S.dx.keep = kpx.checked; if (agx) S.dx.agree = agx.checked;
     if (!tg.checked) { S.dx.files = (S.dx.files || []).filter(function (f) { return f._fid !== pfid; }); S.dx.file = S.dx.files[0] || null; render(); return; }
     if (pf0) fileGet(pfid, function (blob) { if (!blob) { toast(LL('Файл «', 'File «') + pf0.name + LL('» есть в списке, но хранится на другом устройстве', '» is stored on another device')); render(); return; } var fo = new File([blob], pf0.name, { type: pf0.type || blob.type || '' }); fo._fid = pfid; S.dx.files = (S.dx.files || []).filter(function (f) { return f._fid !== pfid; }).concat([fo]); S.dx.file = S.dx.files[0]; render(); });
     return;
   }
-  if (tg.id === 'dxfile' && S.dx) { var kp0 = root.querySelector('#dxkeep'), ag0 = root.querySelector('#dxagree'); if (kp0) S.dx.keep = kp0.checked; if (ag0) S.dx.agree = ag0.checked; S.dx.files = (S.dx.files || []).filter(function (f) { return f._fid; }).concat(tg.files ? Array.prototype.slice.call(tg.files) : []); S.dx.file = S.dx.files[0] || null; render(); return; }
+  if (tg.id === 'dxfile' && S.dx) { var kp0 = root.querySelector('#dxkeep'), ag0 = root.querySelector('#dxagree'); if (kp0) S.dx.keep = kp0.checked; if (ag0) S.dx.agree = ag0.checked; S.dx.files = filesAcc(S.dx.files, tg.files ? Array.prototype.slice.call(tg.files) : []); try { tg.value = ''; } catch (e) {} S.dx.file = S.dx.files[0] || null; render(); return; }
   if (tg.getAttribute('data-act') === 'dflt') { if (tg.value) dfltOf()[tg.getAttribute('data-id')] = tg.value; else delete dfltOf()[tg.getAttribute('data-id')]; saveUI(); render(); return; }
   if (tg.getAttribute('data-act') === 'flt') { if (tg.value) fltOf()[tg.getAttribute('data-id')] = tg.value; else delete fltOf()[tg.getAttribute('data-id')]; saveUI(); render(); return; }
   if (b) { bind(b, tg.type === 'checkbox' ? tg.checked : tg.value); if (tg.tagName === 'SELECT' || tg.type === 'checkbox' || tg.type === 'date') render(); return; }
@@ -4765,12 +4802,12 @@ document.addEventListener('drop', function (ev) {
 });
 document.addEventListener('dragover', function (ev) { var z = ev.target.closest && ev.target.closest('.mpcard'); if (z && !S.dx && ev.dataTransfer && Array.prototype.indexOf.call(ev.dataTransfer.types || [], 'Files') >= 0) { ev.preventDefault(); z.classList.add('over'); } });
 document.addEventListener('dragleave', function (ev) { var z = ev.target.closest && ev.target.closest('.mpcard'); if (z && !z.contains(ev.relatedTarget)) z.classList.remove('over'); });
-document.addEventListener('drop', function (ev) { var z = ev.target.closest && ev.target.closest('.mpcard'); if (!z || S.dx) return; var fl = ev.dataTransfer && ev.dataTransfer.files; if (!fl || !fl.length) return; ev.preventDefault(); ev.stopPropagation(); z.classList.remove('over'); if (!S.mpBusy) mpFromDocs(Array.prototype.slice.call(fl)); }, true);
+document.addEventListener('drop', function (ev) { var z = ev.target.closest && ev.target.closest('.mpcard'); if (!z || S.dx) return; var fl = ev.dataTransfer && ev.dataTransfer.files; if (!fl || !fl.length) return; ev.preventDefault(); ev.stopPropagation(); z.classList.remove('over'); if (!S.mpBusy) { S.mpStage = S.mpStage || { files: [] }; S.mpShow = true; S.mpStage.files = filesAcc(S.mpStage.files, Array.prototype.slice.call(fl)); render(); } }, true);
 document.addEventListener('dragover', function (ev) { var z = ev.target.closest && ev.target.closest('[data-pfdrop]'); if (z && S.drawer && !S.dx) { ev.preventDefault(); z.classList.add('over'); } });
 document.addEventListener('drop', function (ev) { var z = ev.target.closest && ev.target.closest('[data-pfdrop]'); if (!z || !S.drawer || S.dx) return; var fl = ev.dataTransfer && ev.dataTransfer.files; if (!fl || !fl.length) return; ev.preventDefault(); ev.stopPropagation(); z.classList.remove('over'); pfAdd([].slice.call(fl)); }, true);
 document.addEventListener('dragover', function (ev) { if ((S.dx && S.dx.step === 'pick') || (S.view === 'retro' && !S.drawer)) { ev.preventDefault(); var z = root.querySelector('.dxdrop'); if (z) z.classList.add('over'); } });
 document.addEventListener('dragleave', function (ev) { var z = root.querySelector('.dxdrop'); if (z && !ev.relatedTarget) z.classList.remove('over'); });
-document.addEventListener('drop', function (ev) { if (S.view === 'retro' && !S.drawer && !S.dx) { ev.preventDefault(); retroAdd(ev.dataTransfer && ev.dataTransfer.files); return; } if (!S.dx || S.dx.step !== 'pick') return; ev.preventDefault(); var fl = ev.dataTransfer && ev.dataTransfer.files ? Array.prototype.slice.call(ev.dataTransfer.files) : []; if (fl.length) { var kp1 = root.querySelector('#dxkeep'), ag1 = root.querySelector('#dxagree'); if (kp1) S.dx.keep = kp1.checked; if (ag1) S.dx.agree = ag1.checked; S.dx.files = (S.dx.files || []).filter(function (f) { return f._fid; }).concat(fl); S.dx.file = fl[0]; render(); } });
+document.addEventListener('drop', function (ev) { if (S.view === 'retro' && !S.drawer && !S.dx) { ev.preventDefault(); retroAdd(ev.dataTransfer && ev.dataTransfer.files); return; } if (!S.dx || S.dx.step !== 'pick') return; ev.preventDefault(); var fl = ev.dataTransfer && ev.dataTransfer.files ? Array.prototype.slice.call(ev.dataTransfer.files) : []; if (fl.length) { var kp1 = root.querySelector('#dxkeep'), ag1 = root.querySelector('#dxagree'); if (kp1) S.dx.keep = kp1.checked; if (ag1) S.dx.agree = ag1.checked; S.dx.files = filesAcc(S.dx.files, fl); S.dx.file = fl[0]; render(); } });
 document.getElementById('importFile').addEventListener('change', function (ev) {
   var fl = ev.target.files[0]; if (!fl) return; var rd = new FileReader();
   rd.onload = function () {
@@ -6000,12 +6037,14 @@ function renderDx() {
   if (dx.step !== 'rep') {
     h += '<section class="modal dxm" role="dialog" aria-modal="true"><div class="dhead"><div><div class="dh-title">' + ico('sparkle', 18) + LL('Заполнить карточку из документа', 'Fill the record from a document') + '</div><div class="hint">' + LL('Выписка, первичный осмотр, консультативный лист, протокол операции, гистология, МРТ/КТ', 'Discharge summary, consultation, operative note, pathology, MRI/CT') + '</div></div><button type="button" class="iconbtn" data-act="dxclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
     if (dx.step === 'pick') {
-      h += '<label class="dxdrop' + (dx.file ? ' on' : '') + '"><input type="file" id="dxfile" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx,.rtf,.odt,application/pdf,image/*,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/rtf,application/vnd.oasis.opendocument.text" hidden>' + ico(dx.file ? 'doc' : 'upload', 28) + '<b>' + ((dx.files || []).length > 1 ? LL('Документов: ', 'Documents: ') + dx.files.length : dx.file ? esc(dx.file.name) + ' · ' + Math.max(1, Math.round(dx.file.size / 1024)) + ' КБ' : LL('Выберите или перетащите файлы', 'Choose or drop files')) + '</b><span>' + ((dx.files || []).length > 1 ? dx.files.map(function (f) { return esc(f.name); }).join(' · ') : LL('Можно сразу несколько: выписки, протоколы, гистология, МДГ. PDF (в том числе скан), Word, фото или текст', 'Several at once: PDF, Word, photo or text')) + '</span></label>';
+      var nfx = (dx.files || []).length;
+      h += '<label class="dxdrop' + (nfx ? ' on' : '') + '"><input type="file" id="dxfile" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx,.rtf,.odt,application/pdf,image/*,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/rtf,application/vnd.oasis.opendocument.text" hidden>' + ico('upload', 28) + '<b>' + (nfx ? LL('Добавить ещё файлы', 'Add more files') : LL('Выберите или перетащите файлы', 'Choose or drop files')) + '</b><span>' + LL('Можно добавлять несколькими заходами из разных папок, перетаскиванием и из файлов пациента. Всё выбранное разберётся вместе, со сверкой между документами.', 'Add files in several rounds from different folders, by drag and drop, or from patient files. Everything is processed together.') + '</span></label>';
+      h += stageList(dx.files, 'dx');
       var pfs = (S.drawer && S.drawer.p.files) || [];
       if (pfs.length) { var picked = {}; (dx.files || []).forEach(function (f) { if (f._fid) picked[f._fid] = 1; }); h += '<div class="dxpf"><b>' + ico('clip', 15) + LL('Или выберите из файлов пациента', 'Or pick from patient files') + '</b>' + pfs.slice().reverse().map(function (f) { return '<label class="chk"><input type="checkbox" data-dxpf="' + esc(f.fid) + '"' + (picked[f.fid] ? ' checked' : '') + '><span>' + esc(f.name) + ' <em>' + fmtSize(f.size) + (f.at ? ' · ' + fmtDate(String(f.at).slice(0, 10)) : '') + '</em></span></label>'; }).join('') + '</div>'; }
       h += '<label class="chk"><input type="checkbox" id="dxkeep"' + (dx.keep ? ' checked' : '') + '><span>' + LL('Не перезаписывать уже заполненные поля (расхождения покажу отдельно)', 'Keep fields that are already filled (differences listed separately)') + '</span></label>';
       h += dxModeHTML(dx, 'dx');
-      h += '<div class="actions"><button type="button" class="btn primary" data-act="dxrun"' + (dx.file ? '' : ' disabled') + '>' + ico('sparkle', 16) + LL('Распознать и заполнить', 'Extract and fill') + '</button><button type="button" class="btn ghost" data-act="dxclose">' + t('b.cancel') + '</button></div>';
+      h += '<div class="actions"><button type="button" class="btn primary" data-act="dxrun"' + (dx.file ? '' : ' disabled') + '>' + ico('sparkle', 16) + LL('Распознать и заполнить', 'Extract and fill') + ((dx.files || []).length > 1 ? ' (' + dx.files.length + ')' : '') + '</button><button type="button" class="btn ghost" data-act="dxclose">' + t('b.cancel') + '</button></div>';
     } else if (dx.step === 'run') {
       h += '<div class="dxrun"><span class="spin"></span><ul>' + dx.log.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul></div>';
     } else {
