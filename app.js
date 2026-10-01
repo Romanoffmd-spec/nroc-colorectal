@@ -409,16 +409,12 @@ var COLS = {
       f('notes', 'Заметки', 'Notes', 'long', { wide: true })
     ]},
   mdt: { icon: 'mdt', title: ['МДГ', 'MDT'], sub: ['Колоректальная мультидисциплинарная группа', 'Colorectal multidisciplinary team'],
-    titleField: 'fio', subField: 'dx', dateField: 'date', statusField: 'status', views: ['table', 'board', 'cal'],
-    colorBy: { 'Ожидает обсуждения': 'plan', 'Обсуждён': 'prog', 'Лечение начато': 'prog', 'Лечение завершено': 'done', 'Наблюдение': 'done' },
-    list: ['date', 'fio', 'mrn', 'stage', 'plan', 'status', 'change'],
+    titleField: 'fio', subField: 'rec', dateField: 'date', views: ['table', 'cal'],
+    list: ['date', 'fio', 'iin', 'mrn', 'rec'],
     fields: [
-      f('fio', 'ФИО', 'Full name', 'text'), f('mrn', 'Номер МДГ', 'MDT no.', 'text'), f('date', 'Дата МДГ', 'MDT date', 'date'),
-      f('status', 'Статус', 'Status', 'sel', { options: ['Ожидает обсуждения', 'Обсуждён', 'Лечение начато', 'Лечение завершено', 'Наблюдение'] }),
-      f('stage', 'Стадия', 'Stage', 'sel', { options: ['I', 'II', 'III', 'IV', 'Неприменимо'] }),
-      f('plan', 'План лечения', 'Treatment plan', 'multi', { options: ['Операция', 'Химиотерапия', 'Лучевая терапия', 'TNT', 'Watch & wait', 'Протонная терапия', 'Иммунотерапия', 'Термоаблация', 'Паллиативная помощь', 'Повторная оценка'] }),
-      f('change', 'Решение изменено', 'Decision changed', 'seg', { options: YN }), f('lead', 'Ведущий врач', 'Lead clinician', 'sel', { options: SURGEONS }),
-      f('dx', 'Диагноз', 'Diagnosis', 'long', { wide: true }), f('rec', 'Рекомендация МДГ', 'MDT recommendation', 'long', { wide: true })
+      f('fio', 'ФИО', 'Full name', 'text'), f('iin', 'ИИН', 'National ID (IIN)', 'text', { ph: ['12 цифр', '12 digits'] }),
+      f('date', 'Дата МДГ', 'MDT date', 'date'), f('mrn', 'Номер МДГ', 'MDT no.', 'text'),
+      f('rec', 'Решение МДГ', 'MDT decision', 'long', { wide: true })
     ]},
   mm: { icon: 'alert', title: ['M&M', 'M&M'], sub: ['Разборы осложнений и летальности', 'Morbidity and mortality reviews'],
     titleField: 'title', subField: 'reason', dateField: 'date', statusField: 'status', views: ['table', 'board', 'cal'],
@@ -1527,9 +1523,10 @@ function renderCol(k) {
   else h += renderTable(k, list);
   return h;
 }
+function mdtWaiting(r) { return !has(r.rec) && !(r.mp && (r.mp.recTreat || r.mp.recObs || r.mp.recExam || r.mp.recSympt)) && (!r.status || r.status === 'Ожидает обсуждения'); }
 function needsAttn(k, r) {
   var td = isoOf(new Date());
-  if (k === 'mdt') { var w = !r.status || r.status === 'Ожидает обсуждения'; return w ? (r.date && r.date < td ? 'late' : 'wait') : null; }
+  if (k === 'mdt') { var w = mdtWaiting(r); return w ? (r.date && r.date < td ? 'late' : 'wait') : null; }
   if (k === 'mm') { var p = r.status !== 'Разобран'; return p ? (r.date && r.date < td ? 'late' : 'wait') : null; }
   return null;
 }
@@ -1542,8 +1539,9 @@ function renderSplit(k, list) {
   var h = grpHead(k === 'mdt' ? LL('Ожидают обсуждения', 'Awaiting discussion') : LL('Запланированные и неразобранные', 'Planned and pending'), att.length, 'attn', late ? '<span class="tag due">' + LL('просрочено: ', 'overdue: ') + late + '</span>' : '');
   h += att.length ? renderTable(k, att, true) : '<div class="grp-empty">' + LL('Ничего не ожидает', 'Nothing pending') + '</div>';
   S.sort[k] = S0;
-  h += grpHead(k === 'mdt' ? LL('Обсуждены, лечение идёт или завершено', 'Discussed, treatment ongoing or done') : LL('Разобраны', 'Reviewed'), ok.length, 'okg');
-  h += renderTable(k, ok);
+  h += grpHead(k === 'mdt' ? LL('Решение принято', 'Decision made') : LL('Разобраны', 'Reviewed'), ok.length, 'okg');
+  if (k === 'mdt' && !S0) S.sort[k] = { k: 'date', d: 1 };
+  h += renderTable(k, ok); S.sort[k] = S0;
   return h;
 }
 function cellVal(x, val) {
@@ -1732,6 +1730,7 @@ function savePatient() {
   DB.registries.forEach(function (r) { if (r.mode !== 'manual') return; var i = r.members.indexOf(p.id); if (dr.members[r.id] && i < 0) r.members.push(p.id); if (!dr.members[r.id] && i >= 0) r.members.splice(i, 1); });
   delete dr.errs; logPatient(dr);
   if (dr.retroGroup) retroSaved(dr.retroGroup, p.id);
+  (dr.mdgQ || []).forEach(function (m) { mdgUpsert(p, m); });
   if (dr.isNew) { p.created = nowIso(); DB.patients.push(p); DB.seq++; } else DB.patients = DB.patients.map(function (x) { return x.id === p.id ? p : x; });
   if (dr.linkRec) { var lr = DB.cols[dr.linkRec.k].filter(function (x) { return x.id === dr.linkRec.id; })[0]; if (lr) lr.pid = p.id; }
   if (dr.qlAttach) { var qr0 = (QL.resp || []).filter(function (x) { return x.id === dr.qlAttach; })[0]; if (qr0) { qlAttach(qr0, p); if (CLOUD.db) CLOUD.db.collection('qresp').doc(qr0.id).update({ status: 'done', pid: p.id, doneAt: nowIso(), doneBy: me() }).catch(function () {}); QL.resp = QL.resp.filter(function (x) { return x.id !== qr0.id; }); } }
@@ -1750,7 +1749,7 @@ function openRec(k, id, preset) {
 function autoCard(k, r) {
   if (k === 'mm') return null;
   var fio = String(recName(k, r) || '').trim(); if (nameTokens(fio).length < 2) return null;
-  var d = { fio: fio };
+  var d = { fio: fio }; if (k === 'mdt' && r.iin) d.iin = r.iin;
   if (k === 'planner') { if (r.date) d.admDate = r.date; if (r.surgeryDate) d.date = r.surgeryDate; if (r.discharge) d.disDate = r.discharge; if (r.surgeon) d.surgeon = r.surgeon; }
   if (k === 'redcap' && r.opDate) d.date = r.opDate;
   var ts = nowIso(), p = { id: 'CR-' + String(DB.seq).padStart(4, '0'), created: ts, d: d, fu: {}, custom: {}, log: [{ ts: ts, by: me(), act: 'create', note: L(COLS[k].title), ch: [] }] };
@@ -1759,6 +1758,13 @@ function autoCard(k, r) {
 function saveRec() {
   var o = S.rec, list = DB.cols[o.k];
   if (o.k === 'mdt' && o.r.mp && (o.r.mp.recTreat || o.r.mp.recObs)) { var ptm = o.r.pid ? DB.patients.filter(function (x) { return x.id === o.r.pid; })[0] : null; if (ptm) { var recT = [o.r.mp.recTreat, o.r.mp.recObs ? 'Динамическое наблюдение: ' + o.r.mp.recObs : ''].filter(Boolean).join('; '); if (!(ptm.route && ptm.route.rec === recT)) { var trm = applyMdg(ptm, { date: o.r.date || isoOf(new Date()), no: o.r.mrn || '', rec: recT, tracks: tracksFromText(recT) }, LL('МДГ', 'MDT')); if (trm) toast(LL('Решение МДГ учтено: пациент в разделах ', 'MDT decision applied: ') + trm.map(function (k) { return LL(trackOf(k).ru, trackOf(k).en); }).join(', ')); } } }
+  if (o.k === 'mdt') {
+    if (o.r.iin) o.r.iin = String(o.r.iin).replace(/\D/g, '');
+    if (!o.r.pid && o.r.iin) { var byI = DB.patients.filter(function (x) { return x.d.iin === o.r.iin; }); if (byI.length === 1) o.r.pid = byI[0].id; }
+    var ptd = o.r.pid ? DB.patients.filter(function (x) { return x.id === o.r.pid; })[0] : null;
+    if (ptd && !o.r.iin && ptd.d.iin) o.r.iin = ptd.d.iin;
+    if (ptd && o.r.rec && !(o.r.mp && (o.r.mp.recTreat || o.r.mp.recObs)) && !(ptd.route && ptd.route.rec === o.r.rec)) { var trd = applyMdg(ptd, { date: o.r.date || isoOf(new Date()), no: o.r.mrn || '', rec: o.r.rec }, LL('МДГ', 'MDT')); if (trd) toast(LL('Решение МДГ учтено: пациент в разделах ', 'MDT decision applied: ') + trd.map(function (k) { return LL(trackOf(k).ru, trackOf(k).en); }).join(', ')); }
+  }
   Object.keys(o.r).forEach(function (x) { if (!has(o.r[x])) delete o.r[x]; });
   if (LINKED.indexOf(o.k) >= 0 && !o.r.pid) { var ex = guessPatient(DB.patients, recName(o.k, o.r), true); if (ex) o.r.pid = ex.id; else autoCard(o.k, o.r); }
   if (o.k === 'pubs' && o.r.doi && doiCheck(o.r.doi)) { toast('DOI: ' + doiCheck(o.r.doi)); return; }
@@ -1773,7 +1779,6 @@ function quickAdd(k, date, text) {
   var parts = text.split(','), a = parts.shift().trim(), b = parts.join(',').trim();
   r[c.titleField] = a; if (b && c.subField) r[c.subField] = b;
   if (k === 'planner') r.status = 'Планируется';
-  if (k === 'mdt') r.status = 'Ожидает обсуждения';
   if (k === 'redcap') r.done = 'Ожидает';
   if (LINKED.indexOf(k) >= 0) { var ex2 = guessPatient(DB.patients, recName(k, r), true); if (ex2) r.pid = ex2.id; else autoCard(k, r); }
   DB.cols[k].push(r); save(); toast(date ? t('toast.added', { n: a, d: fmtDate(date) }) : t('toast.addedNoDate', { n: a }));
@@ -2959,7 +2964,7 @@ function notifs() {
   qDueAll(3).forEach(function (x) { out.push({ id: 'q:' + x.p.id + ':' + x.e.id, ic: 'clipboard', lvl: x.n < 0 ? 'due' : 'soon', t: LL('Анкета ', 'Questionnaire ') + qShort(qTpl(x.e.tid)) + (x.n < 0 ? LL(' просрочена', ' overdue') : LL(' к заполнению', ' due')), s: pName(x.p) + ' · ' + daysLabel(x.n), go: ['p', x.p.id] }); });
   (DB.cols.redcap || []).forEach(function (r) { if (r.done !== 'Заполнено' && r.contact && r.contact <= td) out.push({ id: 'rc:' + r.id, ic: 'flask', lvl: r.contact < td ? 'due' : 'soon', t: LL('RedCap: связаться с пациентом', 'RedCap: contact the patient'), s: (r.fio || '') + ' · ' + fmtDate(r.contact), go: ['r', 'redcap', r.id] }); });
   (DB.cols.planner || []).forEach(function (r) { if ((r.surgeryDate === tm || r.surgeryDate === td) && r.status !== 'Отменено' && r.status !== 'Завершено') out.push({ id: 'op:' + r.id + ':' + r.surgeryDate, ic: 'knife', lvl: 'info', t: (r.surgeryDate === td ? LL('Операция сегодня: ', 'Surgery today: ') : LL('Операция завтра: ', 'Surgery tomorrow: ')) + (r.fio || ''), s: [r.dx, r.surgeon ? ov(r.surgeon) : ''].filter(Boolean).join(' · '), go: ['r', 'planner', r.id] }); });
-  (DB.cols.mdt || []).forEach(function (r) { if (r.date === td && r.status === 'Ожидает обсуждения') out.push({ id: 'mdt:' + r.id, ic: 'mdt', lvl: 'info', t: LL('Сегодня на МДГ: ', 'At MDT today: ') + (r.fio || ''), s: r.dx || '', go: ['r', 'mdt', r.id] }); });
+  (DB.cols.mdt || []).forEach(function (r) { if (r.date === td && mdtWaiting(r)) out.push({ id: 'mdt:' + r.id, ic: 'mdt', lvl: 'info', t: LL('Сегодня на МДГ: ', 'At MDT today: ') + (r.fio || ''), s: r.dx || '', go: ['r', 'mdt', r.id] }); });
   studies().forEach(function (r) {
     var pr = stProto(r);
     (pr.cps || []).forEach(function (c, i) { if (c.done || !c.date) return; var n = daysTo(c.date); if (n <= 14) out.push({ id: 'cp:' + r.id + ':' + i + ':' + c.date, ic: 'flag', lvl: n < 0 ? 'due' : 'soon', t: c.title || LL('Контрольная точка', 'Checkpoint'), s: regName(r) + ' · ' + daysLabel(n), go: ['s', r.id, 'cps'] }); });
@@ -3591,7 +3596,7 @@ function aiPatCtx(p) {
 function aiViewCtx(v) {
   if (v === 'home') return { key: 'v:home:' + isoOf(new Date()), title: LL('Утренний брифинг', 'Morning briefing'), data: briefText(), greet: 'Сделай утренний брифинг сектора: сначала что срочно сегодня (кому взять контрольные анализы, кто просрочен), затем операции и МДГ, затем наука. Коротко, по пунктам, с конкретными пациентами.', chips: [[LL('Приоритеты дня', 'Priorities'), 'Расставь задачи на сегодня по приоритету и предложи, кому из команды что поручить.'], [LL('Показатели качества', 'Quality'), 'Проанализируй показатели качества сектора относительно международных ориентиров (ESCP, ACS NSQIP, Dutch ColoRectal Audit) со ссылками.']] };
   if (v === 'col:mm') { var mm = DB.cols.mm.slice().sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); }); return { key: 'v:mm', title: 'M&M', data: 'Все разборы M&M (' + mm.length + '):\n' + mm.map(function (r, i) { return (i + 1) + '. ' + recText('mm', r, true); }).join('\n'), greet: 'Сделай общее саммари работы M&M: сколько разборов проведено и запланировано, какие типы случаев и осложнений, повторяющиеся паттерны, какие инициативы приняты. Затем 3-4 совета, что ещё внедрить, со ссылками на доказательства.', chips: [[LL('Повторяющиеся проблемы', 'Recurring issues'), 'Найди повторяющиеся проблемы и системные факторы во всех разборах.'], [LL('Отчёт за год', 'Annual report'), 'Составь годовой отчёт M&M сектора.']] }; }
-  if (v === 'col:mdt') { var md2 = DB.cols.mdt.filter(function (r) { return r.status === 'Ожидает обсуждения' || (r.date && daysTo(r.date) >= -7); }); return { key: 'v:mdt', title: LL('МДГ', 'MDT'), data: 'Ближайшие и ожидающие случаи МДГ (' + md2.length + '):\n' + md2.map(function (r, i) { return (i + 1) + '. ' + recText('mdt', r, true); }).join('\n'), greet: 'Кратко: сколько случаев ждёт МДГ, по каждому одной строкой, что нужно подготовить к заседанию.', chips: [[LL('Повестка', 'Agenda'), 'Составь повестку ближайшего заседания МДГ по приоритету.']] }; }
+  if (v === 'col:mdt') { var md2 = DB.cols.mdt.filter(function (r) { return mdtWaiting(r) || (r.date && daysTo(r.date) >= -7); }); return { key: 'v:mdt', title: LL('МДГ', 'MDT'), data: 'Ближайшие и ожидающие случаи МДГ (' + md2.length + '):\n' + md2.map(function (r, i) { return (i + 1) + '. ' + recText('mdt', r, true); }).join('\n'), greet: 'Кратко: сколько случаев ждёт МДГ, по каждому одной строкой, что нужно подготовить к заседанию.', chips: [[LL('Повестка', 'Agenda'), 'Составь повестку ближайшего заседания МДГ по приоритету.']] }; }
   if (v.indexOf('reg:') === 0 || v === 'fu') {
     var lr = v === 'fu' ? { reg: null, list: DB.patients } : listForReg(), rg = lr.reg;
     var sd = rg && rg.kind === 'study' ? '\nПротокол исследования: ' + JSON.stringify({ no: stProto(rg).no, type: stProto(rg).type, status: stProto(rg).status, target: stProto(rg).target, deadline: stProto(rg).deadline, synopsis: stProto(rg).syn, incl: stProto(rg).incl, excl: stProto(rg).excl, rand: stProto(rg).rand.on }) : '';
@@ -3766,11 +3771,20 @@ function routeCard(dr) {
 }
 /* решение МДГ, найденное в документе, задаёт маршрут: новое решение заменяет прежнее, прежнее уходит в историю */
 function applyMdg(p, m, src) {
-  if (!m) return null; var tr = (m.tracks || []).filter(function (k) { return trackOf(k); }); if (!tr.length && m.rec) tr = tracksFromText(m.rec); if (!tr.length) return null;
+  if (!m) return null;
+  if (S.drawer && S.drawer.p === p && (m.date || m.rec || m.no)) { var dq = S.drawer; dq.mdgQ = (dq.mdgQ || []).filter(function (x) { return !((x.date || '') === (m.date || '') && (x.no || '') === (m.no || '')); }).concat([{ date: m.date || '', no: m.no || '', rec: m.rec || '', src: src || '' }]); } var tr = (m.tracks || []).filter(function (k) { return trackOf(k); }); if (!tr.length && m.rec) tr = tracksFromText(m.rec); if (!tr.length) return null;
   var cur = p.route || { tracks: [] }; if (cur.date && m.date && m.date < cur.date) { cur.hist = (cur.hist || []).concat([{ date: m.date, no: m.no, rec: m.rec, tracks: tr }]); p.route = cur; return null; }
   if (cur.tracks && cur.tracks.length) cur.hist = (cur.hist || []).concat([{ date: cur.date, no: cur.no, rec: cur.rec, tracks: cur.tracks }]);
   p.route = { tracks: tr, date: m.date || '', no: m.no || '', rec: m.rec || '', src: src || '', hist: cur.hist || [] };
   return tr;
+}
+/* решение МДГ из документа любой карточки попадает и в журнал МДГ (одна запись на дату или номер МДГ) */
+function mdgUpsert(p, m) {
+  if (!m || !(m.date || m.rec)) return null; var list = DB.cols.mdt = DB.cols.mdt || [], k = fioKey(p.d.fio);
+  var ex = list.filter(function (r) { return r.pid === p.id && ((m.no && r.mrn === m.no) || (m.date && r.date === m.date)); })[0] || list.filter(function (r) { return !r.pid && m.date && r.date === m.date && k && fioKey(r.fio) === k; })[0];
+  if (ex) { if (m.rec && !has(ex.rec)) ex.rec = m.rec; if (m.no && !ex.mrn) ex.mrn = m.no; if (m.date && !ex.date) ex.date = m.date; if (!ex.iin && p.d.iin) ex.iin = p.d.iin; if (!ex.fio) ex.fio = p.d.fio; ex.pid = p.id; return ex; }
+  var r = { id: 'mdt_' + uid(''), fio: p.d.fio || '', iin: p.d.iin || '', date: m.date || '', mrn: m.no || '', rec: m.rec || '', pid: p.id, log: [{ ts: nowIso(), by: me(), act: 'create', note: LL('из документа в карточке: ', 'from a document in the record: ') + (m.src || ''), ch: [] }] };
+  Object.keys(r).forEach(function (x) { if (!has(r[x])) delete r[x]; }); list.push(r); return r;
 }
 function mdgFromText(tx) {
   var t0 = String(tx || ''); if (!/Заключение\s+(?:мультидисциплинарной\s+группы|МДГ)|МДТ\s+қорытынды/i.test(t0)) return null;
@@ -3779,7 +3793,7 @@ function mdgFromText(tx) {
   var obs = /\(Iб\)|\(II\)|\(III\)/.test(tail) && /3\)[^\n]*наблюдени[^\n]*:\s*([^\n]{3,200})/i.exec(tail);
   var rec = ((m && m[1]) || '').replace(/\s+/g, ' ').replace(/^Рекомендовано\s*:?\s*/i, '').replace(/Рекомендовано\s*:?\s*$/i, '').trim(); if (obs) rec += (rec ? '; ' : '') + obs[1].trim();
   if (!rec || rec.length < 3) return null;
-  var dm = /(?:Дата\s+составления\s+заключения\)?\s*:?\s*)(\d{2}\.\d{2}\.\d{4})/i.exec(t0), nm = /(?:Заключение\s+мультидисциплинарной\s+группы\s*\(МДГ\)\*?|№\s*МДГ)\s*:?\s*№?\s*(\d{3,6})/i.exec(t0.slice(0, 900));
+  var dm = /(?:Дата\s+составления\s+заключения\)?\s*:?\s*)(\d{2}\.\d{2}\.\d{4})/i.exec(t0), nm = /(?:Заключение\s+мультидисциплинарной\s+группы\s*\(МДГ\)\*?|№\s*МДГ)\s*:?\s*№?\s*(\d{1,8}(?:[\/-]\d{2,4})?)/i.exec(t0.slice(0, 900));
   return { date: dm ? dm[1].split('.').reverse().join('-') : '', no: nm ? nm[1] : '', rec: rec, tracks: tracksFromText(rec) };
 }
 /* ======================= Резюме: история болезни ======================= */
@@ -3896,7 +3910,7 @@ function briefing(forAI) {
   });
   var rk = { late: 0, now: 1, soon: 2 }; out.labs.sort(function (a, b) { return rk[a.st] - rk[b.st] || b.pod - a.pod; });
   DB.cols.planner.forEach(function (r) { if ((r.surgeryDate === td || r.surgeryDate === tm) && r.status !== 'Отменено') out.ops.push({ rid: r.id, when: r.surgeryDate === td ? LL('Сегодня', 'Today') : LL('Завтра', 'Tomorrow'), who: pubName(r.fio, r.pid), name: r.fio || '', what: [r.dx, r.surgeon ? ov(r.surgeon) : ''].filter(Boolean).join(' · ') }); });
-  DB.cols.mdt.forEach(function (r) { if (r.date === td) out.mdt.push(nm(r.fio, r.pid) + (r.status ? ' (' + ov(r.status) + ')' : '')); });
+  DB.cols.mdt.forEach(function (r) { if (r.date === td) out.mdt.push(nm(r.fio, r.pid) + (r.rec ? ': ' + String(r.rec).slice(0, 80) : ' (' + LL('ожидает решения', 'awaiting decision') + ')')); });
   fuDueAll().forEach(function (x) { if (x.f.st === 'overdue') out.due.push(LL('Контроль ', 'Follow-up ') + x.f.label + ': ' + nm(pName(x.p), x.p.id) + ', ' + daysLabel(x.f.days)); });
   qDueAll(0).forEach(function (x) { out.due.push(LL('Анкета ', 'Questionnaire ') + qShort(qTpl(x.e.tid)) + ': ' + nm(pName(x.p), x.p.id) + ', ' + daysLabel(x.n)); });
   DB.cols.redcap.forEach(function (r) { if (r.done !== 'Заполнено' && r.contact && r.contact <= td) out.due.push('RedCap: ' + nm(r.fio, r.pid) + ', ' + fmtDate(r.contact)); });
@@ -4098,7 +4112,7 @@ function renderHome() {
   var greet = hr < 5 ? LL('Доброй ночи', 'Good night') : hr < 12 ? LL('Доброе утро', 'Good morning') : hr < 18 ? LL('Добрый день', 'Good afternoon') : LL('Добрый вечер', 'Good evening');
   var inDept = DB.cols.planner.filter(function (r) { return inWard(r, td); }).length;
   var opsWeek = DB.cols.planner.filter(function (r) { return r.surgeryDate >= wsI && r.surgeryDate <= weI && r.status !== 'Отменено'; });
-  var mdtWait = DB.cols.mdt.filter(function (r) { return r.status === 'Ожидает обсуждения'; }).length;
+  var mdtWait = DB.cols.mdt.filter(mdtWaiting).length;
   var dateStr = new Date().toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   var first = String(me() || '').split(' ');
   var h = '<div class="h9"><section class="hero"><div class="hero-bg" style="background-image:url(media/nroc-hero-hd.webp)"></div><div class="hero-in"><div class="hero-k"><img src="media/nroc-logo-white.png" alt="NROC"><span>' + LL('Национальный научный онкологический центр · Астана', 'National Research Oncology Center · Astana') + '</span></div><h1>' + greet + (SESSION ? ', ' + esc(first[1] || first[0]) : '') + '</h1><p>' + LL('Колоректальная хирургия: регистр, операции и наука в одном месте.', 'Colorectal surgery: registry, operations and research in one place.') + '</p><div class="hero-date">' + esc(dateStr.charAt(0).toUpperCase() + dateStr.slice(1)) + '</div><div class="hero-act">' + (can('edit') ? '<button type="button" class="btn light" data-act="newp">' + ico('plus', 16) + LL('Новый пациент', 'New patient') + '</button>' : '') + '<button type="button" class="btn glass" data-act="aiopen">' + ico('sparkle', 16) + LL('Брифинг ИИ', 'AI briefing') + '</button><button type="button" class="btn glass" data-act="view" data-v="col:planner">' + ico('cal', 16) + LL('Планировщик', 'Planner') + '</button><button type="button" class="btn glass" data-act="view" data-v="studies">' + ico('flask', 16) + LL('Исследования', 'Studies') + '</button></div></div></section>';
@@ -4430,6 +4444,7 @@ document.addEventListener('click', function (ev) {
     case 'retroretry': { var ri = RETRO.items.filter(function (x) { return x.id === g('id'); })[0]; if (ri) { ri.st = 'wait'; ri.err = ''; ri.retried = false; } retroStart(); break; }
     case 'retroopen': case 'retroopeng': retroOpenGroup(g('id')); break;
     case 'retrorebuild': retroRebuild(); break;
+    case 'dxforceid': if (S.dx && S.dx.resume) { var fnr = S.dx.resume; S.dx.forceId = true; S.dx.resume = null; fnr(); } break;
     case 'retrosavesafe': retroSaveSafe(); break;
     case 'retroconfirm': retroConfirm(g('id')); break;
     case 'dxclose': if (S.dx && S.dx.step === 'run') break; S.dx = null; render(); break;
@@ -5692,8 +5707,17 @@ function dxNorm(x, v) {
   return { v: String(v).trim() };
 }
 function dxSame(a, b) { return JSON.stringify(Array.isArray(a) ? a.slice().sort() : String(a)) === JSON.stringify(Array.isArray(b) ? b.slice().sort() : String(b)); }
+function dxIdCheck(res, d) {
+  var F = {}; (res.fields || []).forEach(function (f) { if (f && f.id && !F[f.id]) F[f.id] = f; });
+  var dIin = F.iin ? String(F.iin.value || '').replace(/\D/g, '') : '', cIin = String(d.iin || '').replace(/\D/g, ''), dF = F.fio ? String(F.fio.value || '') : '', cF = String(d.fio || ''), bad = '';
+  if (dIin.length === 12 && cIin.length === 12 && dIin !== cIin) bad = 'iin';
+  else if (dF && cF && fioSur(dF) && fioSur(cF) && fioSur(dF) !== fioSur(cF)) bad = 'fio';
+  else if (dF && cF) { var a = nameTokens(dF), b = nameTokens(cF); if (a[1] && b[1] && a[1].length > 1 && b[1].length > 1 && a[1] !== b[1]) bad = 'fio'; }
+  return bad ? { why: bad, doc: [dF, dIin].filter(Boolean).join(', '), card: [cF, cIin].filter(Boolean).join(', ') } : null;
+}
 function dxApply(res, keep, local) {
   var dr = S.drawer, d = dr.p.d, rep = { doc: res.doc || {}, filled: [], same: [], conflict: [], rejected: [], issues: [], questions: (res.questions || []).filter(Boolean), missing: [] };
+  if (!(S.dx && S.dx.forceId)) { var idb = dxIdCheck(res, d); if (idb) { rep.idBlock = idb; rep.questions = []; return rep; } }
   dr.aiFilled = dr.aiFilled || {};
   (res.fields || []).forEach(function (r) {
     var x = FIELD[r.id]; if (!x || x.type === 'files') { if (r.id) rep.rejected.push({ id: r.id, label: r.id, why: LL('такого поля нет в карточке', 'no such field'), quote: r.quote, raw: r.value }); return; }
@@ -5767,13 +5791,16 @@ function dxRun() {
   }).then(function (o) {
     if (!S.dx || !S.drawer) return;
     dx.docText = o.text || ''; dx.usedAI = !!o.ai; dx.ans = ''; dx.qa = [];
+    var fin = function () { if (!S.dx || !S.drawer) return;
     o.res = dxDefaultNo(o.res, o.text, S.drawer.p.d);
     dx.rep = dxApply(o.res, dx.keep, o.local); dx.rep.src = o.src; dx.rep.fallback = o.fallback; dx.rep.file = dx.file.name; dx.rep.at = nowIso();
+    if (dx.rep.idBlock) { dx.resume = fin; dx.step = 'rep'; render(); return; }
     var mg0 = (o.res && o.res.mdg) || mdgFromText(o.text), tr0 = applyMdg(S.drawer.p, mg0, dx.file.name); if (tr0) dx.rep.mdg = { m: mg0, tracks: tr0 };
     var dr = S.drawer; dr.p.docsAI = (dr.p.docsAI || []).concat([{ name: dx.file.name, at: dx.rep.at, by: me(), src: o.src, n: dx.rep.filled.length }]);
     dx.step = 'rep'; render();
     docArchive(S.drawer.p, dx.file.name, dx.docText || '', (o.res && o.res.doc && o.res.doc.summary) || '');
     sumLater(S.drawer, LL('документ «', 'document «') + dx.file.name + '»', '(в архиве документов)');
+    }; fin();
   }).catch(function (e) { if (!S.dx) return; dx.step = 'err'; dx.err = (e && e.message) || String(e); render(); });
 }
 /* пакетная загрузка: документы разбираются по очереди, результат складывается в одну сводку */
@@ -5791,6 +5818,7 @@ function dxRunMany() {
       log(LL('Документ ', 'Document ') + (i + 1) + LL(' из ', ' of ') + n + ': «' + file.name + '»');
       return dxReadFile(file).then(function (doc) { return dxExtract(doc, dx.mode, log); }).then(function (o) {
         if (!S.dx || S.dx !== dx || !S.drawer) return;
+        var idb2 = dxIdCheck(o.res, S.drawer.p.d); if (idb2) { all.issues.push({ id: '', label: '', kind: 'identity', text: '[' + file.name + '] ' + LL('похоже, документ другого пациента (в документе: ', 'looks like another patient (document: ') + idb2.doc + LL('; в карточке: ', '; record: ') + idb2.card + LL('). Данные из него не внесены.', '). Not applied.') }); types.push(file.name + LL(': другой пациент, пропущен', ': other patient, skipped')); return; }
         var mg2 = mdgFromText(o.text), tr2 = applyMdg(S.drawer.p, mg2, file.name); if (tr2) all.mdg = { m: mg2, tracks: tr2 };
         var r = dxApply(o.res, dx.keep, o.local), tag = function (x) { x.note = (x.note ? x.note + '. ' : '') + file.name; x.file = file.name; return x; };
         all.filled = all.filled.concat(r.filled.map(tag)); all.conflict = all.conflict.concat(r.conflict.map(tag)); all.rejected = all.rejected.concat(r.rejected.map(tag));
@@ -5833,8 +5861,10 @@ function dxRunManyAI(files, log) {
       res.fields = res.fields || [];
       docs.forEach(function (d) { if (d.text && !d.scanned) { try { res = dxMerge(res, dxRules(d)); } catch (e) {} } });
       var allText = docs.map(function (d) { return '=== ДОКУМЕНТ «' + d.name + '» ===\n' + (d.text || ''); }).join('\n\n');
+      var fin = function () { if (!S.dx || !S.drawer) return;
       res = dxDefaultNo(res, allText, S.drawer.p.d, true);
       var r = dxApply(res, dx.keep, AI.prov === 'local');
+      if (r.idBlock) { r.src = AI_PROV[AI.prov].name + ' · ' + AI.model; r.file = LL('документов: ', 'documents: ') + docs.length; r.at = nowIso(); dx.rep = r; dx.docs = docs; dx.docText = allText; dx.resume = fin; dx.step = 'rep'; render(); return; }
       var mg1 = res.mdg || null; if (!mg1) docs.forEach(function (d) { var x = mdgFromText(d.text); if (x && (!mg1 || (x.date || '') >= (mg1.date || ''))) mg1 = x; }); var tr1 = applyMdg(S.drawer.p, mg1, LL('пакет документов', 'batch')); if (tr1) r.mdg = { m: mg1, tracks: tr1 };
       r.src = AI_PROV[AI.prov].name + ' · ' + AI.model + LL(' · пакет, документы сверены между собой', ' · batch, cross-checked');
       r.file = LL('документов: ', 'documents: ') + docs.length; r.at = nowIso();
@@ -5843,6 +5873,7 @@ function dxRunManyAI(files, log) {
       dx.rep = r; dx.docs = docs; dx.doc = null; dx.docText = allText; dx.usedAI = true; dx.ans = ''; dx.qa = []; dx.step = 'rep'; render();
       docs.forEach(function (d) { docArchive(S.drawer.p, d.name, d.text || '', ''); });
       sumLater(S.drawer, LL('документы: ', 'documents: ') + docs.map(function (d) { return d.name; }).join(', '), '(в архиве документов)');
+      }; fin();
     });
   }).catch(function (e) { if (!S.dx) return; dx.step = 'err'; dx.err = LL('ИИ не ответил: ', 'AI failed: ') + ((e && e.message) || String(e)) + LL('. Карточка не изменена.', '. Record unchanged.'); render(); });
 }
@@ -5928,6 +5959,7 @@ function renderDx() {
   var probs = r.issues.length + r.rejected.length;
   h += '<section class="modal dxrep" role="dialog" aria-modal="true"><div class="dhead"><div><div class="dh-title">' + ico('sparkle', 18) + LL('Сводка заполнения из документа', 'Document extraction summary') + '</div><div class="hint">' + esc(r.file) + ' · ' + esc(r.src) + '</div></div><button type="button" class="iconbtn" data-act="dxclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
   if (dx.docText) h += '<details class="dxtext"><summary>' + LL('Показать текст, который удалось прочитать из документа', 'Show text read from the document') + '</summary><pre>' + esc(dx.docText.slice(0, 40000)) + '</pre></details>';
+  if (r.idBlock) h += '<div class="dxprov warn idblock" style="margin-bottom:12px">' + ico('alert', 18) + '<div><b>' + LL('Похоже, это документ другого пациента. Данные НЕ внесены.', 'This looks like another patient. Nothing was applied.') + '</b><span>' + LL('В документе: ', 'In document: ') + '<b>' + esc(r.idBlock.doc) + '</b>. ' + LL('В карточке: ', 'In record: ') + '<b>' + esc(r.idBlock.card) + '</b>. ' + LL('Не совпадает ', 'Mismatch: ') + (r.idBlock.why === 'iin' ? LL('ИИН', 'IIN') : LL('ФИО', 'name')) + '.</span><div class="actions"><button type="button" class="btn small" data-act="dxforceid">' + LL('Это тот же пациент, внести данные', 'Same patient, apply anyway') + '</button></div></div></div>';
   if (r.mdg) h += '<div class="dxprov ok" style="margin-bottom:12px">' + ico('mdt', 16) + '<div><b>' + LL('Решение МДГ', 'MDT decision') + (r.mdg.m.date ? LL(' от ', ' of ') + fmtDate(r.mdg.m.date) : '') + (r.mdg.m.no ? ' № ' + esc(r.mdg.m.no) : '') + ': ' + esc(r.mdg.m.rec || '') + '</b><span>' + LL('Пациент попадёт в разделы: ', 'Patient goes to: ') + r.mdg.tracks.map(function (k) { var t1 = trackOf(k); return t1 ? esc(LL(t1.ru, t1.en)) : k; }).join(', ') + LL(' (после сохранения карточки). Изменить можно во вкладке «Прочее» → «Маршрут лечения».', ' (after saving).') + '</span></div></div>';
   if (r.fallback) h += '<div class="dxprov warn" style="margin-bottom:12px">' + ico('alert', 16) + '<div><b>' + LL('Обработано без ИИ', 'Processed without AI') + '</b><span>' + esc(r.fallback) + '</span></div></div>';
   if (r.match) h += '<div class="dxprov ok" style="margin-bottom:12px">' + ico('users', 16) + '<div><b>' + esc(r.match) + '</b></div></div>';
@@ -6141,15 +6173,16 @@ function retroMove(itemId, target) {
   it.weak = false; it.how = LL('перенесён вручную', 'moved manually'); retroRebuild();
 }
 function retroConfirm(itemId) { var it = RETRO.items.filter(function (x) { return x.id === itemId; })[0]; if (!it || RETRO.run) return; retroFreeze(); it.weak = false; it.how = LL('подтверждено вручную', 'confirmed manually'); retroRebuild(); }
-function retroOpenGroup(gid, silent) {
+function retroOpenGroup(gid, silent, force) {
   var g = RETRO.groups.filter(function (x) { return x.id === gid; })[0]; if (!g || !g.res) return false;
   var pid = g.pid && DB.patients.some(function (p) { return p.id === g.pid; }) ? g.pid : null;
   openPatient(pid, pid ? null : {}, { noCtx: true });
   var dr = S.drawer; dr.retroGroup = g.id;
   var docs = retroDocs(g).map(function (d) { return d.docObj; }).filter(Boolean);
   var res = dxDefaultNo(JSON.parse(JSON.stringify(g.res)), g.text || '', dr.p.d, docs.length > 1);
-  S.dx = { step: 'rep', keep: RETRO.keep, docs: docs, docText: g.text || '' };
-  var r = dxApply(res, RETRO.keep, g.local); r.src = g.src; r.file = LL('документов: ', 'documents: ') + docs.length + ' (' + docs.map(function (d) { return d.name; }).join(', ') + ')'; r.at = nowIso();
+  S.dx = { step: 'rep', keep: RETRO.keep, docs: docs, docText: g.text || '', forceId: !!force };
+  var r = dxApply(res, RETRO.keep, g.local);
+  if (r.idBlock) { r.src = g.src; r.file = LL('документов: ', 'documents: ') + docs.length; S.dx.rep = r; S.dx.resume = function () { retroOpenGroup(gid, false, true); }; if (!silent) render(); return false; } r.src = g.src; r.file = LL('документов: ', 'documents: ') + docs.length + ' (' + docs.map(function (d) { return d.name; }).join(', ') + ')'; r.at = nowIso();
   r.match = (pid ? LL('Документы отнесены к карточке ', 'Matched to record ') + pid + ' (' + g.mhow + ')' : g.mhow) + '. ' + LL('Группа: ', 'Group: ') + g.how + '.';
   var wr = (g.warn || []).concat(g.xwarn || []); if (wr.length) r.issues = wr.map(function (x) { return { id: '', label: '', kind: 'identity', text: LL('Идентификация: ', 'Identity: ') + x }; }).concat(r.issues || []);
   if (g.mdg) { var tr = applyMdg(dr.p, g.mdg, LL('пакет документов', 'batch')); if (tr) r.mdg = { m: g.mdg, tracks: tr }; }
@@ -6167,7 +6200,7 @@ function retroSaveSafe() {
   var ok = 0, stop = null;
   list.forEach(function (g) {
     if (stop) return;
-    if (!retroOpenGroup(g.id, true)) return;
+    if (!retroOpenGroup(g.id, true)) { S.drawer = null; S.dx = null; return; }
     S.dx = null; savePatient();
     if (S.drawer) { stop = g; } else ok++;
   });
