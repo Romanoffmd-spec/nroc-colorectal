@@ -1909,14 +1909,27 @@ html[data-theme="dark"] .rt-view mark,html[data-theme="dark"] .rt-hl{background:
 .rg-docs{width:100%;border-collapse:collapse;font-size:13px}.rg-docs td{padding:5px 4px;border-top:1px solid var(--line2);vertical-align:top}.rg-docs td:first-child svg{vertical-align:-2px;margin-right:5px;color:var(--muted)}
 .rg-docs tr.weak td:first-child{background:var(--warn-soft,#fff8eb)}.rg-docs select{max-width:180px;font-size:12px}.rg-docs .btn{margin-left:4px}
 .rg-f{display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:2px}
+
+/* «Нет информации» */
+.f-na .na-v{display:flex;align-items:center;gap:6px;min-height:36px;padding:0 10px;border:1px dashed var(--line);border-radius:var(--r,4px);background:var(--surface-2);color:var(--muted);font-size:13px;font-style:italic}
+.f-na .na-v .linkbtn{margin-left:auto;font-style:normal;font-size:12px}
+.na-set{display:none;margin-top:4px;border:0;background:transparent;color:var(--navy);font-size:11.5px;padding:0;cursor:pointer;text-decoration:underline dotted}
+.fld:focus-within .na-set{display:inline-block}
+
+/* файлы пациента */
+.pfiles.over{outline:2px dashed var(--navy);outline-offset:-4px}
+.pfiles .filechip em{font-style:normal;font-size:11.5px;color:var(--muted);margin-left:4px}
+.pfx{border:0;background:transparent;color:var(--muted);padding:2px;margin-left:2px;cursor:pointer;display:inline-flex;border-radius:4px}.pfx:hover{color:var(--due);background:var(--surface-3)}
+.dxpf{display:flex;flex-direction:column;gap:4px;margin:10px 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r,4px);background:var(--surface-2);max-height:220px;overflow:auto}
+.dxpf>b{display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:2px}.dxpf em{font-style:normal;font-size:11.5px;color:var(--muted)}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <input type="file" id="importFile" accept=".json,.js,application/json,text/javascript" hidden>
-<script src="firebase-config.js?v=80d9f8c5"></script>
-<script src="i18n.js?v=80d9f8c5"></script>
-<script src="ai-corpus.js?v=80d9f8c5"></script>
-<script src="app.js?v=80d9f8c5"></script>
+<script src="firebase-config.js?v=cb1e2149"></script>
+<script src="i18n.js?v=cb1e2149"></script>
+<script src="ai-corpus.js?v=cb1e2149"></script>
+<script src="app.js?v=cb1e2149"></script>
 </body>
 </html>
