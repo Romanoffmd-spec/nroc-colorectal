@@ -1731,6 +1731,7 @@ function savePatient() {
   Object.keys(d).forEach(function (k) { if (!has(d[k])) delete d[k]; });
   DB.registries.forEach(function (r) { if (r.mode !== 'manual') return; var i = r.members.indexOf(p.id); if (dr.members[r.id] && i < 0) r.members.push(p.id); if (!dr.members[r.id] && i >= 0) r.members.splice(i, 1); });
   delete dr.errs; logPatient(dr);
+  if (dr.retroGroup) retroSaved(dr.retroGroup, p.id);
   if (dr.isNew) { p.created = nowIso(); DB.patients.push(p); DB.seq++; } else DB.patients = DB.patients.map(function (x) { return x.id === p.id ? p : x; });
   if (dr.linkRec) { var lr = DB.cols[dr.linkRec.k].filter(function (x) { return x.id === dr.linkRec.id; })[0]; if (lr) lr.pid = p.id; }
   if (dr.qlAttach) { var qr0 = (QL.resp || []).filter(function (x) { return x.id === dr.qlAttach; })[0]; if (qr0) { qlAttach(qr0, p); if (CLOUD.db) CLOUD.db.collection('qresp').doc(qr0.id).update({ status: 'done', pid: p.id, doneAt: nowIso(), doneBy: me() }).catch(function () {}); QL.resp = QL.resp.filter(function (x) { return x.id !== qr0.id; }); } }
@@ -4424,10 +4425,13 @@ document.addEventListener('click', function (ev) {
     case 'retromode': { var kr = root.querySelector('#retrokeep'), ar = root.querySelector('#retroagree'); if (kr) RETRO.keep = kr.checked; if (ar) RETRO.agree = ar.checked; RETRO.mode = g('v'); render(); break; }
     case 'retrostart': { var rk = root.querySelector('#retrokeep'), ra = root.querySelector('#retroagree'); RETRO.keep = rk ? rk.checked : true; RETRO.agree = ra ? ra.checked : false; retroStart(); break; }
     case 'retrostop': RETRO.run = false; render(); break;
-    case 'retroclear': RETRO.items = []; render(); break;
-    case 'retrodel': RETRO.items = RETRO.items.filter(function (x) { return x.id !== g('id'); }); render(); break;
+    case 'retroclear': RETRO.items = []; RETRO.groups = []; RETRO.pinMeta = {}; render(); break;
+    case 'retrodel': RETRO.items = RETRO.items.filter(function (x) { return x.id !== g('id'); }); if (RETRO.groups.length) retroGroup(); render(); break;
     case 'retroretry': { var ri = RETRO.items.filter(function (x) { return x.id === g('id'); })[0]; if (ri) { ri.st = 'wait'; ri.err = ''; ri.retried = false; } retroStart(); break; }
-    case 'retroopen': retroOpen(g('id')); break;
+    case 'retroopen': case 'retroopeng': retroOpenGroup(g('id')); break;
+    case 'retrorebuild': retroRebuild(); break;
+    case 'retrosavesafe': retroSaveSafe(); break;
+    case 'retroconfirm': retroConfirm(g('id')); break;
     case 'dxclose': if (S.dx && S.dx.step === 'run') break; S.dx = null; render(); break;
     case 'dxrun': { var kp = root.querySelector('#dxkeep'), ag = root.querySelector('#dxagree'); S.dx.keep = kp ? kp.checked : true; S.dx.agree = ag ? ag.checked : false; dxRun(); break; }
     case 'dxback': S.dx.step = 'pick'; render(); break;
@@ -4681,7 +4685,8 @@ document.addEventListener('input', function (ev) {
 document.addEventListener('change', function (ev) {
   var tg = ev.target, b = tg.getAttribute('data-bind');
   if (tg.id === 'retrofiles') { retroAdd(tg.files); tg.value = ''; return; }
-  if (tg.getAttribute('data-act') === 'retropick') { var rp = RETRO.items.filter(function (x) { return x.id === tg.getAttribute('data-id'); })[0]; if (rp) rp.pid = tg.value || null; render(); return; }
+  if (tg.getAttribute('data-retrogp')) { var rg0 = RETRO.groups.filter(function (x) { return x.id === tg.getAttribute('data-retrogp'); })[0]; if (rg0) { rg0.pid = tg.value || null; rg0.pidManual = true; } render(); return; }
+  if (tg.getAttribute('data-retromv')) { if (tg.value) retroMove(tg.getAttribute('data-retromv'), tg.value); return; }
   if (tg.id === 'dxfile' && S.dx) { var kp0 = root.querySelector('#dxkeep'), ag0 = root.querySelector('#dxagree'); if (kp0) S.dx.keep = kp0.checked; if (ag0) S.dx.agree = ag0.checked; S.dx.files = tg.files ? Array.prototype.slice.call(tg.files) : []; S.dx.file = S.dx.files[0] || null; render(); return; }
   if (tg.getAttribute('data-act') === 'dflt') { if (tg.value) dfltOf()[tg.getAttribute('data-id')] = tg.value; else delete dfltOf()[tg.getAttribute('data-id')]; saveUI(); render(); return; }
   if (tg.getAttribute('data-act') === 'flt') { if (tg.value) fltOf()[tg.getAttribute('data-id')] = tg.value; else delete fltOf()[tg.getAttribute('data-id')]; saveUI(); render(); return; }
@@ -5350,7 +5355,7 @@ var DX_BATCH = 'ЭТО ПАКЕТ ИЗ НЕСКОЛЬКИХ ДОКУМЕНТОВ
 function dxCallMany(docs, schema, extra, sysO, promptO) {
   var pv = AI.prov, inline = function (d) { return d.kind === 'image' || (d.kind === 'pdf' && (d.scanned || !d.text || d.text.replace(/\s/g, '').length < 400)); };
   var body = docs.map(function (d, i) { return '=== ДОКУМЕНТ ' + (i + 1) + ' из ' + docs.length + ': «' + d.name + '» ===\n' + (inline(d) ? '(см. приложенный файл ' + (i + 1) + ')' : String(d.text || '').slice(0, Math.floor(150000 / docs.length))); }).join('\n\n');
-  var prompt = promptO ? promptO.replace('{DOCS}', body) : DX_BATCH + '\n\nСХЕМА КАРТОЧКИ (id | название | тип | варианты):\n' + schema + '\n\n' + body + (extra ? '\n\n' + extra : '') + '\n\nВерни один JSON по формату для всего пакета.', SYS = sysO || SYS;
+  var prompt = promptO ? promptO.replace('{DOCS}', body) : DX_BATCH + '\n\nСХЕМА КАРТОЧКИ (id | название | тип | варианты):\n' + schema + '\n\n' + body + (extra ? '\n\n' + extra : '') + '\n\nВерни один JSON по формату для всего пакета.', SYS = sysO || dxSys();
   if (AI.coolUntil && Date.now() < AI.coolUntil) return Promise.reject(new Error(aiQuotaMsg()));
   var fail = function (r) { return r.json().then(function (j) { throw new Error(aiErrMsg(j, 'HTTP ' + r.status)); }, function () { throw new Error('HTTP ' + r.status); }); };
   if (pv === 'gemini') {
@@ -5947,81 +5952,271 @@ function renderDx() {
 }
 
 /* ======================= Retro batch: many documents → cards ======================= */
-var RETRO = { items: [], run: false, keep: true, agree: false, mode: null };
-function retroMatch(res) {
-  var F = {}; (res.fields || []).forEach(function (r) { F[r.id] = r.value; });
-  var fio = F.fio ? String(F.fio) : '', dob = F.dob ? (dxNorm(FIELD.dob, F.dob).v || '') : '', ib = F.ib ? String(F.ib).trim() : '';
-  var who = { fio: fio, dob: dob, ib: ib };
-  if (ib) { var byIb = DB.patients.filter(function (p) { return p.d.ib && String(p.d.ib).trim() === ib; }); if (byIb.length === 1) return { who: who, p: byIb[0], how: LL('по № ИБ', 'by case no.') }; }
-  var tk = nameTokens(fio); if (!tk.length) return { who: who, p: null, how: LL('ФИО не найдено в документе', 'no name in document') };
-  var c = DB.patients.filter(function (p) { var pt = nameTokens(p.d.fio); if (!pt.length || pt[0] !== tk[0]) return false; if (tk[1] && pt[1] && pt[1][0] !== tk[1][0]) return false; if (dob && p.d.dob && p.d.dob !== dob) return false; return true; });
-  if (c.length === 1) return { who: who, p: c[0], how: dob && c[0].d.dob === dob ? LL('по ФИО и дате рождения', 'by name and DOB') : LL('по ФИО', 'by name') };
-  if (c.length > 1) return { who: who, p: null, cand: c, how: LL('несколько похожих карточек: выберите вручную', 'several similar records: choose manually') };
-  return { who: who, p: null, how: LL('совпадений нет: будет создана новая карточка', 'no match: a new record will be created') };
+var RETRO = { items: [], groups: [], run: false, keep: true, agree: false, mode: null, phase: '' };
+/* ---------- ИИН Казахстана: контрольная цифра, дата рождения и пол ---------- */
+function iinValid(s) {
+  s = String(s || ''); if (!/^\d{12}$/.test(s)) return false;
+  var a = s.split('').map(Number), w1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], w2 = [3, 4, 5, 6, 7, 8, 9, 10, 11, 1, 2], c = 0, i;
+  for (i = 0; i < 11; i++) c += a[i] * w1[i]; c %= 11;
+  if (c === 10) { c = 0; for (i = 0; i < 11; i++) c += a[i] * w2[i]; c %= 11; if (c === 10) return false; }
+  return c === a[11];
+}
+function iinInfo(s) {
+  if (!iinValid(s)) return null; var cent = { 1: 1800, 2: 1800, 3: 1900, 4: 1900, 5: 2000, 6: 2000 }[s.charAt(6)], o = {};
+  if (cent) { var y = cent + +s.slice(0, 2), m = s.slice(2, 4), d = s.slice(4, 6), dt0 = new Date(y + '-' + m + '-' + d + 'T00:00:00'); if (!isNaN(dt0) && dt0.getMonth() + 1 === +m) o.dob = y + '-' + m + '-' + d; o.sex = +s.charAt(6) % 2 ? 'М' : 'Ж'; }
+  return o;
+}
+function iinAll(tx) { var out = []; String(tx || '').replace(/(?:^|\D)(\d{12})(?!\d)/g, function (m0, x) { if (iinValid(x) && out.indexOf(x) < 0) out.push(x); return m0; }); return out; }
+/* ---------- ФИО: сравнение без учёта регистра, ё/е и казахских букв ---------- */
+function fioKey(fio) { var t0 = nameTokens(fio).filter(function (w) { return w.length > 1; }); return t0.length >= 2 ? t0[0] + ' ' + t0[1] : ''; }
+function fioSur(fio) { var t0 = nameTokens(fio); return t0[0] || ''; }
+function fioFull(fio) { return nameTokens(fio).filter(function (w) { return w.length > 1; }).length >= 2; }
+function ibNorm(x) { return String(x || '').replace(/\s+/g, '').replace(/^№/, '').toLowerCase(); }
+var RETRO_ID_SYS = 'Ты определяешь, к какому пациенту относится медицинский документ (выписка, протокол, гистология, МДГ, консультация, анализы). Верни ТОЛЬКО JSON: {"fio":"Фамилия Имя Отчество пациента как в документе","iin":"12 цифр ИИН пациента или пусто","dob":"YYYY-MM-DD или пусто","ib":"№ истории болезни или медицинской карты пациента или пусто","docType":"вид документа кратко","docDate":"YYYY-MM-DD дата документа или пусто","others":["ФИО других пациентов, если в документе есть данные ещё о ком-то, кроме основного пациента"]}. Не путай пациента с врачами, членами комиссии, заведующими, родственниками и контактными лицами. Если пациент не указан, верни пустые строки. Ничего не придумывай.';
+/* шаг 1: опознать пациента в каждом файле */
+function retroIdentify(it) {
+  return dxReadFile(it.file).then(function (doc) {
+    it.docObj = doc; it.doc = { kind: doc.kind, pages: doc.pages, scanned: doc.scanned };
+    var needOcr = (doc.scanned || doc.kind === 'image') && !(RETRO.mode === 'ai' && aiReady());
+    var p0 = Promise.resolve();
+    if (needOcr) { it.note = LL('распознаю скан (OCR)…', 'OCR…'); render(); p0 = dxOCR(doc, function (pr, i, n) { if (i) { it.note = 'OCR ' + i + '/' + n; render(); } }).then(function (t1) { doc.text = t1; doc.ocr = true; }); }
+    return p0.then(function () {
+      var idn = { fio: '', iin: '', dob: '', ib: '', docType: '', docDate: '', src: LL('шаблоны', 'patterns'), weakFio: false, iins: [], others: [] };
+      if (doc.text) {
+        var rr = { fields: [] }; try { rr = dxRules(doc); } catch (e) {}
+        var F = {}; (rr.fields || []).forEach(function (f) { if (!F[f.id]) F[f.id] = f; });
+        if (F.fio) { idn.fio = String(F.fio.value || ''); idn.weakFio = (F.fio.confidence || 0) < 0.8; }
+        if (F.dob) idn.dob = dxNorm(FIELD.dob, F.dob.value).v || '';
+        if (F.ib) idn.ib = String(F.ib.value || '').trim();
+        idn.iins = iinAll(doc.text);
+        if (F.iin && iinValid(String(F.iin.value))) idn.iin = String(F.iin.value); else if (idn.iins.length === 1) idn.iin = idn.iins[0];
+        if (rr.doc) { idn.docType = /без ИИ|without AI/i.test(rr.doc.type || '') ? '' : rr.doc.type || ''; idn.docDate = rr.doc.date || ''; }
+      }
+      var useAI = RETRO.mode === 'ai' && aiReady() && (!doc.text || doc.scanned || doc.kind === 'image' || !idn.iin || idn.weakFio || idn.iins.length > 1);
+      if (!useAI) return idn;
+      it.st = 'ai'; it.note = LL('ИИ определяет пациента…', 'AI identifying patient…'); render();
+      return dxCallMany([doc], '', '', RETRO_ID_SYS, 'Документ:\n\n{DOCS}\n\nВерни JSON.').then(dxParseJSON).then(function (j) {
+        var ai = { fio: String(j.fio || '').trim(), iin: String(j.iin || '').replace(/\D/g, ''), dob: j.dob ? (dxNorm(FIELD.dob, j.dob).v || '') : '', ib: String(j.ib || '').trim() };
+        if (ai.fio) { idn.fio = ai.fio; idn.weakFio = false; }
+        if (ai.iin && iinValid(ai.iin)) { if (idn.iin && idn.iin !== ai.iin) idn.warn = LL('ИИН в тексте и по мнению ИИ различаются', 'IIN mismatch between text and AI'); idn.iin = ai.iin; } else if (ai.iin && !idn.iin) idn.badIin = ai.iin;
+        if (ai.dob && !idn.dob) idn.dob = ai.dob; if (ai.ib && !idn.ib) idn.ib = ai.ib;
+        idn.docType = j.docType || idn.docType; idn.docDate = (j.docDate && dxNorm(FIELD.dob, j.docDate).v) || idn.docDate; idn.others = (j.others || []).filter(Boolean).slice(0, 5); idn.src = AI_PROV[AI.prov].name;
+        return idn;
+      }).catch(function (e) { idn.aiErr = (e && e.message) || String(e); return idn; });
+    }).then(function (idn) {
+      var inf = idn.iin ? iinInfo(idn.iin) : null;
+      if (inf && inf.dob) { if (idn.dob && idn.dob !== inf.dob) idn.warn = (idn.warn ? idn.warn + '. ' : '') + LL('дата рождения в документе не совпадает с ИИН', 'DOB differs from IIN'); if (!idn.dob) idn.dob = inf.dob; }
+      if (idn.iins.length > 1) idn.warn = (idn.warn ? idn.warn + '. ' : '') + LL('в документе несколько ИИН: ', 'several IINs in document: ') + idn.iins.length;
+      if (idn.others && idn.others.length) idn.warn = (idn.warn ? idn.warn + '. ' : '') + LL('в документе есть данные других людей: ', 'other people in document: ') + idn.others.join(', ');
+      it.idn = idn; it.st = 'id'; it.note = ''; render();
+    });
+  });
+}
+/* шаг 2: группировка документов по пациентам */
+function retroGroup() {
+  var items = RETRO.items.filter(function (x) { return x.idn; }), groups = [], byIin = {}, gid = function () { return uid('g'); };
+  function mk(it, how, strength) { var g = { id: gid(), items: [it.id], how: how, st: 'wait', warn: [] }; groups.push(g); it.gid = g.id; it.weak = strength !== 'strong'; return g; }
+  function add(g, it, weak, how) { g.items.push(it.id); it.gid = g.id; it.weak = !!weak; it.how = how; }
+  function docsOf(g) { return g.items.map(function (id) { return RETRO.items.filter(function (x) { return x.id === id; })[0]; }).filter(Boolean); }
+  /* закреплённые вручную переносы сохраняются */
+  var manual = items.filter(function (it) { return it.pin; });
+  items.forEach(function (it) { delete it.gid; });
+  var PM = RETRO.pinMeta || {};
+  manual.forEach(function (it) { var g = groups.filter(function (z) { return z.pinKey === it.pin; })[0], meta = PM[it.pin] || {}; if (!g) { g = { id: meta.gid || gid(), items: [], how: meta.how || LL('вручную', 'manual'), st: 'wait', warn: [], pinKey: it.pin }; if (meta.iin) g.iin = meta.iin; groups.push(g); } g.items.push(it.id); it.gid = g.id; });
+  var rest = items.filter(function (it) { return !it.pin; });
+  /* 1) ИИН */
+  rest.filter(function (it) { return it.idn.iin; }).forEach(function (it) { var g = byIin[it.idn.iin]; if (g) add(g, it, false, LL('по ИИН', 'by IIN')); else { g = mk(it, LL('по ИИН', 'by IIN'), 'strong'); g.iin = it.idn.iin; byIin[it.idn.iin] = g; it.how = LL('по ИИН', 'by IIN'); } });
+  /* 2) без ИИН: № ИБ, затем ФИО + дата рождения, затем только ФИО (слабо) */
+  rest.filter(function (it) { return !it.idn.iin; }).forEach(function (it) {
+    var idn = it.idn, k = fioKey(idn.fio), ib = ibNorm(idn.ib), hit;
+    if (ib) { hit = groups.filter(function (g) { return docsOf(g).some(function (d) { return ibNorm(d.idn.ib) === ib && (!k || !fioKey(d.idn.fio) || fioKey(d.idn.fio) === k); }); }); if (hit.length === 1) { add(hit[0], it, false, LL('по № ИБ', 'by case no.')); return; } }
+    if (k && idn.dob) { hit = groups.filter(function (g) { return docsOf(g).some(function (d) { return fioKey(d.idn.fio) === k && d.idn.dob === idn.dob; }); }); if (hit.length === 1) { add(hit[0], it, false, LL('по ФИО и дате рождения', 'by name and DOB')); return; } }
+    if (k) { hit = groups.filter(function (g) { var ds = docsOf(g); return ds.some(function (d) { return fioKey(d.idn.fio) === k; }) && !ds.some(function (d) { return d.idn.dob && idn.dob && d.idn.dob !== idn.dob; }); }); if (hit.length === 1) { add(hit[0], it, true, LL('только по ФИО: проверьте', 'by name only: check')); return; } }
+    if (k) { mk(it, idn.dob ? LL('по ФИО и дате рождения', 'by name and DOB') : LL('только по ФИО', 'by name only'), idn.dob && !idn.weakFio ? 'strong' : 'weak'); it.how = LL('новая группа', 'new group'); return; }
+    mk(it, LL('пациент не определён', 'patient not identified'), 'none'); it.how = LL('ни ФИО, ни ИИН не найдены', 'no name or IIN found');
+  });
+  /* сводные данные группы, предупреждения и поиск карточки в базе */
+  var old = RETRO.groups;
+  groups.forEach(function (g) {
+    var ds = docsOf(g), pick = function (f) { var v = ''; ds.forEach(function (d) { if (!v && d.idn[f]) v = d.idn[f]; }); return v; };
+    g.who = { fio: (ds.filter(function (d) { return fioFull(d.idn.fio) && !d.idn.weakFio; })[0] || ds.filter(function (d) { return d.idn.fio; })[0] || { idn: {} }).idn.fio || '', iin: g.iin || pick('iin'), dob: pick('dob'), ib: pick('ib') };
+    var ks = {}; ds.forEach(function (d) { var k = fioKey(d.idn.fio); if (k) ks[k] = d.idn.fio; });
+    if (Object.keys(ks).length > 1) g.warn.push(LL('ФИО в документах различаются: ', 'Names differ: ') + Object.keys(ks).map(function (k) { return ks[k]; }).join(' / ') + LL(' (возможна смена фамилии или опечатка; если это разные люди, разнесите документы)', ' (name change or typo? split if different people)'));
+    var dobs = {}; ds.forEach(function (d) { if (d.idn.dob) dobs[d.idn.dob] = 1; }); if (Object.keys(dobs).length > 1) g.warn.push(LL('разные даты рождения в документах: ', 'different DOBs: ') + Object.keys(dobs).map(fmtDate).join(', '));
+    ds.forEach(function (d) { if (d.idn.warn) g.warn.push(d.file.name + ': ' + d.idn.warn); if (d.idn.badIin) g.warn.push(d.file.name + LL(': ИИН «', ': IIN «') + d.idn.badIin + LL('» не проходит проверку контрольной цифры, не использован', '» fails the check digit, ignored')); });
+    g.unknown = ds.every(function (d) { return !d.idn.iin && !fioKey(d.idn.fio) && !d.pinNew; });
+    g.strength = g.unknown ? 'none' : ds.some(function (d) { return d.weak; }) ? 'weak' : 'strong';
+    if (!g.iin) { var iins = {}; ds.forEach(function (d) { if (d.idn.iin) iins[d.idn.iin] = 1; }); var ik = Object.keys(iins); if (ik.length === 1) g.iin = ik[0]; else if (ik.length > 1) g.warn.push(LL('в группе документы с разными ИИН: ', 'different IINs in group: ') + ik.join(', ') + LL('. Скорее всего, это разные пациенты: разнесите документы.', '. Probably different patients.')); }
+    retroMatchGroup(g);
+    /* сохранить результат разбора, если состав документов не изменился */
+    var prev = old.filter(function (o) { return o.items.slice().sort().join() === g.items.slice().sort().join(); })[0];
+    if (prev) { ['st', 'res', 'text', 'src', 'local', 'opened', 'saved', 'xwarn', 'err'].forEach(function (k) { if (prev[k] !== undefined) g[k] = prev[k]; }); if (prev.pidManual) { g.pid = prev.pid; g.pidManual = true; } if (prev.saved) g.pid = prev.pid; }
+  });
+  groups.sort(function (a, b) { var r = { none: 2, weak: 1, strong: 0 }; return (r[a.strength] - r[b.strength]) || String(a.who.fio).localeCompare(String(b.who.fio), locale()); });
+  RETRO.groups = groups;
+}
+function retroMatchGroup(g) {
+  var w = g.who, hit;
+  g.pid = null; g.cand = null;
+  if (w.iin) { hit = DB.patients.filter(function (p) { return String(p.d.iin || '') === w.iin; }); if (hit.length === 1) { g.pid = hit[0].id; g.mhow = LL('карточка найдена по ИИН', 'record found by IIN'); if (w.fio && fioSur(hit[0].d.fio) && fioSur(hit[0].d.fio) !== fioSur(w.fio)) g.warn.push(LL('ИИН совпал с карточкой «', 'IIN matches record «') + pName(hit[0]) + LL('», но фамилия другая', '», but surname differs')); return; } if (hit.length > 1) { g.cand = hit; g.mhow = LL('несколько карточек с этим ИИН: выберите', 'several records with this IIN'); return; } }
+  var ib = ibNorm(w.ib), k = fioKey(w.fio);
+  if (ib) { hit = DB.patients.filter(function (p) { return p.d.ib && ibNorm(p.d.ib) === ib && (!k || !fioKey(p.d.fio) || fioKey(p.d.fio) === k); }); if (hit.length === 1) { g.pid = hit[0].id; g.mhow = LL('карточка найдена по № ИБ', 'record found by case no.'); return; } }
+  if (k) {
+    var full = DB.patients.filter(function (p) { return fioKey(p.d.fio) === k; });
+    var withDob = full.filter(function (p) { return w.dob && p.d.dob === w.dob; });
+    if (withDob.length === 1 && !(w.iin && withDob[0].d.iin && withDob[0].d.iin !== w.iin)) { g.pid = withDob[0].id; g.mhow = LL('карточка найдена по ФИО и дате рождения', 'record found by name and DOB'); return; }
+    var compat = full.filter(function (p) { return !(w.dob && p.d.dob && p.d.dob !== w.dob) && !(w.iin && p.d.iin && p.d.iin !== w.iin); });
+    var sur = fioSur(w.fio), init = (nameTokens(w.fio)[1] || '').charAt(0), loose = DB.patients.filter(function (p) { var t0 = nameTokens(p.d.fio); return t0[0] === sur && (!init || !t0[1] || t0[1].charAt(0) === init) && compat.indexOf(p) < 0 && !(w.dob && p.d.dob && p.d.dob !== w.dob) && !(w.iin && p.d.iin && p.d.iin !== w.iin); });
+    var cands = compat.concat(loose);
+    if (cands.length) { g.cand = cands; g.mhow = LL('похожие карточки есть, но совпадение неполное: выберите или создайте новую', 'similar records exist: choose or create new'); return; }
+  }
+  g.mhow = g.unknown ? LL('укажите пациента: перенесите документ в нужную группу', 'assign this document to a patient') : LL('совпадений нет: будет создана новая карточка', 'no match: new record');
+}
+function retroDocs(g) { return g.items.map(function (id) { return RETRO.items.filter(function (x) { return x.id === id; })[0]; }).filter(Boolean); }
+/* шаг 3: извлечение данных по каждому пациенту, документы сверяются между собой */
+function retroExtract(g) {
+  var ds = retroDocs(g), docs = ds.map(function (d) { return d.docObj; }).filter(Boolean);
+  g.st = 'ai'; g.err = ''; g.xwarn = []; render();
+  if (!docs.length) { g.st = 'err'; g.err = LL('нет прочитанных документов', 'no readable documents'); return Promise.resolve(); }
+  docs.sort(function (a, b) { var da = (ds.filter(function (x) { return x.docObj === a; })[0].idn || {}).docDate || '', db0 = (ds.filter(function (x) { return x.docObj === b; })[0].idn || {}).docDate || ''; return String(da).localeCompare(String(db0)); });
+  var allText = docs.map(function (d) { return '=== ДОКУМЕНТ «' + d.name + '» ===\n' + (d.text || ''); }).join('\n\n');
+  var who = g.who, ident = 'ВАЖНО: все документы этого пакета отнесены к одному пациенту' + (who.fio ? ': ' + who.fio : '') + (who.iin ? ', ИИН ' + who.iin : '') + (who.dob ? ', дата рождения ' + who.dob : '') + '. Если какой-то документ явно относится к другому человеку, НЕ бери из него данные и добавь в issues запись {"kind":"otherPatient","text":"<имя файла>: <почему>"}.';
+  var p;
+  if (RETRO.mode === 'ai' && aiReady()) {
+    p = dxCallMany(docs, dxSchemaText(), ident).then(dxParseJSON).then(function (res) {
+      res.fields = res.fields || [];
+      docs.forEach(function (d) { if (d.text && !d.scanned) { try { res = dxMerge(res, dxRules(d)); } catch (e) {} } });
+      return { res: res, src: AI_PROV[AI.prov].name + ' · ' + AI.model + LL(' · документы пациента сверены между собой', ' · cross-checked'), local: AI.prov === 'local' };
+    });
+  } else {
+    p = Promise.resolve().then(function () {
+      var by = {}, res = { fields: [], issues: [], questions: [], doc: { type: LL('пакет документов', 'batch') } };
+      docs.forEach(function (d) { var r = { fields: [] }; try { r = dxRules(d); } catch (e) {} (r.fields || []).forEach(function (f) { by[f.id] = Object.assign({}, f, { note: (f.note ? f.note + '. ' : '') + d.name }); }); (r.issues || []).forEach(function (x) { res.issues.push(x); }); });
+      res.fields = Object.keys(by).map(function (k) { return by[k]; });
+      return { res: res, src: LL('без ИИ: шаблоны', 'no AI: patterns'), local: true };
+    });
+  }
+  return p.then(function (o) {
+    var res = o.res, F = {}; (res.fields || []).forEach(function (f) { F[f.id] = f; });
+    if (F.iin && who.iin && String(F.iin.value).replace(/\D/g, '') !== who.iin) g.xwarn.push(LL('ИИН в извлечённых данных отличается от ИИН группы', 'Extracted IIN differs from group IIN'));
+    if (F.fio && who.fio && fioKey(F.fio.value) && fioKey(F.fio.value) !== fioKey(who.fio)) g.xwarn.push(LL('ФИО в извлечённых данных: «', 'Extracted name: «') + F.fio.value + '»');
+    (res.issues || []).filter(function (x) { return x && x.kind === 'otherPatient'; }).forEach(function (x) { g.xwarn.push(LL('ИИ считает, что документ о другом пациенте: ', 'AI thinks a document is about another patient: ') + x.text); });
+    if (!F.fio && who.fio) res.fields.push({ id: 'fio', value: who.fio, confidence: 0.9, quote: LL('по документам пакета', 'from batch') });
+    if (!F.iin && who.iin) res.fields.push({ id: 'iin', value: who.iin, confidence: 0.95, quote: 'ИИН' });
+    if (!F.dob && who.dob) res.fields.push({ id: 'dob', value: who.dob, confidence: 0.9, quote: who.iin ? LL('из ИИН', 'from IIN') : '' });
+    if (!F.sex && who.iin && iinInfo(who.iin) && iinInfo(who.iin).sex) res.fields.push({ id: 'sex', value: iinInfo(who.iin).sex, confidence: 0.9, quote: LL('из ИИН', 'from IIN') });
+    var mg = res.mdg || null; if (!mg) docs.forEach(function (d) { var x = mdgFromText(d.text); if (x && (!mg || (x.date || '') >= (mg.date || ''))) mg = x; }); g.mdg = mg;
+    g.res = res; g.text = allText; g.src = o.src; g.local = o.local; g.nF = res.fields.length; g.st = 'done'; render();
+  }).catch(function (e) { g.st = 'err'; g.err = (e && e.message) || String(e); render(); });
 }
 function retroAdd(files) { [].slice.call(files || []).forEach(function (f) { RETRO.items.push({ id: uid('rt'), file: f, st: 'wait' }); }); render(); }
 function retroStart() {
   if (RETRO.run) return;
   if (RETRO.mode === 'ai' && aiReady() && AI.prov !== 'local' && !RETRO.agree) { toast(LL('Подтвердите отправку во внешний сервис ИИ или выберите обработку без ИИ', 'Confirm sending, or choose no-AI')); return; }
-  RETRO.run = true; render(); retroNext();
-}
-function retroNext() {
-  var it = RETRO.items.filter(function (x) { return x.st === 'wait'; })[0];
-  if (!it || !RETRO.run) { RETRO.run = false; render(); return; }
-  it.st = 'read'; render();
-  var log = function (l) { it.note = l; render(); };
-  dxReadFile(it.file).then(function (doc) {
-    it.doc = { kind: doc.kind, pages: doc.pages, scanned: doc.scanned };
-    it.st = RETRO.mode === 'ai' && aiReady() ? 'ai' : 'rules'; render();
-    return dxExtract(doc, RETRO.mode, log);
-  }).then(function (o) {
-    var res = o.res; it.res = res; it.text = o.text; it.m = retroMatch(res); it.st = 'done'; it.src = o.src; it.local = o.local; it.fallback = o.fallback; it.note = '';
-    it.nF = (res.fields || []).length; it.nI = (res.issues || []).length + (res.questions || []).length;
-    it.pid = it.m.p ? it.m.p.id : null; render(); setTimeout(retroNext, 800);
-  }).catch(function (e) {
-    it.st = 'err'; it.err = (e && e.message) || String(e); render(); setTimeout(retroNext, 800);
+  if (RETRO.mode === 'ai' && !aiReady()) { toast(LL('ИИ не подключён: включите его в шапке или выберите обработку без ИИ', 'AI is not connected')); return; }
+  RETRO.run = true; RETRO.phase = 'id'; render();
+  var seq = Promise.resolve();
+  RETRO.items.filter(function (it) { return it.st === 'wait' || it.st === 'err'; }).forEach(function (it) {
+    seq = seq.then(function () { if (!RETRO.run) return; it.st = 'read'; it.err = ''; render(); return retroIdentify(it).catch(function (e) { it.st = 'err'; it.err = (e && e.message) || String(e); render(); }); });
   });
+  seq.then(function () {
+    if (!RETRO.run) { render(); return; }
+    retroGroup(); RETRO.phase = 'x'; render();
+    return retroExtractPending();
+  }).then(function () { RETRO.run = false; RETRO.phase = ''; render(); });
 }
-function retroOpen(id) {
-  var it = RETRO.items.filter(function (x) { return x.id === id; })[0]; if (!it || !it.res) return;
-  var pid = it.pid && DB.patients.some(function (p) { return p.id === it.pid; }) ? it.pid : null;
-  openPatient(pid, pid ? null : {});
-  S.drawer.retroItem = it.id;
-  S.dx = { step: 'rep', keep: RETRO.keep, file: it.file, docText: it.text || '' };
-  it.res = dxDefaultNo(it.res, it.text || '', S.drawer.p.d);
-  S.dx.rep = dxApply(it.res, RETRO.keep, it.local); S.dx.rep.src = it.src; S.dx.rep.fallback = it.fallback; S.dx.rep.file = it.file.name; S.dx.rep.at = nowIso();
-  S.dx.rep.match = it.m ? (pid ? LL('Документ отнесён к карточке ', 'Matched to record ') + pid + ' (' + it.m.how + ')' : it.m.how) : '';
-  S.drawer.p.docsAI = (S.drawer.p.docsAI || []).concat([{ name: it.file.name, at: S.dx.rep.at, by: me(), src: it.src, n: S.dx.rep.filled.length }]);
-  it.opened = true; render();
+function retroExtractPending() {
+  var seq = Promise.resolve();
+  RETRO.groups.filter(function (g) { return !g.unknown && !g.saved && (g.st === 'wait' || g.st === 'err'); }).forEach(function (g) { seq = seq.then(function () { if (!RETRO.run) return; return retroExtract(g); }); });
+  return seq;
+}
+function retroRebuild() { if (RETRO.run) return; RETRO.run = true; retroGroup(); RETRO.phase = 'x'; render(); retroExtractPending().then(function () { RETRO.run = false; RETRO.phase = ''; render(); }); }
+/* после первого ручного действия текущая раскладка закрепляется и дальше меняется только вручную */
+function retroFreeze() { RETRO.pinMeta = RETRO.pinMeta || {}; RETRO.groups.forEach(function (g) { var key = g.pinKey || ('p_' + g.id); g.pinKey = key; RETRO.pinMeta[key] = { gid: g.id, how: g.how, iin: g.iin }; retroDocs(g).forEach(function (d) { d.pin = key; }); }); }
+function retroMove(itemId, target) {
+  var it = RETRO.items.filter(function (x) { return x.id === itemId; })[0]; if (!it || RETRO.run) return;
+  retroFreeze();
+  if (target === 'new') { var k = 'p_' + uid('n'); RETRO.pinMeta[k] = { how: LL('отдельный пациент (указано вручную)', 'separate patient (manual)') }; it.pin = k; it.pinNew = true; }
+  else { var tg = RETRO.groups.filter(function (g) { return g.id === target; })[0]; if (!tg) return; it.pin = tg.pinKey; }
+  it.weak = false; it.how = LL('перенесён вручную', 'moved manually'); retroRebuild();
+}
+function retroConfirm(itemId) { var it = RETRO.items.filter(function (x) { return x.id === itemId; })[0]; if (!it || RETRO.run) return; retroFreeze(); it.weak = false; it.how = LL('подтверждено вручную', 'confirmed manually'); retroRebuild(); }
+function retroOpenGroup(gid, silent) {
+  var g = RETRO.groups.filter(function (x) { return x.id === gid; })[0]; if (!g || !g.res) return false;
+  var pid = g.pid && DB.patients.some(function (p) { return p.id === g.pid; }) ? g.pid : null;
+  openPatient(pid, pid ? null : {}, { noCtx: true });
+  var dr = S.drawer; dr.retroGroup = g.id;
+  var docs = retroDocs(g).map(function (d) { return d.docObj; }).filter(Boolean);
+  var res = dxDefaultNo(JSON.parse(JSON.stringify(g.res)), g.text || '', dr.p.d, docs.length > 1);
+  S.dx = { step: 'rep', keep: RETRO.keep, docs: docs, docText: g.text || '' };
+  var r = dxApply(res, RETRO.keep, g.local); r.src = g.src; r.file = LL('документов: ', 'documents: ') + docs.length + ' (' + docs.map(function (d) { return d.name; }).join(', ') + ')'; r.at = nowIso();
+  r.match = (pid ? LL('Документы отнесены к карточке ', 'Matched to record ') + pid + ' (' + g.mhow + ')' : g.mhow) + '. ' + LL('Группа: ', 'Group: ') + g.how + '.';
+  var wr = (g.warn || []).concat(g.xwarn || []); if (wr.length) r.issues = wr.map(function (x) { return { id: '', label: '', kind: 'identity', text: LL('Идентификация: ', 'Identity: ') + x }; }).concat(r.issues || []);
+  if (g.mdg) { var tr = applyMdg(dr.p, g.mdg, LL('пакет документов', 'batch')); if (tr) r.mdg = { m: g.mdg, tracks: tr }; }
+  dr.p.docsAI = (dr.p.docsAI || []).concat(docs.map(function (d) { return { name: d.name, at: r.at, by: me(), src: g.src, n: 0 }; }));
+  docs.forEach(function (d) { docArchive(dr.p, d.name, d.text || '', ''); });
+  S.dx.rep = r; S.dx.usedAI = !g.local; g.opened = true;
+  if (!silent) { render(); sumLater(dr, LL('документы: ', 'documents: ') + docs.map(function (d) { return d.name; }).join(', '), '(в архиве документов)'); }
+  return true;
+}
+function retroSaved(gid, pid) { var g = RETRO.groups.filter(function (x) { return x.id === gid; })[0]; if (g) { g.saved = true; g.pid = pid; g.st = 'saved'; } }
+function retroSafe(g) { return g.st === 'done' && !g.saved && !g.unknown && g.strength === 'strong' && !(g.warn || []).length && !(g.xwarn || []).length && (g.pid || !g.cand); }
+function retroSaveSafe() {
+  var list = RETRO.groups.filter(retroSafe); if (!list.length) return;
+  if (!confirm(LL('Сохранить без ручной проверки карточки ', 'Save without manual review ') + list.length + LL(' пациентов, опознанных надёжно (ИИН, № ИБ или ФИО с датой рождения, без расхождений)? Уже заполненные поля не перезаписываются.', ' reliably identified patients? Filled fields are kept.'))) return;
+  var ok = 0, stop = null;
+  list.forEach(function (g) {
+    if (stop) return;
+    if (!retroOpenGroup(g.id, true)) return;
+    S.dx = null; savePatient();
+    if (S.drawer) { stop = g; } else ok++;
+  });
+  toast(LL('Сохранено карточек: ', 'Saved records: ') + ok + (stop ? LL('. Остановлено: в карточке «', '. Stopped: «') + (stop.who.fio || '?') + LL('» есть ошибки проверки, исправьте и сохраните вручную', '» has validation errors') : ''));
+  render();
 }
 function renderRetro() {
-  var st = { wait: [LL('В очереди', 'Queued'), ''], read: [LL('Читаю файл', 'Reading'), 'prog'], ai: [LL('ИИ извлекает данные', 'AI extracting'), 'prog'], rules: [LL('Обработка без ИИ', 'Processing without AI'), 'prog'], done: [LL('Готово', 'Done'), 'done'], err: [LL('Ошибка', 'Error'), 'cancel'] };
-  var h = pageHead(LL('Пациенты', 'Patients'), LL('Ретро-загрузка документов', 'Retrospective document import'), LL('Загрузите пачку выписок, протоколов операций, гистологий, консультативных листов. ИИ по очереди извлечёт данные, найдёт карточку пациента по ФИО, дате рождения или № ИБ (или предложит новую), а вы откроете каждую, проверите сводку и сохраните.', 'Upload a batch of documents; AI extracts data, matches patients, you review and save each.'), '');
-  h += '<div class="retro"><label class="dxdrop"><input type="file" id="retrofiles" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx,.rtf,.odt,application/pdf,image/*,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/rtf,application/vnd.oasis.opendocument.text" hidden>' + ico('upload', 28) + '<b>' + LL('Выберите или перетащите файлы', 'Choose or drop files') + '</b><span>' + LL('Можно сразу много: PDF, сканы, фото, текст', 'Many at once: PDF, scans, photos, text') + '</span></label>';
+  var st = { wait: [LL('В очереди', 'Queued'), ''], read: [LL('Читаю файл', 'Reading'), 'prog'], ai: [LL('ИИ определяет пациента', 'AI identifying'), 'prog'], id: [LL('Пациент определён', 'Identified'), 'done'], err: [LL('Ошибка', 'Error'), 'cancel'] };
+  var h = pageHead(LL('Пациенты', 'Patients'), LL('Пакетная загрузка документов', 'Batch document import'), LL('Загрузите документы разных пациентов вперемешку: выписки, протоколы, гистологии, МДГ, консультации. Система определит пациента в каждом файле (ИИН с проверкой контрольной цифры, № ИБ, ФИО и дата рождения), сгруппирует документы по пациентам, найдёт существующие карточки или подготовит новые и разберёт документы каждого пациента вместе, сверяя их между собой.', 'Upload mixed documents of different patients; they are identified, grouped per patient, matched to records and extracted together.'), '');
+  h += '<div class="retro"><label class="dxdrop"><input type="file" id="retrofiles" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.doc,.docx,.rtf,.odt,application/pdf,image/*,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/rtf,application/vnd.oasis.opendocument.text" hidden>' + ico('upload', 28) + '<b>' + LL('Выберите или перетащите файлы', 'Choose or drop files') + '</b><span>' + LL('Можно сразу много и разных пациентов: PDF, сканы, фото, Word, текст', 'Many files of different patients') + '</span></label>';
   h += '<div class="retro-opts"><label class="chk"><input type="checkbox" id="retrokeep"' + (RETRO.keep ? ' checked' : '') + '><span>' + LL('Не перезаписывать уже заполненные поля', 'Keep fields already filled') + '</span></label>';
   if (!RETRO.mode) RETRO.mode = aiReady() ? 'ai' : 'rules';
   h += dxModeHTML(RETRO, 'retro');
-  var nW = RETRO.items.filter(function (x) { return x.st === 'wait'; }).length;
-  h += '<div class="actions"><button type="button" class="btn primary" data-act="retrostart"' + (nW && !RETRO.run ? '' : ' disabled') + '>' + ico('sparkle', 16) + (RETRO.run ? LL('Идёт обработка…', 'Processing…') : LL('Обработать', 'Process') + (nW ? ' (' + nW + ')' : '')) + '</button>' + (RETRO.run ? '<button type="button" class="btn ghost" data-act="retrostop">' + LL('Остановить после текущего', 'Stop after current') + '</button>' : '') + (RETRO.items.length && !RETRO.run ? '<button type="button" class="btn ghost" data-act="retroclear">' + LL('Очистить список', 'Clear list') + '</button>' : '') + '</div></div>';
-  if (RETRO.items.length) {
-    h += '<div class="tablewrap"><table class="grid retrotab"><thead><tr><th>' + LL('Файл', 'File') + '</th><th>' + LL('Статус', 'Status') + '</th><th>' + LL('Документ', 'Document') + '</th><th>' + LL('Пациент в документе', 'Patient in document') + '</th><th>' + LL('Карточка', 'Record') + '</th><th>' + LL('Найдено', 'Found') + '</th><th></th></tr></thead><tbody>';
-    RETRO.items.forEach(function (it) {
-      var s = st[it.st], d = it.res && it.res.doc || {}, w = it.m ? it.m.who : {};
-      var card = '';
-      if (it.m) {
-        if (it.m.cand) card = '<select data-act="retropick" data-id="' + it.id + '"><option value="">' + LL('Новая карточка', 'New record') + '</option>' + it.m.cand.map(function (p) { return '<option value="' + p.id + '"' + (it.pid === p.id ? ' selected' : '') + '>' + p.id + ' · ' + esc(pName(p)) + (p.d.dob ? ' · ' + fmtDate(p.d.dob) : '') + '</option>'; }).join('') + '</select>';
-        else card = it.pid ? '<b class="mono">' + it.pid + '</b> ' + esc(pName(DB.patients.filter(function (p) { return p.id === it.pid; })[0] || { d: {} })) : '<span class="tag">' + LL('новая', 'new') + '</span>';
-        card += '<div class="muted small">' + esc(it.m.how) + '</div>';
-      }
-      h += '<tr><td class="strong">' + esc(it.file.name) + (it.doc ? '<div class="muted small">' + (it.doc.kind === 'pdf' ? it.doc.pages + LL(' стр.', ' p.') + (it.doc.scanned ? LL(', скан', ', scan') : '') : it.doc.kind) + '</div>' : '') + '</td>';
-      h += '<td><span class="st st-' + s[1] + '">' + s[0] + '</span>' + (it.note && it.st !== 'done' ? '<div class="muted small">' + esc(it.note) + '</div>' : '') + (it.fallback ? '<div class="muted small">' + LL('без ИИ (ИИ не ответил)', 'no AI (AI failed)') + '</div>' : '') + (it.err ? '<div class="aerr small">' + esc(it.err) + '</div>' : '') + '</td>';
-      h += '<td>' + esc(d.type || '') + (d.date ? '<div class="muted small">' + fmtDate(d.date) + '</div>' : '') + '</td><td>' + esc(w.fio || '') + (w.dob ? '<div class="muted small">' + fmtDate(w.dob) + '</div>' : '') + '</td><td>' + card + '</td>';
-      h += '<td>' + (it.st === 'done' ? it.nF + LL(' полей', ' fields') + (it.nI ? '<div class="muted small">' + it.nI + LL(' замечаний и вопросов', ' notes') + '</div>' : '') : '') + '</td>';
-      h += '<td class="nowrap">' + (it.st === 'done' ? '<button type="button" class="btn small ' + (it.opened ? '' : 'primary') + '" data-act="retroopen" data-id="' + it.id + '">' + (it.opened ? LL('Открыть снова', 'Open again') : LL('Открыть и проверить', 'Open and review')) + '</button>' : it.st === 'err' ? '<button type="button" class="btn small" data-act="retroretry" data-id="' + it.id + '">' + LL('Повторить', 'Retry') + '</button>' : '') + (!RETRO.run || it.st !== 'read' && it.st !== 'ai' ? '<button type="button" class="iconbtn sm" data-act="retrodel" data-id="' + it.id + '" aria-label="' + LL('Убрать', 'Remove') + '">' + ico('x', 14) + '</button>' : '') + '</td></tr>';
-    });
-    h += '</tbody></table></div><p class="muted small retro-note">' + LL('Ничего не сохраняется автоматически: откройте каждый документ, проверьте подсвеченные поля и сводку, затем нажмите «Сохранить» в карточке. Несколько документов одного пациента открывайте по очереди: каждый дополнит карточку.', 'Nothing is saved automatically: open each document, review, then Save.') + '</p>';
+  var nW = RETRO.items.filter(function (x) { return x.st === 'wait' || x.st === 'err'; }).length, nGw = RETRO.groups.filter(function (g) { return !g.unknown && !g.saved && (g.st === 'wait' || g.st === 'err'); }).length;
+  h += '<div class="actions"><button type="button" class="btn primary" data-act="retrostart"' + (nW && !RETRO.run ? '' : ' disabled') + '>' + ico('sparkle', 16) + (RETRO.run ? (RETRO.phase === 'id' ? LL('Определяю пациентов…', 'Identifying…') : LL('Разбираю документы пациентов…', 'Extracting…')) : LL('Обработать', 'Process') + (nW ? ' (' + nW + ')' : '')) + '</button>' + (!RETRO.run && nGw && !nW ? '<button type="button" class="btn" data-act="retrorebuild">' + LL('Разобрать изменённые группы (', 'Re-extract changed groups (') + nGw + ')</button>' : '') + (RETRO.run ? '<button type="button" class="btn ghost" data-act="retrostop">' + LL('Остановить', 'Stop') + '</button>' : '') + (RETRO.items.length && !RETRO.run ? '<button type="button" class="btn ghost" data-act="retroclear">' + LL('Очистить список', 'Clear list') + '</button>' : '') + '</div></div>';
+  /* файлы, ещё не распределённые по пациентам */
+  var pend = RETRO.items.filter(function (it) { return !it.gid; });
+  if (pend.length) {
+    h += '<div class="tablewrap"><table class="grid retrotab"><thead><tr><th>' + LL('Файл', 'File') + '</th><th>' + LL('Статус', 'Status') + '</th><th>' + LL('Пациент в документе', 'Patient in document') + '</th><th></th></tr></thead><tbody>';
+    pend.forEach(function (it) { var s = st[it.st] || st.wait, w = it.idn || {}; h += '<tr><td class="strong">' + esc(it.file.name) + '</td><td><span class="st st-' + s[1] + '">' + s[0] + '</span>' + (it.note ? '<div class="muted small">' + esc(it.note) + '</div>' : '') + (it.err ? '<div class="aerr small">' + esc(it.err) + '</div>' : '') + '</td><td>' + esc(w.fio || '') + (w.iin ? '<div class="muted small mono">' + LL('ИИН ', 'IIN ') + esc(w.iin) + '</div>' : '') + '</td><td class="nowrap">' + (!RETRO.run ? '<button type="button" class="iconbtn sm" data-act="retrodel" data-id="' + it.id + '" aria-label="' + LL('Убрать', 'Remove') + '">' + ico('x', 15) + '</button>' : '') + '</td></tr>'; });
+    h += '</tbody></table></div>';
   }
-  return h;
+  if (RETRO.groups.length) {
+    var nSafe = RETRO.groups.filter(retroSafe).length, nNew = RETRO.groups.filter(function (g) { return !g.unknown && !g.pid; }).length, nOld = RETRO.groups.filter(function (g) { return g.pid; }).length;
+    h += '<div class="rg-sum"><b>' + LL('Пациентов: ', 'Patients: ') + RETRO.groups.filter(function (g) { return !g.unknown; }).length + '</b><span>' + LL('найдено в базе: ', 'in database: ') + nOld + ' · ' + LL('новых: ', 'new: ') + nNew + (RETRO.groups.some(function (g) { return g.unknown; }) ? ' · <span class="due">' + LL('не определено документов: ', 'unidentified documents: ') + RETRO.groups.filter(function (g) { return g.unknown; }).length + '</span>' : '') + '</span>' + (nSafe && !RETRO.run ? '<button type="button" class="btn small" data-act="retrosavesafe">' + ico('check', 14) + LL('Сохранить надёжно опознанных без проверки (', 'Save reliable ones (') + nSafe + ')</button>' : '') + '</div>';
+    var gopts = function (cur) { return RETRO.groups.filter(function (z) { return !z.unknown && z.id !== cur; }).map(function (z) { return '<option value="' + z.id + '">' + esc(z.who.fio || LL('без ФИО', 'no name')) + (z.who.iin ? ' · ' + z.who.iin : '') + '</option>'; }).join(''); };
+    h += '<div class="rgs">' + RETRO.groups.map(function (g) {
+      var ds = retroDocs(g), cls = g.saved ? 'saved' : g.unknown ? 'unk' : g.strength, badge = g.saved ? [LL('сохранено', 'saved'), 'done'] : g.unknown ? [LL('не определён', 'unknown'), 'cancel'] : g.strength === 'strong' && !(g.warn || []).length && !(g.xwarn || []).length ? [LL('надёжно', 'reliable'), 'done'] : [LL('проверьте', 'check'), 'plan'];
+      var x = '<section class="card rg rg-' + cls + '"><header class="rg-h"><div class="rg-who"><b>' + esc(g.who.fio || LL('Пациент не определён', 'Patient not identified')) + '</b><span class="muted">' + [g.who.iin ? LL('ИИН ', 'IIN ') + g.who.iin : '', g.who.dob ? fmtDate(g.who.dob) : '', g.who.ib ? LL('ИБ ', 'Case ') + g.who.ib : ''].filter(Boolean).join(' · ') + '</span></div><span class="st st-' + badge[1] + '">' + badge[0] + '</span><span class="muted small">' + esc(g.how) + '</span></header>';
+      if (!g.unknown) {
+        x += '<div class="rg-card">' + ico('user', 14);
+        if (g.cand && !g.saved && !g.pidManual) x += '<select data-retrogp="' + g.id + '"><option value="">' + LL('Новая карточка', 'New record') + '</option>' + g.cand.map(function (p) { return '<option value="' + p.id + '"' + (g.pid === p.id ? ' selected' : '') + '>' + p.id + ' · ' + esc(pName(p)) + (p.d.dob ? ' · ' + fmtDate(p.d.dob) : '') + (p.d.iin ? ' · ' + p.d.iin : '') + '</option>'; }).join('') + '</select>';
+        else x += g.pid ? '<b class="mono">' + g.pid + '</b> ' + esc(pName(DB.patients.filter(function (p) { return p.id === g.pid; })[0] || { d: {} })) : '<span class="tag">' + LL('новая карточка', 'new record') + '</span>';
+        x += '<span class="muted small">' + esc(g.saved ? LL('сохранено', 'saved') : g.pidManual ? LL('выбрано вручную', 'chosen manually') : g.mhow || '') + '</span></div>';
+      }
+      var wr = (g.warn || []).concat(g.xwarn || []);
+      if (wr.length) x += '<ul class="rg-warn">' + wr.map(function (w) { return '<li>' + ico('alert', 13) + esc(w) + '</li>'; }).join('') + '</ul>';
+      x += '<table class="rg-docs"><tbody>' + ds.map(function (d) { var w = d.idn || {}; return '<tr' + (d.weak ? ' class="weak"' : '') + '><td>' + ico('file', 14) + '<b>' + esc(d.file.name) + '</b><div class="muted small">' + esc([w.docType, w.docDate ? fmtDate(w.docDate) : '', w.fio && fioKey(w.fio) !== fioKey(g.who.fio) ? LL('в документе: ', 'in doc: ') + w.fio : '', d.how || ''].filter(Boolean).join(' · ')) + '</div></td><td class="nowrap">' + (!RETRO.run && !g.saved ? '<select data-retromv="' + d.id + '" aria-label="' + LL('Перенести документ', 'Move document') + '"><option value="">' + LL('Перенести к…', 'Move to…') + '</option>' + gopts(g.id) + '<option value="new">' + LL('Отдельный пациент', 'Separate patient') + '</option></select>' + (d.weak ? '<button type="button" class="btn small" data-act="retroconfirm" data-id="' + d.id + '" title="' + LL('Подтвердить, что документ относится к этому пациенту', 'Confirm this document belongs to this patient') + '">' + ico('check', 13) + LL('Это он', 'Same patient') + '</button>' : '') : '') + '</td></tr>'; }).join('') + '</tbody></table>';
+      x += '<footer class="rg-f">';
+      if (g.unknown) x += '<span class="muted small">' + LL('Перенесите документ к нужному пациенту или отметьте как отдельного пациента', 'Move this document to a patient') + '</span>';
+      else if (g.st === 'ai') x += '<span class="st st-prog">' + LL('ИИ разбирает документы пациента…', 'AI extracting…') + '</span>';
+      else if (g.st === 'wait') x += '<span class="muted small">' + LL('ждёт разбора', 'waiting') + '</span>';
+      else if (g.st === 'err') x += '<span class="aerr small">' + esc(g.err || '') + '</span><button type="button" class="btn small" data-act="retrorebuild">' + LL('Повторить', 'Retry') + '</button>';
+      else x += '<span class="muted small">' + esc(g.src || '') + ' · ' + (g.nF || 0) + LL(' полей', ' fields') + '</span><button type="button" class="btn small' + (g.saved || g.opened ? '' : ' primary') + '" data-act="retroopeng" data-id="' + g.id + '"' + (RETRO.run ? ' disabled' : '') + '>' + (g.saved ? LL('Открыть карточку', 'Open record') : g.opened ? LL('Открыть снова', 'Open again') : LL('Открыть и проверить', 'Open and review')) + '</button>';
+      return x + '</footer></section>';
+    }).join('') + '</div>';
+    h += '<p class="muted small retro-note">' + LL('Документы одного пациента разбираются вместе и сверяются между собой. Совпадение только по ФИО никогда не склеивается молча: такие документы помечены «проверьте». Любой документ можно перенести к другому пациенту, после этого нажмите «Разобрать изменённые группы». Без вашей проверки сохраняются только пациенты, опознанные надёжно и без расхождений, и только по кнопке.', 'Name-only matches are never merged silently. Move documents if needed. Only reliable groups can be saved without review.') + '</p>';
+  }
+  return h + '</div>';
 }
 
 /* ======================= v12: top navigation (no sidebar) ======================= */
