@@ -7030,7 +7030,7 @@ function rtToolbar(sid, sec) {
   h += b('ul', '•≡', LL('Маркированный список', 'Bulleted list')) + b('ol', '1≡', LL('Нумерованный список', 'Numbered list')) + b('outdent', '⇤', LL('Уменьшить отступ', 'Decrease indent')) + b('indent', '⇥', LL('Увеличить отступ', 'Increase indent')) + sep;
   h += b('left', ico('alignl', 15), LL('По левому краю', 'Align left')) + b('center', ico('alignc', 15), LL('По центру', 'Center')) + b('right', ico('alignr', 15), LL('По правому краю', 'Align right')) + b('justify', ico('alignj', 15), LL('По ширине', 'Justify')) + sep;
   h += b('table', ico('grid', 15), LL('Вставить таблицу', 'Insert table')) + b('row', '+' + LL('стр', 'row'), LL('Добавить строку в таблицу', 'Add table row'), 'wtxt') + b('col', '+' + LL('стлб', 'col'), LL('Добавить столбец в таблицу', 'Add table column'), 'wtxt') + b('link', ico('ext', 15), LL('Ссылка', 'Link')) + b('hr', '―', LL('Горизонтальная линия', 'Horizontal line')) + '<span class="rt-dd">' + b('sym', 'Ω', LL('Спецсимволы', 'Symbols')) + '<span class="rt-sym" hidden>' + RT_SYM.map(function (x) { return '<button type="button" class="rtb" data-rt="ins" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</span></span>' + sep;
-  h += b('cite', ico('book', 15) + '<span>' + LL('Цитировать', 'Cite') + '</span>', LL('Вставить ссылку на источник', 'Insert citation'), 'wtxt') + b('note', ico('chat', 15) + '<span>' + LL('Заметка к выделенному', 'Comment') + '</span>', LL('Оставить заметку к выделенному фрагменту', 'Comment on selection'), 'wtxt');
+  h += b('scales', ico('clipboard', 15) + '<span>' + LL('Шкалы TNT', 'TNT scales') + '</span>', LL('Вставить раздел «Использование объективных шкал»', 'Insert the objective scales paragraph'), 'wtxt') + b('cite', ico('book', 15) + '<span>' + LL('Цитировать', 'Cite') + '</span>', LL('Вставить ссылку на источник', 'Insert citation'), 'wtxt') + b('note', ico('chat', 15) + '<span>' + LL('Заметка к выделенному', 'Comment') + '</span>', LL('Оставить заметку к выделенному фрагменту', 'Comment on selection'), 'wtxt');
   return h + '</div>';
 }
 function rtEd() { return root.querySelector('#msed[contenteditable]'); }
@@ -7070,6 +7070,7 @@ function rtExec(cmd, v) {
     case 'justify': X('justifyFull'); break;
     case 'clear': X('removeFormat'); X('unlink'); break;
     case 'hr': X('insertHorizontalRule'); break;
+    case 'scales': X('insertHTML', tntScalesHTML()); break;
     case 'mark': X('hiliteColor', '#fff3a3'); break;
     case 'unmark': { var r0 = rtRange(ed); if (r0) [].slice.call(ed.querySelectorAll('mark,span[style*="background"]')).forEach(function (m) { if (r0.intersectsNode(m)) { while (m.firstChild) m.parentNode.insertBefore(m.firstChild, m); m.parentNode.removeChild(m); } }); break; }
     case 'ins': X('insertText', v === '«»' ? '«»' : v); break;
@@ -7182,6 +7183,8 @@ document.addEventListener('keydown', function (ev) {
   else if (k === ',' || k === 'б') { ev.preventDefault(); rtExec('sub'); }
 }, true);
 
+/* текст раздела о шкалах для протокола TNT (без длинных тире) */
+function tntScalesHTML() { return '<h3>' + LL('Использование объективных шкал', 'Use of objective scales') + '</h3><ul><li>' + LL('Оценка токсичности: по критериям CTCAE v5.0;', 'Toxicity: CTCAE v5.0 criteria;') + '</li><li>' + LL('Качество жизни: с помощью EORTC QLQ-C30 и QLQ-CR29;', 'Quality of life: EORTC QLQ-C30 and QLQ-CR29;') + '</li><li>' + LL('Ответ опухоли: по RECIST 1.1 (для КТ) и mrTRG (для МРТ).', 'Tumour response: RECIST 1.1 (CT) and mrTRG (MRI).') + '</li></ul>'; }
 /* ---------- шаблон «Протокол исследования» (по SPIRIT 2013) и заполнение из мастера протокола ---------- */
 var PROTO_SECS = PAPER_TPL.proto[1];
 function protoPrefill(r) {
@@ -7201,7 +7204,7 @@ function protoPrefill(r) {
   out['Конечные точки'] = s.endpoint ? '<p><b>' + LL('Первичная конечная точка.', 'Primary endpoint.') + '</b> ' + esc(s.endpoint) + '</p><p><b>' + LL('Вторичные конечные точки.', 'Secondary endpoints.') + '</b> </p>' : '';
   out['Гипотеза и расчёт размера выборки'] = P(s.hyp);
   if (pr.rand && pr.rand.on === 'Да') out['Рандомизация и ослепление'] = '<p>' + LL('Рандомизация: да. Группы: ', 'Randomisation: yes. Arms: ') + esc((pr.rand.arms || []).map(function (a) { return a.name; }).join(', ')) + '.</p>';
-  out['Методология, обследование и сбор данных'] = P(s.meth);
+  out['Методология, обследование и сбор данных'] = P(s.meth) + (/TNT|ТНТ|тотальн[а-я]* неоадъювант/i.test(regName(r) + ' ' + JSON.stringify(s)) ? tntScalesHTML() : '');
   out['Этапы и сроки'] = (pr.cps || []).length ? '<table><thead><tr><th>' + LL('Этап', 'Milestone') + '</th><th>' + LL('Срок', 'Date') + '</th></tr></thead><tbody>' + pr.cps.map(function (c) { return '<tr><td>' + esc(c.title || '') + '</td><td>' + esc(fmtDate(c.date) || '') + '</td></tr>'; }).join('') + '</tbody></table>' : '';
   out['Ожидаемые результаты'] = P(s.exp);
   return out;
