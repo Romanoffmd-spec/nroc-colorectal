@@ -2325,14 +2325,309 @@ var Q_BUILTIN = [
       { id: 'w5', type: 'single', text: ['Недержание меняет образ жизни', 'Lifestyle alteration'], opts: WX }
     ] }
 ];
+/* ======================= Анкеты для исследования TNT: шкалы, лицензионный текст, подсчёт по руководствам ======================= */
+function qnum(lo, hi) { var o = []; for (var i = lo; i <= hi; i++) o.push(i); return o; }
+/* EORTC: 4 и 7 градаций. Подписи нейтральные, официальные формулировки вставляются из лицензионной версии */
+function eo4() { return [qo('1 · совсем нет', '1 · not at all', 1), qo('2 · немного', '2 · a little', 2), qo('3 · довольно', '3 · quite a bit', 3), qo('4 · очень', '4 · very much', 4)]; }
+function eo7() { return qnum(1, 7).map(function (i) { return qo(i + (i === 1 ? ' · очень плохо' : i === 7 ? ' · отлично' : ''), i + (i === 1 ? ' · very poor' : i === 7 ? ' · excellent' : ''), i); }); }
+function ph(n, ru) { return ['[' + (ru || 'Пункт') + ' ' + n + ': вставьте текст из официальной версии]', '[Item ' + n + ': paste the official text]']; }
+function eoItems(from, to, opts, pref) { return qnum(from, to).map(function (n) { return { id: (pref || 'q') + n, type: 'single', text: ph(n), opts: opts ? opts(n) : eo4() }; }); }
+var EORTC_LIC = { org: 'EORTC Quality of Life Group', url: 'https://qol.eortc.org', note: ['Использование бесплатно для академических исследований после регистрации на сайте EORTC. Там же выдаётся официальная русская версия и руководство по подсчёту. Текст пунктов вставляется в приложение из полученной версии.', 'Free for academic use after registration with EORTC; the official Russian version and scoring manual are provided there.'] };
+var Q_TNT = [];
+/* ---------- EORTC QLQ-C30 v3.0: подсчёт по руководству EORTC (Fayers 2001) ---------- */
+Q_TNT.push({ id: 'qlqc30', builtin: true, lic: EORTC_LIC, tnt: 'core', name: ['EORTC QLQ-C30: качество жизни (общий опросник)', 'EORTC QLQ-C30: quality of life (core)'], short: 'QLQ-C30',
+  desc: ['30 пунктов. Шкалы 0-100: функциональные и общее качество жизни (выше = лучше), симптомы (выше = хуже).', '30 items. 0-100 scales: functioning and global QoL (higher = better), symptoms (higher = worse).'],
+  sub: ['За последнюю неделю', 'During the past week'],
+  items: eoItems(1, 30, function (n) { return n >= 29 ? eo7() : eo4(); }),
+  scales: [
+    { id: 'QL', name: ['Общее качество жизни', 'Global health status'], items: ['q29', 'q30'], type: 'eo-g', range: 6, main: true },
+    { id: 'PF', name: ['Физическое функционирование', 'Physical functioning'], items: ['q1', 'q2', 'q3', 'q4', 'q5'], type: 'eo-f', range: 3 },
+    { id: 'RF', name: ['Ролевое функционирование', 'Role functioning'], items: ['q6', 'q7'], type: 'eo-f', range: 3 },
+    { id: 'EF', name: ['Эмоциональное функционирование', 'Emotional functioning'], items: ['q21', 'q22', 'q23', 'q24'], type: 'eo-f', range: 3 },
+    { id: 'CF', name: ['Когнитивное функционирование', 'Cognitive functioning'], items: ['q20', 'q25'], type: 'eo-f', range: 3 },
+    { id: 'SF', name: ['Социальное функционирование', 'Social functioning'], items: ['q26', 'q27'], type: 'eo-f', range: 3 },
+    { id: 'FA', name: ['Слабость', 'Fatigue'], items: ['q10', 'q12', 'q18'], type: 'eo-s', range: 3 },
+    { id: 'NV', name: ['Тошнота и рвота', 'Nausea and vomiting'], items: ['q14', 'q15'], type: 'eo-s', range: 3 },
+    { id: 'PA', name: ['Боль', 'Pain'], items: ['q9', 'q19'], type: 'eo-s', range: 3 },
+    { id: 'DY', name: ['Одышка', 'Dyspnoea'], items: ['q8'], type: 'eo-s', range: 3 },
+    { id: 'SL', name: ['Бессонница', 'Insomnia'], items: ['q11'], type: 'eo-s', range: 3 },
+    { id: 'AP', name: ['Потеря аппетита', 'Appetite loss'], items: ['q13'], type: 'eo-s', range: 3 },
+    { id: 'CO', name: ['Запор', 'Constipation'], items: ['q16'], type: 'eo-s', range: 3 },
+    { id: 'DI', name: ['Диарея', 'Diarrhoea'], items: ['q17'], type: 'eo-s', range: 3 },
+    { id: 'FI', name: ['Финансовые трудности', 'Financial difficulties'], items: ['q28'], type: 'eo-s', range: 3 },
+    { id: 'SUM', name: ['Суммарный балл C30 (Summary Score)', 'C30 Summary Score'], type: 'c30sum' }
+  ] });
+/* ---------- EORTC QLQ-CR29: пункты 31-59, 48 = есть ли стома; 49-54 разные для стомы и без; 55 только стома; 56-57 мужчины, 58-59 женщины ---------- */
+(function () {
+  var it = eoItems(31, 47);
+  it.push({ id: 'q48', type: 'single', text: ph(48, 'Пункт (наличие стомы)'), opts: [qo('Да, есть стома (калоприёмник)', 'Yes, I have a stoma (bag)', 0), qo('Нет', 'No', 0)] });
+  qnum(49, 54).forEach(function (n) { it.push({ id: 'q' + n, type: 'single', text: ph(n, 'Пункт без стомы'), opts: eo4(), cond: { q: 'q48', a: 1 } }); });
+  qnum(49, 55).forEach(function (n) { it.push({ id: 'q' + n + 's', type: 'single', text: ph(n, 'Пункт для стомы'), opts: eo4(), cond: { q: 'q48', a: 0 } }); });
+  it.push({ id: '_sex', type: 'single', text: ['Ваш пол', 'Your sex'], opts: [qo('Мужской', 'Male', 0), qo('Женский', 'Female', 0)], app: true });
+  [56, 57].forEach(function (n) { it.push({ id: 'q' + n, type: 'single', text: ph(n, 'Пункт для мужчин'), opts: eo4(), cond: { q: '_sex', a: 0 } }); });
+  [58, 59].forEach(function (n) { it.push({ id: 'q' + n, type: 'single', text: ph(n, 'Пункт для женщин'), opts: eo4(), cond: { q: '_sex', a: 1 } }); });
+  function S(id, ru, en, items, type) { return { id: id, name: [ru, en], items: items, type: type, range: 3 }; }
+  Q_TNT.push({ id: 'qlqcr29', builtin: true, lic: EORTC_LIC, tnt: 'core', name: ['EORTC QLQ-CR29: колоректальный модуль', 'EORTC QLQ-CR29: colorectal module'], short: 'QLQ-CR29',
+    desc: ['29 пунктов, заполняется вместе с QLQ-C30. Включает базовую оценку сексуальной функции у всех пациентов.', '29 items, used with QLQ-C30; includes basic sexual function for all.'],
+    sub: ['За последнюю неделю', 'During the past week'], items: it,
+    scales: [
+      S('BI', 'Образ тела', 'Body image', ['q45', 'q46', 'q47'], 'eo-f'), S('ANX', 'Тревога', 'Anxiety', ['q43'], 'eo-f'), S('WEI', 'Вес', 'Weight', ['q44'], 'eo-f'),
+      S('SEXM', 'Сексуальный интерес (мужчины)', 'Sexual interest (men)', ['q56'], 'eo-f'), S('SEXW', 'Сексуальный интерес (женщины)', 'Sexual interest (women)', ['q58'], 'eo-f'),
+      S('UF', 'Частое мочеиспускание', 'Urinary frequency', ['q31', 'q32'], 'eo-s'), S('UI', 'Недержание мочи', 'Urinary incontinence', ['q33'], 'eo-s'), S('DY', 'Дизурия', 'Dysuria', ['q34'], 'eo-s'),
+      S('AP', 'Боль в животе', 'Abdominal pain', ['q35'], 'eo-s'), S('BP', 'Боль в ягодицах и заднем проходе', 'Buttock pain', ['q36'], 'eo-s'), S('BF', 'Вздутие', 'Bloating', ['q37'], 'eo-s'),
+      S('BMS', 'Кровь и слизь в стуле', 'Blood and mucus in stool', ['q38', 'q39'], 'eo-s'), S('DM', 'Сухость во рту', 'Dry mouth', ['q40'], 'eo-s'), S('HL', 'Выпадение волос', 'Hair loss', ['q41'], 'eo-s'), S('TA', 'Изменение вкуса', 'Taste', ['q42'], 'eo-s'),
+      S('FL', 'Газы', 'Flatulence', ['q49|q49s'], 'eo-s'), S('FI', 'Недержание кала', 'Faecal incontinence', ['q50|q50s'], 'eo-s'), S('SS', 'Раздражение кожи', 'Sore skin', ['q51|q51s'], 'eo-s'),
+      S('SF', 'Частота стула', 'Stool frequency', ['q52|q52s', 'q53|q53s'], 'eo-s'), S('EMB', 'Смущение', 'Embarrassment', ['q54|q54s'], 'eo-s'), S('STO', 'Проблемы ухода за стомой', 'Stoma care problems', ['q55s'], 'eo-s'),
+      S('IMP', 'Импотенция', 'Impotence', ['q57'], 'eo-s'), S('DYS', 'Диспареуния', 'Dyspareunia', ['q59'], 'eo-s')
+    ] });
+})();
+/* ---------- EORTC QLQ-CIPN20: нейропатия от оксалиплатина. Раскладка подшкал вставляется из руководства EORTC ---------- */
+Q_TNT.push({ id: 'qlqcipn20', builtin: true, lic: EORTC_LIC, tnt: 'oxali', name: ['EORTC QLQ-CIPN20: нейропатия после химиотерапии', 'EORTC QLQ-CIPN20: chemotherapy-induced neuropathy'], short: 'QLQ-CIPN20',
+  desc: ['20 пунктов, при схемах с оксалиплатином (FOLFOX, CAPOX). Подшкалы: сенсорная, моторная, вегетативная.', '20 items, for oxaliplatin regimens. Sensory, motor, autonomic subscales.'],
+  sub: ['За последнюю неделю', 'During the past week'], items: eoItems(31, 50), scales: [], scalesFromManual: true });
+/* ---------- HADS: тревога и депрессия. Баллы ответов задаются из официального ключа ---------- */
+Q_TNT.push({ id: 'hads', builtin: true, tnt: 'psy', lic: { org: 'GL Assessment (правообладатель HADS)', url: 'https://www.gl-assessment.co.uk/', note: ['Платная лицензия у правообладателя. Текст и баллы ответов вставляются из лицензионной русской версии.', 'Licensed instrument; paste the licensed Russian version with option scores.'] },
+  name: ['HADS: госпитальная шкала тревоги и депрессии', 'HADS: Hospital Anxiety and Depression Scale'], short: 'HADS',
+  desc: ['14 пунктов: тревога (HADS-A) и депрессия (HADS-D), по 0-21. 0-7 норма, 8-10 субклинически выраженная, 11 и выше клинически выраженная.', '14 items: anxiety and depression, 0-21 each.'],
+  items: qnum(1, 14).map(function (n) { return { id: 'h' + n, type: 'single', text: ph(n), opts: [qo('[вариант 1]', '[option 1]', null), qo('[вариант 2]', '[option 2]', null), qo('[вариант 3]', '[option 3]', null), qo('[вариант 4]', '[option 4]', null)], needScores: true }; }),
+  scales: [
+    { id: 'A', name: ['Тревога (HADS-A)', 'Anxiety (HADS-A)'], items: ['h1', 'h3', 'h5', 'h7', 'h9', 'h11', 'h13'], type: 'sum', max: 21, bands: [{ min: 0, max: 7, t: ['норма', 'normal'], c: 'ok' }, { min: 8, max: 10, t: ['субклиническая', 'borderline'], c: 'warn' }, { min: 11, max: 21, t: ['клиническая', 'clinical'], c: 'due' }], main: true },
+    { id: 'D', name: ['Депрессия (HADS-D)', 'Depression (HADS-D)'], items: ['h2', 'h4', 'h6', 'h8', 'h10', 'h12', 'h14'], type: 'sum', max: 21, bands: [{ min: 0, max: 7, t: ['норма', 'normal'], c: 'ok' }, { min: 8, max: 10, t: ['субклиническая', 'borderline'], c: 'warn' }, { min: 11, max: 21, t: ['клиническая', 'clinical'], c: 'due' }] }
+  ] });
+/* ---------- IIEF-15 (мужчины): домены по Rosen 1997 ---------- */
+Q_TNT.push({ id: 'iief', builtin: true, tnt: 'sexm', sex: 'М', lic: { org: 'IIEF (Rosen et al., Urology 1997)', url: 'https://pubmed.ncbi.nlm.nih.gov/9187685/', note: ['Используйте валидированную русскую версию; текст и баллы ответов вставляются из неё.', 'Use a validated Russian version.'] },
+  name: ['IIEF: международный индекс эректильной функции (мужчины)', 'IIEF: International Index of Erectile Function (men)'], short: 'IIEF',
+  desc: ['15 пунктов, 5 доменов. Эректильная функция 1-30: 26-30 нет ЭД, 22-25 лёгкая, 17-21 лёгкая-умеренная, 11-16 умеренная, 6-10 тяжёлая.', '15 items, 5 domains.'],
+  sub: ['За последние 4 недели', 'Over the past 4 weeks'],
+  items: qnum(1, 15).map(function (n) { return { id: 'i' + n, type: 'single', text: ph(n), opts: [qo('[вариант]', '[option]', null)], needScores: true }; }),
+  scales: [
+    { id: 'EF', name: ['Эректильная функция', 'Erectile function'], items: ['i1', 'i2', 'i3', 'i4', 'i5', 'i15'], type: 'sum', max: 30, main: true, bands: [{ min: 26, max: 30, t: ['нет ЭД', 'no ED'], c: 'ok' }, { min: 22, max: 25, t: ['лёгкая ЭД', 'mild'], c: 'warn' }, { min: 17, max: 21, t: ['лёгкая-умеренная', 'mild-moderate'], c: 'warn' }, { min: 11, max: 16, t: ['умеренная', 'moderate'], c: 'due' }, { min: 0, max: 10, t: ['тяжёлая', 'severe'], c: 'due' }] },
+    { id: 'OF', name: ['Оргазмическая функция', 'Orgasmic function'], items: ['i9', 'i10'], type: 'sum', max: 10 },
+    { id: 'SD', name: ['Половое влечение', 'Sexual desire'], items: ['i11', 'i12'], type: 'sum', max: 10 },
+    { id: 'IS', name: ['Удовлетворённость половым актом', 'Intercourse satisfaction'], items: ['i6', 'i7', 'i8'], type: 'sum', max: 15 },
+    { id: 'OS', name: ['Общая удовлетворённость', 'Overall satisfaction'], items: ['i13', 'i14'], type: 'sum', max: 10 }
+  ] });
+/* ---------- FSFI (женщины): домены и коэффициенты по Rosen 2000, порог 26,55 (Wiegel 2005) ---------- */
+Q_TNT.push({ id: 'fsfi', builtin: true, tnt: 'sexw', sex: 'Ж', lic: { org: 'FSFI (Rosen et al., J Sex Marital Ther 2000)', url: 'https://pubmed.ncbi.nlm.nih.gov/10782451/', note: ['Используйте валидированную русскую версию; текст и баллы ответов вставляются из неё.', 'Use a validated Russian version.'] },
+  name: ['FSFI: индекс женской сексуальной функции', 'FSFI: Female Sexual Function Index'], short: 'FSFI',
+  desc: ['19 пунктов, 6 доменов, общий балл 2-36. 26,55 и ниже указывает на сексуальную дисфункцию.', '19 items, 6 domains, total 2-36; 26.55 or less suggests dysfunction.'],
+  sub: ['За последние 4 недели', 'Over the past 4 weeks'],
+  items: qnum(1, 19).map(function (n) { return { id: 'f' + n, type: 'single', text: ph(n), opts: [qo('[вариант]', '[option]', null)], needScores: true }; }),
+  scales: [
+    { id: 'DES', name: ['Желание', 'Desire'], items: ['f1', 'f2'], type: 'wsum', k: 0.6 }, { id: 'ARO', name: ['Возбуждение', 'Arousal'], items: ['f3', 'f4', 'f5', 'f6'], type: 'wsum', k: 0.3 },
+    { id: 'LUB', name: ['Любрикация', 'Lubrication'], items: ['f7', 'f8', 'f9', 'f10'], type: 'wsum', k: 0.3 }, { id: 'ORG', name: ['Оргазм', 'Orgasm'], items: ['f11', 'f12', 'f13'], type: 'wsum', k: 0.4 },
+    { id: 'SAT', name: ['Удовлетворённость', 'Satisfaction'], items: ['f14', 'f15', 'f16'], type: 'wsum', k: 0.4 }, { id: 'PAIN', name: ['Боль', 'Pain'], items: ['f17', 'f18', 'f19'], type: 'wsum', k: 0.4 },
+    { id: 'TOT', name: ['Общий балл FSFI', 'FSFI total'], type: 'fsfitot', main: true, bands: [{ min: 26.56, max: 36, t: ['норма', 'normal'], c: 'ok' }, { min: 0, max: 26.55, t: ['дисфункция', 'dysfunction'], c: 'due' }] }
+  ] });
+/* ---------- EQ-5D-5L: профиль, сумма уровней, ВАШ. Индекс полезности требует национального набора ценностей ---------- */
+Q_TNT.push({ id: 'eq5d5l', builtin: true, tnt: 'eq', lic: { org: 'EuroQol Research Foundation', url: 'https://euroqol.org', note: ['Регистрация использования на сайте EuroQol, официальная русская версия выдаётся там. Индекс полезности считается по национальному набору ценностей.', 'Register with EuroQol; utility needs a national value set.'] },
+  name: ['EQ-5D-5L: общий статус здоровья', 'EQ-5D-5L: health status'], short: 'EQ-5D-5L',
+  desc: ['5 измерений по 5 уровней и визуальная аналоговая шкала 0-100.', '5 dimensions, 5 levels, plus VAS 0-100.'],
+  items: qnum(1, 5).map(function (n) { return { id: 'e' + n, type: 'single', text: ph(n, 'Измерение'), opts: qnum(1, 5).map(function (l) { return qo('[уровень ' + l + ']', '[level ' + l + ']', l); }) }; }).concat([{ id: 'e6', type: 'num', text: ['[Шкала здоровья 0-100: вставьте текст из официальной версии]', '[Health VAS 0-100]'] }]),
+  scales: [{ id: 'PROF', name: ['Профиль', 'Profile'], type: 'eqprof', main: true }, { id: 'LSS', name: ['Сумма уровней (5-25)', 'Level sum (5-25)'], items: ['e1', 'e2', 'e3', 'e4', 'e5'], type: 'sum', max: 25 }, { id: 'VAS', name: ['ВАШ здоровья', 'Health VAS'], items: ['e6'], type: 'sum', max: 100 }] });
+/* ---------- PRO-CTCAE (NCI): пациент оценивает симптомы, рабочий перевод выбранных пунктов ---------- */
+(function () {
+  var FQ = function () { return [qo('Никогда', 'Never', 0), qo('Редко', 'Rarely', 1), qo('Иногда', 'Occasionally', 2), qo('Часто', 'Frequently', 3), qo('Почти постоянно', 'Almost constantly', 4)]; };
+  var SV = function () { return [qo('Нет', 'None', 0), qo('Слабая', 'Mild', 1), qo('Умеренная', 'Moderate', 2), qo('Сильная', 'Severe', 3), qo('Очень сильная', 'Very severe', 4)]; };
+  var IN = function () { return [qo('Совсем не мешали', 'Not at all', 0), qo('Немного', 'A little bit', 1), qo('Отчасти', 'Somewhat', 2), qo('Значительно', 'Quite a bit', 3), qo('Очень сильно', 'Very much', 4)]; };
+  var it = [], sc = [];
+  function sym(k, ru, en, attrs, sex) {
+    var ids = [], first = null;
+    attrs.forEach(function (a) {
+      var id = 'pc_' + k + '_' + a, txt;
+      if (a === 'f') txt = ['Как ЧАСТО у вас было: ' + ru + '?', 'How OFTEN did you have ' + en + '?'];
+      else if (a === 's') txt = ['Какой была ТЯЖЕСТЬ в худшие моменты: ' + ru + '?', 'What was the SEVERITY of your ' + en + ' at its WORST?'];
+      else txt = ['Насколько ' + ru + ' МЕШАЛО вашим обычным делам?', 'How much did ' + en + ' INTERFERE with your usual or daily activities?'];
+      var x = { id: id, type: 'single', text: txt, opts: a === 'f' ? FQ() : a === 's' ? SV() : IN() };
+      if (first) x.cond = { q: first, ne: 0 }; else if (sex) x.cond = { q: '_sex', a: sex === 'М' ? 0 : 1 };
+      if (!first) first = id; it.push(x); ids.push(id);
+    });
+    sc.push({ id: k, name: [ru.charAt(0).toUpperCase() + ru.slice(1), en], items: ids, type: 'max', max: 4 });
+  }
+  it.push({ id: '_sex', type: 'single', text: ['Ваш пол', 'Your sex'], opts: [qo('Мужской', 'Male', 0), qo('Женский', 'Female', 0)], app: true });
+  sym('diar', 'жидкий или водянистый стул', 'loose or watery stools (diarrhea)', ['f']);
+  sym('naus', 'тошнота', 'nausea', ['f', 's']);
+  sym('vom', 'рвота', 'vomiting', ['f', 's']);
+  sym('mouth', 'язвы во рту или горле', 'mouth or throat sores', ['s', 'i']);
+  sym('appet', 'снижение аппетита', 'decreased appetite', ['s', 'i']);
+  sym('fatig', 'усталость, слабость, нехватка сил', 'fatigue, tiredness, or lack of energy', ['s', 'i']);
+  sym('neuro', 'онемение или покалывание в кистях или стопах', 'numbness or tingling in your hands or feet', ['s', 'i']);
+  sym('handft', 'ладонно-подошвенный синдром (покраснение, трещины, боль кожи ладоней и стоп)', 'hand-foot syndrome', ['s']);
+  sym('abdp', 'боль в животе', 'pain in the abdomen (belly area)', ['f', 's', 'i']);
+  sym('fincon', 'потеря контроля над кишечником (недержание кала)', 'loss of control of bowel movements', ['f', 'i']);
+  sym('dysur', 'боль или жжение при мочеиспускании', 'pain or burning with urination', ['s']);
+  sym('urg', 'внезапные позывы к мочеиспусканию', 'sudden urges to urinate', ['f', 'i']);
+  sym('rtskin', 'ожог кожи от облучения', 'skin burns from radiation', ['s']);
+  sym('libido', 'снижение сексуального влечения', 'decreased sexual interest', ['s']);
+  sym('erect', 'трудности с эрекцией', 'difficulty getting or keeping an erection', ['s'], 'М');
+  sym('vagdry', 'сухость во влагалище', 'vaginal dryness', ['s'], 'Ж');
+  sym('dyspar', 'боль при половом акте', 'pain during vaginal sex', ['s'], 'Ж');
+  sc.unshift({ id: 'WORST', name: ['Наибольший балл по симптомам', 'Worst symptom score'], type: 'maxall', max: 4, main: true });
+  Q_TNT.push({ id: 'proctcae', builtin: true, tnt: 'core', working: true, lic: { org: 'NCI PRO-CTCAE', url: 'https://healthcaredelivery.cancer.gov/pro-ctcae/', note: ['Инструмент NCI в открытом доступе. В приложении рабочий перевод выбранных пунктов; для исследования замените его официальной валидированной русской версией NCI (кнопка «Вставить официальный текст»).', 'NCI instrument; app uses a working translation of selected items. Replace with the official validated Russian version.'] },
+    name: ['PRO-CTCAE: токсичность глазами пациента', 'PRO-CTCAE: patient-reported toxicity'], short: 'PRO-CTCAE',
+    desc: ['Пациент сам оценивает симптомы, связанные с химиотерапией и лучевой терапией. Каждый пункт 0-4; по симптому берётся наибольший балл его пунктов.', 'Patient-reported symptoms, 0-4 per item; per symptom the highest item score.'],
+    sub: ['За последние 7 дней', 'In the last 7 days'], items: it, scales: sc });
+})();
+/* ---------- CTCAE v5.0 (NCI): оценивает врач. Критерии степеней в сокращённом переводе ---------- */
+(function () {
+  var it = [], sc = [];
+  function ae(k, ru, en, g) { var id = 'ae_' + k; it.push({ id: id, type: 'single', text: [ru, en], opts: [qo('Нет (степень 0)', 'None (grade 0)', 0)].concat(g.map(function (x, i) { return x ? qo('Степень ' + (i + 1) + ': ' + x, 'Grade ' + (i + 1), i + 1) : null; }).filter(Boolean)) }); sc.push({ id: k, name: [ru, en], items: [id], type: 'max', max: 5 }); }
+  var G5 = 'смерть';
+  ae('diar', 'Диарея', 'Diarrhea', ['учащение стула менее чем на 4 раза в сутки к исходному; лёгкое увеличение отделяемого по стоме', 'учащение на 4-6 раз в сутки; умеренное увеличение по стоме; ограничение инструментальной повседневной активности', 'учащение на 7 и более раз в сутки; показана госпитализация; выраженное увеличение по стоме; ограничение самообслуживания', 'угроза жизни; показано срочное вмешательство', G5]);
+  ae('naus', 'Тошнота', 'Nausea', ['снижение аппетита без изменения пищевого поведения', 'снижение приёма пищи без значимой потери веса, обезвоживания или недоедания', 'недостаточный приём пищи или жидкости; показаны зондовое или парентеральное питание, госпитализация']);
+  ae('vom', 'Рвота', 'Vomiting', ['вмешательство не требуется', 'показаны амбулаторная внутривенная гидратация, медикаментозное лечение', 'показаны зондовое или парентеральное питание, госпитализация', 'угроза жизни', G5]);
+  ae('mucos', 'Мукозит полости рта', 'Oral mucositis', ['бессимптомный или слабо выраженный; вмешательство не требуется', 'умеренная боль или язвы, не мешающие приёму пищи; показана щадящая диета', 'сильная боль; мешает приёму пищи', 'угроза жизни; показано срочное вмешательство', G5]);
+  ae('fatig', 'Слабость (утомляемость)', 'Fatigue', ['проходит после отдыха', 'не проходит после отдыха; ограничение инструментальной повседневной активности', 'не проходит после отдыха; ограничение самообслуживания']);
+  ae('anor', 'Анорексия', 'Anorexia', ['снижение аппетита без изменения пищевого поведения', 'изменение приёма пищи без значимой потери веса или недоедания; показаны пищевые добавки', 'значимая потеря веса или недоедание; показаны зондовое или парентеральное питание', 'угроза жизни; показано срочное вмешательство', G5]);
+  ae('neuro', 'Периферическая сенсорная нейропатия', 'Peripheral sensory neuropathy', ['бессимптомная', 'умеренные симптомы; ограничение инструментальной повседневной активности', 'выраженные симптомы; ограничение самообслуживания', 'угроза жизни; показано срочное вмешательство', G5]);
+  ae('ppe', 'Ладонно-подошвенная эритродизестезия', 'Palmar-plantar erythrodysesthesia', ['минимальные изменения кожи (эритема, отёк, гиперкератоз) без боли', 'изменения кожи (шелушение, пузыри, кровоточивость, трещины, отёк, гиперкератоз) с болью; ограничение инструментальной повседневной активности', 'выраженные изменения кожи с болью; ограничение самообслуживания']);
+  ae('neut', 'Нейтропения (снижение нейтрофилов)', 'Neutrophil count decreased', ['от нижней границы нормы до 1,5 × 10⁹/л', 'менее 1,5 до 1,0 × 10⁹/л', 'менее 1,0 до 0,5 × 10⁹/л', 'менее 0,5 × 10⁹/л']);
+  ae('fn', 'Фебрильная нейтропения', 'Febrile neutropenia', [null, null, 'нейтрофилы менее 1,0 × 10⁹/л и однократно температура выше 38,3 °C или стойко 38 °C и выше более часа', 'угроза жизни; показано срочное вмешательство', G5]);
+  ae('plt', 'Тромбоцитопения', 'Platelet count decreased', ['от нижней границы нормы до 75 × 10⁹/л', 'менее 75 до 50 × 10⁹/л', 'менее 50 до 25 × 10⁹/л', 'менее 25 × 10⁹/л']);
+  ae('anem', 'Анемия', 'Anemia', ['гемоглобин от нижней границы нормы до 100 г/л', 'менее 100 до 80 г/л', 'менее 80 г/л; показана трансфузия', 'угроза жизни; показано срочное вмешательство', G5]);
+  ae('proct', 'Проктит', 'Proctitis', ['дискомфорт в прямой кишке; вмешательство не требуется', 'симптомы (дискомфорт, выделение крови или слизи); показано лечение; ограничение инструментальной повседневной активности', 'выраженные симптомы; императивные позывы или недержание; ограничение самообслуживания', 'угроза жизни; показано срочное вмешательство', G5]);
+  ae('rtderm', 'Лучевой дерматит', 'Dermatitis radiation', ['слабая эритема или сухое шелушение', 'умеренная или яркая эритема; очаговое влажное шелушение преимущественно в складках; умеренный отёк', 'влажное шелушение вне складок; кровоточивость от незначительной травмы', 'угроза жизни; некроз или изъязвление кожи на всю толщу дермы; спонтанное кровотечение; показана пересадка кожи', G5]);
+  ae('cyst', 'Цистит неинфекционный', 'Cystitis noninfective', ['микрогематурия; минимальное учащение, императивные позывы, дизурия или никтурия; впервые возникшее недержание', 'умеренная гематурия; умеренное учащение, позывы, дизурия, никтурия или недержание; показаны катетер или промывание пузыря; ограничение инструментальной повседневной активности', 'макрогематурия; показаны трансфузия, внутривенное лечение или госпитализация; показано плановое эндоскопическое, рентгенохирургическое или хирургическое вмешательство', 'угроза жизни; показано срочное вмешательство', G5]);
+  ae('abdp', 'Боль в животе', 'Abdominal pain', ['слабая боль', 'умеренная боль; ограничение инструментальной повседневной активности', 'сильная боль; ограничение самообслуживания']);
+  ae('alt', 'Повышение АЛТ/АСТ (при исходной норме)', 'ALT/AST increased', ['выше нормы до 3,0 × ВГН', 'выше 3,0 до 5,0 × ВГН', 'выше 5,0 до 20,0 × ВГН', 'выше 20,0 × ВГН']);
+  ae('bili', 'Повышение билирубина (при исходной норме)', 'Blood bilirubin increased', ['выше нормы до 1,5 × ВГН', 'выше 1,5 до 3,0 × ВГН', 'выше 3,0 до 10,0 × ВГН', 'выше 10,0 × ВГН']);
+  ae('creat', 'Повышение креатинина', 'Creatinine increased', ['выше нормы до 1,5 × ВГН', 'выше 1,5 до 3,0 × исходного или ВГН', 'выше 3,0 × исходного; выше 3,0 до 6,0 × ВГН', 'выше 6,0 × ВГН']);
+  ae('vte', 'Тромбоэмболическое осложнение', 'Thromboembolic event', ['лечение не требуется (например, поверхностный тромбоз)', 'показано лечение', 'показано срочное лечение (например, ТЭЛА или внутрисердечный тромб)', 'угроза жизни с нестабильностью гемодинамики или неврологическим дефицитом', G5]);
+  it.push({ id: 'ae_other', type: 'text', text: ['Другие нежелательные явления: название по CTCAE v5.0, степень, связь с лечением', 'Other adverse events: CTCAE term, grade, attribution'] });
+  sc.unshift({ id: 'G3', name: ['Нежелательных явлений 3 степени и выше', 'Grade 3+ events'], type: 'cnt3', max: 20 }, { id: 'WORST', name: ['Наибольшая степень', 'Worst grade'], type: 'maxall', max: 5, main: true, bands: [{ min: 0, max: 0, t: ['без НЯ', 'none'], c: 'ok' }, { min: 1, max: 2, t: ['1-2 степень', 'grade 1-2'], c: 'warn' }, { min: 3, max: 5, t: ['3 степень и выше', 'grade 3+'], c: 'due' }] });
+  Q_TNT.push({ id: 'ctcae5', builtin: true, clin: true, tnt: 'core', working: true, lic: { org: 'NCI CTCAE v5.0', url: 'https://ctep.cancer.gov/protocoldevelopment/electronic_applications/ctc.htm', note: ['Общедоступный документ NCI. В приложении сокращённый перевод критериев для нежелательных явлений, типичных для ТНТ; при спорной степени сверяйтесь с полным текстом CTCAE v5.0.', 'Public NCI document; abbreviated translation of TNT-relevant terms.'] },
+    name: ['CTCAE v5.0: токсичность (оценивает врач)', 'CTCAE v5.0: toxicity (clinician-rated)'], short: 'CTCAE v5.0',
+    desc: ['Заполняет врач на каждом визите или курсе. Выберите степень для каждого нежелательного явления; итог: наибольшая степень и число НЯ 3 степени и выше.', 'Clinician-rated at each visit or cycle.'],
+    items: it, scales: sc });
+})();
+Q_BUILTIN = Q_BUILTIN.concat(Q_TNT);
+/* ---------- подсчёт по шкалам ---------- */
+function qItemVal(q, ans, id, vis) {
+  var ids = String(id).split('|');
+  for (var i = 0; i < ids.length; i++) { var it = q.items.filter(function (x) { return x.id === ids[i]; })[0], a = ans[ids[i]]; if (!it || !has(a) || (vis && !vis[ids[i]])) continue; if (it.type === 'num') return num(a); var o = it.opts && it.opts[+a]; if (o && o.s !== null && o.s !== undefined) return +o.s; }
+  return null;
+}
+function qScales(q, ans) {
+  if (!q || !q.scales || !q.scales.length) return null;
+  var out = {}, vals = {}, vis = {}; qVisible(q, ans).forEach(function (it) { vis[it.id] = 1; });
+  q.scales.forEach(function (s) {
+    var v = null, xs = (s.items || []).map(function (id) { return qItemVal(q, ans, id, vis); }), got = xs.filter(function (x) { return x !== null; });
+    if (s.type === 'eo-f' || s.type === 'eo-s' || s.type === 'eo-g') {
+      if (got.length && got.length * 2 >= xs.length) { var rs = got.reduce(function (a, b) { return a + b; }, 0) / got.length; v = s.type === 'eo-f' ? (1 - (rs - 1) / s.range) * 100 : (rs - 1) / s.range * 100; }
+    } else if (s.type === 'sum') { if (got.length && got.length === xs.length) v = got.reduce(function (a, b) { return a + b; }, 0); }
+    else if (s.type === 'wsum') { if (got.length === xs.length) v = got.reduce(function (a, b) { return a + b; }, 0) * s.k; }
+    else if (s.type === 'max') { if (got.length) v = Math.max.apply(null, got); }
+    vals[s.id] = v;
+  });
+  q.scales.forEach(function (s) {
+    var v = vals[s.id];
+    if (s.type === 'c30sum') { var F = ['PF', 'RF', 'SF', 'EF', 'CF'], Sy = ['FA', 'PA', 'DY', 'SL', 'AP', 'NV', 'CO', 'DI'], ok = F.concat(Sy).every(function (k) { return vals[k] !== null && vals[k] !== undefined; }); v = ok ? (F.reduce(function (a, k) { return a + vals[k]; }, 0) + Sy.reduce(function (a, k) { return a + (100 - vals[k]); }, 0)) / 13 : null; }
+    else if (s.type === 'fsfitot') { var dm = ['DES', 'ARO', 'LUB', 'ORG', 'SAT', 'PAIN']; v = dm.every(function (k) { return vals[k] !== null; }) ? dm.reduce(function (a, k) { return a + vals[k]; }, 0) : null; }
+    else if (s.type === 'maxall') { var all = q.scales.filter(function (z) { return z.type === 'max'; }).map(function (z) { return vals[z.id]; }).filter(function (x) { return x !== null; }); v = all.length ? Math.max.apply(null, all) : (Object.keys(ans).length ? 0 : null); }
+    else if (s.type === 'cnt3') { v = q.scales.filter(function (z) { return z.type === 'max' && vals[z.id] !== null && vals[z.id] >= 3; }).length; }
+    else if (s.type === 'eqprof') { var lv = ['e1', 'e2', 'e3', 'e4', 'e5'].map(function (id) { return qItemVal(q, ans, id, vis); }); v = lv.every(function (x) { return x !== null; }) ? lv.join('') : null; }
+    if (typeof v === 'number') v = Math.round(v * 10) / 10;
+    out[s.id] = v;
+  });
+  return out;
+}
+function qScaleBand(s, v) { if (v === null || v === undefined || !s.bands) return null; return s.bands.filter(function (b) { return v >= b.min && v <= b.max; })[0] || null; }
+function qScalesHTML(q, sc, compact) {
+  if (!q || !q.scales || !sc) return '';
+  var list = q.scales.filter(function (s) { return sc[s.id] !== null && sc[s.id] !== undefined; });
+  if (compact) list = list.filter(function (s) { return s.main; });
+  if (!list.length) return '';
+  return '<div class="qsc' + (compact ? ' compact' : '') + '">' + list.map(function (s) { var v = sc[s.id], b = qScaleBand(s, v); return '<span class="qsc-i' + (b ? ' sc-' + b.c : '') + (s.main ? ' main' : '') + '" title="' + esc(L(s.name)) + '"><em>' + esc(compact ? qShortScale(s) : L(s.name)) + '</em><b>' + esc(String(v)) + (s.max && typeof v === 'number' && !/^eo/.test(s.type) ? '<i>/' + s.max + '</i>' : '') + '</b>' + (b ? '<span>' + esc(L(b.t)) + '</span>' : '') + '</span>'; }).join('') + '</div>';
+}
+function qShortScale(s) { return s.id.length <= 5 ? s.id : L(s.name); }
+/* ---------- официальный текст: хранится в базе центра поверх встроенной структуры ---------- */
+function qTextReady(q) {
+  if (!q || !q.lic || q.working) return true;
+  var ov = (DB.qtext || {})[q.id]; if (!ov) return false;
+  return q.items.filter(function (it) { return !it.app; }).every(function (it) { var o = ov.items && ov.items[it.id]; return o && o.t && (!it.needScores || (o.opts && o.opts.length && o.opts.every(function (x) { return x.s !== null && x.s !== undefined; }))); }) && (!q.scalesFromManual || (ov.scales && ov.scales.length));
+}
+function qApplyText(q) {
+  var ov = q && (DB.qtext || {})[q.id]; if (!ov) return q;
+  var c = JSON.parse(JSON.stringify(q));
+  c.items.forEach(function (it) { var o = ov.items && ov.items[it.id]; if (!o) return; if (o.t) it.text = [o.t, o.t]; if (o.opts && o.opts.length) it.opts = o.opts.map(function (x, i) { var keep = it.opts[i] || {}; return { t: [x.t, x.t], s: x.s !== null && x.s !== undefined ? x.s : keep.s }; }); });
+  if (ov.sub) c.sub = [ov.sub, ov.sub];
+  if (ov.scales && ov.scales.length) c.scales = ov.scales.concat((c.scales || []).filter(function (s) { return !ov.scales.some(function (z) { return z.id === s.id; }); }));
+  c.textBy = ov.by; c.textAt = ov.at;
+  return c;
+}
+/* формат вставки: по строке на пункт в порядке анкеты; ответы после «||» через «|», балл через «=»; «#ответы:» общие варианты; «#шкала ID Название: 31,32» */
+function qParseText(q, txt) {
+  var lines = String(txt || '').split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean), items = {}, commonOpts = null, scales = [], sub = '', errs = [];
+  var targets = q.items.filter(function (it) { return !it.app; }), k = 0;
+  function parseOpts(s) { return s.split('|').map(function (x) { x = x.trim(); if (!x) return null; var m = /^(.*?)\s*=\s*(-?\d+(?:[.,]\d+)?)\s*$/.exec(x); return m ? { t: m[1].trim(), s: num(m[2]) } : { t: x, s: null }; }).filter(Boolean); }
+  lines.forEach(function (l) {
+    var m;
+    if ((m = /^#\s*ответы\s*:\s*(.+)$/i.exec(l))) { commonOpts = parseOpts(m[1]); return; }
+    if ((m = /^#\s*инструкция\s*:\s*(.+)$/i.exec(l))) { sub = m[1].trim(); return; }
+    if ((m = /^#\s*шкала\s+([A-Za-z0-9_]+)\s+(.+?)\s*:\s*([\d,\s|s]+)$/i.exec(l))) { var pre = q.items[0] && /^[a-z]+/i.exec(q.items[0].id)[0]; scales.push({ id: m[1], name: [m[2], m[2]], items: m[3].split(/[,\s]+/).filter(Boolean).map(function (n) { return /^[a-z]/i.test(n) ? n : pre + n; }), type: q.scaleType || 'eo-s', range: 3 }); return; }
+    if (l.charAt(0) === '#') return;
+    var tgt = targets[k++]; if (!tgt) { errs.push(LL('лишняя строка: ', 'extra line: ') + l.slice(0, 40)); return; }
+    var parts = l.split('||'), t0 = parts[0].replace(/^\s*\d{1,3}[.)]\s*/, '').trim(), o = { t: t0 };
+    if (parts[1]) o.opts = parseOpts(parts[1]); else if (commonOpts && (tgt.type === 'single')) o.opts = commonOpts.map(function (x, i) { return { t: x.t, s: x.s !== null ? x.s : (tgt.opts[i] ? tgt.opts[i].s : null) }; });
+    if (o.opts && tgt.opts && !tgt.needScores && o.opts.length !== tgt.opts.length) errs.push(LL('пункт ', 'item ') + tgt.id + LL(': вариантов ответа ', ': options ') + o.opts.length + LL(', ожидается ', ', expected ') + tgt.opts.length);
+    items[tgt.id] = o;
+  });
+  if (k < targets.length) errs.push(LL('не хватает пунктов: вставлено ', 'missing items: pasted ') + k + LL(' из ', ' of ') + targets.length);
+  return { items: items, scales: scales, sub: sub, errs: errs, n: k, need: targets.length };
+}
+function renderQText() {
+  var o = S.qtx, q = Q_BUILTIN.filter(function (x) { return x.id === o.qid; })[0]; if (!q) return '';
+  var targets = q.items.filter(function (it) { return !it.app; }), ov = (DB.qtext || {})[q.id];
+  var h = '<div class="dim" data-act="qtxx"></div><section class="modal" role="dialog" aria-modal="true" style="width:min(820px,calc(100% - 24px))"><div class="dhead"><div><div class="dh-kicker">' + LL('Официальный текст анкеты', 'Official questionnaire text') + '</div><div class="dh-title">' + esc(qName(q)) + '</div></div><button type="button" class="iconbtn" data-act="qtxx" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
+  h += '<div class="dxprov warn" style="margin-bottom:10px">' + ico('info', 16) + '<div><b>' + esc(q.lic.org) + '</b><span>' + esc(L(q.lic.note)) + ' <a href="' + esc(q.lic.url) + '" target="_blank" rel="noopener">' + esc(q.lic.url.replace(/^https?:\/\//, '')) + '</a></span></div></div>';
+  h += '<p class="hint">' + LL('Вставьте пункты по одному на строку, в порядке анкеты (номера в начале строки можно оставить). Ожидается пунктов: ', 'Paste one item per line in order. Items expected: ') + '<b>' + targets.length + '</b>.' + (targets.some(function (x) { return x.needScores; }) ? LL(' Для этой анкеты у каждого пункта нужны варианты ответа с баллами из официального ключа: «текст пункта || ответ = балл | ответ = балл | …».', ' Each item needs options with scores: “item || option = score | …”.') : LL(' Общие варианты ответа можно задать строкой «#ответы: Совсем нет | Немного | Довольно | Очень» (баллы 1-4 сохранятся).', ' Common options: “#ответы: … | …”.')) + (q.scalesFromManual ? LL(' Подшкалы задайте по руководству EORTC строками вида «#шкала SENS Сенсорная: 31, 32, 33 …».', ' Define subscales from the EORTC manual: “#шкала SENS Sensory: 31, 32 …”.') : '') + LL(' Инструкцию можно задать строкой «#инструкция: …».', ' Instruction: “#инструкция: …”.') + '</p>';
+  h += '<textarea id="qtxt" rows="16" style="width:100%;font:13px/1.5 ui-monospace,monospace" placeholder="' + esc(targets.slice(0, 3).map(function (it, i) { return (i + 1) + '. ' + LL('текст пункта', 'item text') + (it.needScores ? ' || ' + LL('ответ', 'option') + ' = 3 | ' + LL('ответ', 'option') + ' = 2 | …' : ''); }).join('\n')) + '">' + esc(o.text || '') + '</textarea>';
+  if (o.res) h += '<div class="' + (o.res.errs.length ? 'aerr' : 'hint ok') + '" style="margin-top:8px">' + (o.res.errs.length ? o.res.errs.map(esc).join('<br>') : LL('Распознано пунктов: ', 'Items recognised: ') + o.res.n + LL(' из ', ' of ') + o.res.need) + '</div>';
+  if (ov) h += '<p class="hint">' + LL('Текущий текст вставлен: ', 'Current text by: ') + esc(ov.by || '') + ', ' + fmtDT(ov.at) + '</p>';
+  h += '</div><div class="dfoot"><div>' + (ov ? '<button type="button" class="btn ghost danger" data-act="qtxdel">' + LL('Удалить вставленный текст', 'Remove pasted text') + '</button>' : '') + '</div><div class="actions"><button type="button" class="btn" data-act="qtxcheck">' + LL('Проверить', 'Check') + '</button><button type="button" class="btn primary" data-act="qtxsave">' + LL('Сохранить', 'Save') + '</button></div></div></section>';
+  return h;
+}
+/* ---------- набор анкет для исследования TNT ---------- */
+var TNT_POINTS = [['base', ['Исходно, до начала ТНТ', 'Baseline, before TNT'], 'tnt0', 0], ['mid', ['Середина ТНТ', 'Mid-TNT'], 'tnt0', 42], ['postTnt', ['После завершения ТНТ (перед оценкой ответа)', 'After TNT (before response assessment)'], 'tnt1', 14], ['m3', ['3 мес после операции или начала W&W', '3 mo after surgery or W&W'], 'op', 90], ['m6', ['6 мес', '6 mo'], 'op', 180], ['m12', ['12 мес', '12 mo'], 'op', 365], ['m24', ['24 мес', '24 mo'], 'op', 730]];
+function tntPlan(o, p) {
+  var d = p.d, sex = d.sex, sets = ['proctcae', 'qlqc30', 'qlqcr29'];
+  if (o.oxali) sets.push('qlqcipn20'); if (o.sexEnd && (sex === 'Ж' || sex === 'М')) sets.push(sex === 'Ж' ? 'fsfi' : 'iief'); if (o.hads) sets.push('hads'); if (o.eq) sets.push('eq5d5l');
+  var anc = { tnt0: o.tnt0 || d.neoStart || d.rtStart, tnt1: o.tnt1 || d.neoEnd || d.rtEnd, op: o.op || d.date }, out = [];
+  TNT_POINTS.forEach(function (pt) {
+    if (o.pts.indexOf(pt[0]) < 0) return; var a = anc[pt[2]]; if (!a) return; var due = isoOf(addDays(a, pt[3]));
+    sets.forEach(function (tid) { out.push({ id: uid('q'), tid: tid, due: due, label: 'TNT · ' + L(pt[1]) }); });
+    if (o.ctcae && ['base', 'mid', 'postTnt'].indexOf(pt[0]) >= 0) out.push({ id: uid('q'), tid: 'ctcae5', due: due, label: 'TNT · ' + L(pt[1]) });
+    if (o.lars && /^m/.test(pt[0])) out.push({ id: uid('q'), tid: 'lars', due: due, label: 'TNT · ' + L(pt[1]) });
+  });
+  return out;
+}
+function renderTntSet() {
+  var o = S.tnt, p = findPat(o.pid); if (!p) return ''; var d = p.d, plan = tntPlan(o, p);
+  function chk(k, lab, sub) { return '<label class="chk"><input type="checkbox" data-tnt="' + k + '"' + (o[k] ? ' checked' : '') + '><span>' + lab + (sub ? ' <em class="muted small">' + sub + '</em>' : '') + '</span></label>'; }
+  function dt(k, lab, v) { return '<div class="fld"><label>' + lab + '</label><input type="date" data-tntd="' + k + '" value="' + esc(o[k] || v || '') + '"></div>'; }
+  var h = '<div class="dim" data-act="tntx"></div><section class="modal xmodal" role="dialog" aria-modal="true" style="width:min(760px,calc(100% - 24px))"><div class="dhead"><div><div class="dh-kicker">' + LL('Исследование TNT', 'TNT study') + '</div><div class="dh-title">' + LL('Набор шкал и анкет', 'Scales and questionnaires') + ' · ' + esc(pName(p)) + '</div></div><button type="button" class="iconbtn" data-act="tntx" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
+  h += '<div class="xgrp"><div class="xlab">' + LL('Обязательное ядро (на каждой точке)', 'Core (every time point)') + '</div><p class="hint">PRO-CTCAE · EORTC QLQ-C30 · EORTC QLQ-CR29' + LL(' (включая базовую сексуальную функцию у всех)', ' (incl. basic sexual function)') + '</p>' + chk('ctcae', LL('CTCAE v5.0 (врач) на точках во время ТНТ', 'CTCAE v5.0 (clinician) during TNT')) + '</div>';
+  h += '<div class="xgrp"><div class="xlab">' + LL('Дополнительно', 'Optional') + '</div>' + chk('oxali', 'QLQ-CIPN20', LL('схема с оксалиплатином (FOLFOX, CAPOX)', 'oxaliplatin regimen')) + chk('lars', 'LARS', LL('после сфинктеросохраняющей операции, на точках после операции', 'after sphincter-saving surgery')) + chk('sexEnd', (d.sex === 'Ж' ? 'FSFI' : d.sex === 'М' ? 'IIEF' : 'IIEF / FSFI'), LL('если сексуальная функция отдельная конечная точка', 'if sexual function is a separate endpoint')) + chk('hads', 'HADS', LL('если психологическое состояние отдельная цель', 'if psychology is a separate aim')) + chk('eq', 'EQ-5D-5L', LL('универсальная оценка здоровья, экономический анализ', 'utility, economic analysis')) + '</div>';
+  h += '<div class="xgrp"><div class="xlab">' + LL('Даты отсчёта', 'Anchor dates') + '</div><div class="fgrid">' + dt('tnt0', LL('Начало ТНТ', 'TNT start'), d.neoStart || d.rtStart) + dt('tnt1', LL('Окончание ТНТ', 'TNT end'), d.neoEnd || d.rtEnd) + dt('op', LL('Операция или начало W&W', 'Surgery or W&W start'), d.date) + '</div></div>';
+  h += '<div class="xgrp"><div class="xlab">' + LL('Точки оценки', 'Time points') + '</div><div class="chips">' + TNT_POINTS.map(function (pt) { return '<button type="button" class="chip' + (o.pts.indexOf(pt[0]) >= 0 ? ' on' : '') + '" data-act="tntpt" data-v="' + pt[0] + '">' + esc(L(pt[1])) + '</button>'; }).join('') + '</div></div>';
+  if (o.sexEnd && d.sex !== 'Ж' && d.sex !== 'М') h += '<div class="dxprov warn">' + ico('alert', 16) + '<div><b>' + LL('Не указан пол пациента', 'Patient sex not set') + '</b><span>' + LL('IIEF или FSFI назначаются по полу. Укажите пол в карточке, затем откройте набор снова.', 'IIEF or FSFI depends on sex. Set sex in the record and reopen the set.') + '</span></div></div>';
+  var miss = []; ['proctcae', 'qlqc30', 'qlqcr29', 'qlqcipn20', 'hads', 'iief', 'fsfi', 'eq5d5l'].forEach(function (id) { var q = Q_BUILTIN.filter(function (x) { return x.id === id; })[0]; if (q && plan.some(function (e) { return e.tid === id; }) && !qTextReady(q)) miss.push(q.short); });
+  if (miss.length) h += '<div class="dxprov warn">' + ico('alert', 16) + '<div><b>' + LL('Нет официального текста: ', 'Official text missing: ') + esc(miss.join(', ')) + '</b><span>' + LL('Назначить можно уже сейчас, но заполнить эти анкеты получится после вставки лицензионного текста на странице «Анкеты».', 'You can schedule now; filling needs the licensed text first.') + '</span></div></div>';
+  h += '<p class="hint">' + LL('Будет назначено анкет: ', 'Will be scheduled: ') + '<b>' + plan.length + '</b>' + (plan.length ? ' (' + Object.keys(plan.reduce(function (a, e) { a[e.label] = 1; return a; }, {})).length + LL(' точек)', ' time points)') : LL('. Укажите даты отсчёта и точки.', '. Set dates and time points.')) + '</p>';
+  h += '</div><div class="dfoot"><div></div><div class="actions"><button type="button" class="btn" data-act="tntx">' + t('b.cancel') + '</button><button type="button" class="btn primary" data-act="tntgo"' + (plan.length ? '' : ' disabled') + '>' + LL('Назначить набор', 'Schedule set') + '</button></div></div></section>';
+  return h;
+}
+
 function qTpls() { return Q_BUILTIN.concat(DB.qtpl || []); }
-function qTpl(id) { return qTpls().filter(function (q) { return q.id === id; })[0]; }
+function qTpl(id) { return qApplyText(qTpls().filter(function (q) { return q.id === id; })[0]); }
 function qName(q) { return q ? L(q.name) : '?'; }
 function qShort(q) { return q ? (q.short || L(q.name)) : '?'; }
+function fillVis(q, f) { var hd = f.hide || []; return qVisible(q, f.ans).filter(function (it) { return hd.indexOf(it.id) < 0; }); }
 function qVisible(q, ans) {
   return q.items.filter(function (it) {
     if (!it.cond || !it.cond.q) return true;
     var a = ans[it.cond.q]; if (!has(a)) return false;
+    if (it.cond.ne !== undefined) return +a !== +it.cond.ne;
     return Array.isArray(a) ? a.indexOf(+it.cond.a) >= 0 : +a === +it.cond.a;
   });
 }
@@ -2357,13 +2652,14 @@ function qDueAll(days) {
 }
 function qStatusTag(e) {
   var st = qStatus(e), q = qTpl(e.tid);
+  if (st === 'done' && e.scales && q && q.scales) return '<span class="tag ok">' + LL('Заполнена ', 'Done ') + fmtDate(e.date) + '</span>' + qScalesHTML(q, e.scales, true);
   if (st === 'done') { var b = qBand(q || {}, e.score); return '<span class="tag ok">' + LL('Заполнена ', 'Done ') + fmtDate(e.date) + '</span>' + (e.score !== null && e.score !== undefined ? '<span class="score' + (b ? ' sc-' + b.c : '') + '">' + e.score + (q && q.max ? '<i>/' + q.max + '</i>' : '') + (b ? ' · ' + esc(L(b.t)) : '') + '</span>' : ''); }
   if (st === 'overdue') return '<span class="tag due">' + LL('Просрочена: ', 'Overdue: ') + fmtDate(e.due) + '</span>';
   return '<span class="tag">' + LL('К ', 'Due ') + fmtDate(e.due) + ' · ' + daysLabel(daysTo(e.due)) + '</span>';
 }
 function qCard(p, isNew) {
   var list = qEntries(p);
-  var h = '<section class="card ph-post" id="sec-q"><h3>' + ico('clipboard', 18) + LL('Анкеты пациента', 'Patient questionnaires') + '<span class="h3-note">LARS, Wexner</span></h3>';
+  var h = '<section class="card ph-post" id="sec-q"><h3>' + ico('clipboard', 18) + LL('Анкеты пациента', 'Patient questionnaires') + '<span class="h3-note">LARS, EORTC, PRO-CTCAE, CTCAE…</span></h3>';
   if (isNew) return h + '<p class="hint">' + LL('Сохраните карточку, чтобы назначать и заполнять анкеты.', 'Save the record to schedule and fill questionnaires.') + '</p></section>';
   if (!list.length) h += '<p class="hint">' + LL('Назначьте анкеты на контрольные сроки (например 3, 6 и 12 месяцев после закрытия стомы) или заполните прямо сейчас на планшете вместе с пациентом.', 'Schedule questionnaires at follow-up points (e.g. 3, 6 and 12 months after stoma closure) or fill one now on a tablet with the patient.') + '</p>';
   else h += '<div class="qlist">' + list.map(function (e) {
@@ -2371,10 +2667,11 @@ function qCard(p, isNew) {
     var r = '<div class="qrow"><div class="qn"><b>' + esc(qShort(q)) + '</b>' + (e.label ? '<span>' + esc(e.label) + '</span>' : '') + '</div><div class="qs">' + qStatusTag(e) + '</div><div class="qa">';
     r += e.date ? '<button type="button" class="btn small ghost" data-act="qview" data-id="' + e.id + '">' + (open ? LL('Скрыть ответы', 'Hide answers') : LL('Ответы', 'Answers')) + '</button>' : '<button type="button" class="btn small primary" data-act="qfill" data-pid="' + p.id + '" data-id="' + e.id + '">' + ico('tablet', 15) + LL('Заполнить', 'Fill in') + '</button>' + (CLOUD.on ? '<button type="button" class="btn small" data-act="qlnew" data-id="' + e.tid + '" data-pid="' + p.id + '" data-eid="' + e.id + '">' + ico('ext', 14) + LL('Ссылка пациенту', 'Link for patient') + '</button>' : '');
     r += '<button type="button" class="iconbtn sm" aria-label="' + LL('Удалить', 'Delete') + '" data-act="qdel" data-pid="' + p.id + '" data-id="' + e.id + '">' + ico('x', 15) + '</button></div></div>';
+    if (open && q && e.scales) r += qScalesHTML(q, e.scales, false);
     if (open && q) r += '<ol class="qans">' + qVisible(q, e.ans || {}).map(function (it) { var a = (e.ans || {})[it.id]; var txt = !has(a) ? '' : it.type === 'single' ? L(it.opts[+a].t) + (q.score ? ' (' + (it.opts[+a].s || 0) + ')' : '') : it.type === 'multi' ? a.map(function (i) { return L(it.opts[+i].t); }).join(', ') : String(a); return '<li><span>' + esc(L(it.text)) + '</span><b>' + esc(txt || LL('нет ответа', 'no answer')) + '</b></li>'; }).join('') + '</ol>';
     return r;
   }).join('') + '</div>';
-  h += '<div class="actions qbtns"><button type="button" class="btn" data-act="qsched" data-pid="' + p.id + '">' + ico('cal', 16) + LL('Назначить анкеты', 'Schedule') + '</button><button type="button" class="btn" data-act="qnow" data-pid="' + p.id + '">' + ico('tablet', 16) + LL('Заполнить сейчас', 'Fill in now') + '</button></div>';
+  h += '<div class="actions qbtns"><button type="button" class="btn" data-act="tntopen" data-pid="' + p.id + '">' + ico('flask', 16) + LL('Набор для исследования TNT', 'TNT study set') + '</button><button type="button" class="btn" data-act="qsched" data-pid="' + p.id + '">' + ico('cal', 16) + LL('Назначить анкеты', 'Schedule') + '</button><button type="button" class="btn" data-act="qnow" data-pid="' + p.id + '">' + ico('tablet', 16) + LL('Заполнить сейчас', 'Fill in now') + '</button></div>';
   return h + '</section>';
 }
 function renderQSched() {
@@ -2401,16 +2698,20 @@ function qSchedGo() {
 }
 function openFill(pid, eid) {
   var p = findPat(pid), e = p && (p.q || []).filter(function (x) { return x.id === eid; })[0]; if (!e) return;
-  S.fill = { pid: pid, eid: eid, i: 0, ans: clone(e.ans || {}), done: false }; S.menu = null; render();
+  var q0 = qTpls().filter(function (x) { return x.id === e.tid; })[0];
+  if (q0 && !qTextReady(q0)) { toast(LL('Сначала вставьте официальный текст анкеты ', 'Paste the official text first: ') + qShort(q0) + LL(' (Анкеты → Шаблоны анкет)', ' (Questionnaires → Templates)')); return; }
+  var a0 = clone(e.ans || {}); if (q0 && q0.items.some(function (it) { return it.id === '_sex'; }) && !has(a0._sex) && (p.d.sex === 'М' || p.d.sex === 'Ж')) a0._sex = p.d.sex === 'М' ? 0 : 1;
+  S.fill = { pid: pid, eid: eid, i: 0, ans: a0, done: false, hide: has(a0._sex) && !has((e.ans || {})._sex) ? ['_sex'] : [] }; S.menu = null; render();
 }
 function renderFill() {
   var f = S.fill, p = findPat(f.pid), e = (p.q || []).filter(function (x) { return x.id === f.eid; })[0], q = qTpl(e.tid);
-  var vis = qVisible(q, f.ans), n = vis.length, it = vis[Math.min(f.i, n - 1)];
+  var vis = fillVis(q, f), n = vis.length, it = vis[Math.min(f.i, n - 1)];
   var h = '<section class="fill" role="dialog" aria-modal="true" aria-label="' + esc(qName(q)) + '"><header class="fill-top"><img src="media/nroc-logo.png" alt="NROC"><div class="ft-t"><b>' + esc(qName(q)) + '</b><span>' + esc(pName(p)) + '</span></div><button type="button" class="iconbtn" data-act="fillclose" aria-label="' + t('a11y.close') + '">' + ico('x', 22) + '</button></header>';
   h += '<div class="fill-prog"><span style="width:' + (f.done ? 100 : Math.round(f.i / Math.max(1, n) * 100)) + '%"></span></div><div class="fill-body">';
   if (f.done) {
     var sc = qScore(q, f.ans), b = qBand(q, sc);
     h += '<div class="fill-done"><div class="fd-ic">' + ico('check', 40) + '</div><h2>' + LL('Спасибо! Анкета заполнена', 'Thank you! Questionnaire completed') + '</h2>';
+    if (q.scales && q.scales.length) h += qScalesHTML(q, qScales(q, f.ans), false);
     if (sc !== null) h += '<div class="fd-score' + (b ? ' sc-' + b.c : '') + '"><b>' + sc + '</b><span>' + LL('баллов', 'points') + (q.max ? LL(' из ', ' of ') + q.max : '') + '</span>' + (b ? '<em>' + esc(L(b.t)) + '</em>' : '') + '</div>';
     h += '<p class="muted">' + LL('Верните, пожалуйста, планшет врачу.', 'Please hand the tablet back to your doctor.') + '</p></div>';
   } else {
@@ -2428,7 +2729,7 @@ function renderFill() {
 }
 function fillSave() {
   var f = S.fill, q = null, sc = null, bd = null;
-  withPat(f.pid, function (p) { var e = (p.q || []).filter(function (x) { return x.id === f.eid; })[0]; if (!e) return; q = qTpl(e.tid); sc = qScore(q, f.ans); bd = qBand(q, sc); e.ans = clone(f.ans); e.date = isoOf(new Date()); e.score = sc; e.band = bd ? L(bd.t) : null; e.by = me(); });
+  withPat(f.pid, function (p) { var e = (p.q || []).filter(function (x) { return x.id === f.eid; })[0]; if (!e) return; q = qTpl(e.tid); sc = qScore(q, f.ans); bd = qBand(q, sc); e.ans = clone(f.ans); e.scales = qScales(q, f.ans); e.date = isoOf(new Date()); e.score = sc; e.band = bd ? L(bd.t) : null; e.by = me(); });
   var p = findPat(f.pid); if (p) p.log = (p.log || []).concat([{ ts: nowIso(), by: me(), act: 'q', note: qShort(q) + (sc !== null ? ', ' + sc + LL(' баллов', ' points') : ''), ch: [] }]);
   if (S.drawer && S.drawer.p.id === f.pid && p) S.drawer.p.log = clone(p.log);
   S.fill = null; save(); toast(LL('Анкета сохранена', 'Questionnaire saved')); render();
@@ -2484,7 +2785,8 @@ function renderQPage() {
   var h = '<div class="head"><div><div class="kicker">' + LL('Наука', 'Research') + '</div><h1>' + LL('Анкеты пациентов', 'Patient questionnaires') + '</h1></div><div class="actions"><button type="button" class="btn primary" data-act="qbnew">' + ico('plus', 16) + LL('Новая анкета', 'New questionnaire') + '</button></div></div>';
   h += '<div class="tabs pad">' + [['due', LL('К заполнению', 'Due'), due.length], ['tpl', LL('Шаблоны анкет', 'Templates'), qTpls().length], ['res', LL('Результаты', 'Results'), null]].concat(CLOUD.on ? [['inbox', LL('Входящие', 'Inbox'), QL.resp.length || null]] : []).map(function (x) { return '<button type="button" class="tab' + (tab === x[0] ? ' on' : '') + '" data-act="qtab" data-v="' + x[0] + '">' + x[1] + (x[2] !== null ? '<span class="cnt">' + x[2] + '</span>' : '') + '</button>'; }).join('') + '</div>';
   if (tab === 'tpl') {
-    h += '<div class="scards pad">' + qTpls().map(function (q) { return '<div class="scard qt"><span class="sc-ic">' + ico('clipboard', 20) + '</span><b>' + esc(qName(q)) + '</b><span class="muted">' + esc(L(q.desc || ['', ''])) + '</span><div class="sc-meta"><span>' + plural(q.items.length, 'pl.question') + '</span>' + (q.max ? '<span>0..' + q.max + LL(' баллов', ' points') + '</span>' : '') + (q.builtin ? '<span class="tag">' + LL('встроенная', 'built-in') + '</span>' : '') + '</div><div class="sc-act">' + (q.builtin ? '<button type="button" class="btn small" data-act="qbcopy" data-id="' + q.id + '">' + LL('Сделать копию', 'Duplicate') + '</button>' : '<button type="button" class="btn small" data-act="qbedit" data-id="' + q.id + '">' + LL('Изменить', 'Edit') + '</button>') + (can('edit') ? '<button type="button" class="btn small primary" data-act="qlnew" data-id="' + q.id + '">' + ico('ext', 14) + LL('Сформировать ссылку', 'Create link') + '</button>' : '') + '</div></div>'; }).join('') + '<button type="button" class="scard new" data-act="qbnew"><span class="sc-ic">' + ico('plus', 20) + '</span><b>' + LL('Новая анкета', 'New questionnaire') + '</b></button></div>';
+    h += '<div class="pad"><section class="card tntq"><h3>' + ico('flask', 18) + LL('Шкалы для исследования TNT при раке прямой кишки', 'Scales for the rectal cancer TNT study') + '</h3><p class="hint">' + LL('Ядро: CTCAE v5.0 (врач) + PRO-CTCAE + EORTC QLQ-C30 + QLQ-CR29. Дополнительно: QLQ-CIPN20 при оксалиплатине, LARS после сфинктеросохраняющей операции, IIEF/FSFI если сексуальная функция отдельная конечная точка, HADS, EQ-5D-5L. Ответ опухоли: RECIST 1.1 и mrTRG в карточке пациента. Назначить весь набор пациенту: карточка → Анкеты пациента → «Набор для исследования TNT».', 'Core: CTCAE v5.0 + PRO-CTCAE + QLQ-C30 + QLQ-CR29; optional: CIPN20, LARS, IIEF/FSFI, HADS, EQ-5D-5L.') + '</p><table class="grid tntt"><thead><tr><th>' + LL('Шкала', 'Scale') + '</th><th>' + LL('Кто заполняет', 'Who') + '</th><th>' + LL('Подсчёт', 'Scoring') + '</th><th>' + LL('Текст', 'Text') + '</th><th></th></tr></thead><tbody>' + Q_TNT.map(function (q) { var ready = qTextReady(q), ov = (DB.qtext || {})[q.id]; return '<tr><td><b>' + esc(q.short) + '</b><div class="muted small">' + esc(qName(q)) + '</div></td><td>' + (q.clin ? LL('врач', 'clinician') : LL('пациент', 'patient')) + '</td><td class="small">' + (q.scalesFromManual && !(ov && ov.scales && ov.scales.length) ? LL('подшкалы задаются из руководства EORTC', 'subscales from EORTC manual') : (q.scales || []).length + LL(' шкал', ' scales')) + '</td><td>' + (ov ? '<span class="tag ok">' + LL('официальный вставлен', 'official pasted') + '</span>' : q.working ? '<span class="tag">' + LL('рабочий перевод', 'working translation') + '</span>' : '<span class="tag due">' + LL('нужен лицензионный текст', 'licensed text needed') + '</span>') + '</td><td class="nowrap">' + (can('edit') ? '<button type="button" class="btn small' + (ready ? '' : ' primary') + '" data-act="qtxopen" data-id="' + q.id + '">' + (ov ? LL('Изменить текст', 'Edit text') : LL('Вставить официальный текст', 'Paste official text')) + '</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></section></div>';
+    h += '<div class="scards pad">' + qTpls().filter(function (q) { return !q.tnt; }).map(function (q) { return '<div class="scard qt"><span class="sc-ic">' + ico('clipboard', 20) + '</span><b>' + esc(qName(q)) + '</b><span class="muted">' + esc(L(q.desc || ['', ''])) + '</span><div class="sc-meta"><span>' + plural(q.items.length, 'pl.question') + '</span>' + (q.max ? '<span>0..' + q.max + LL(' баллов', ' points') + '</span>' : '') + (q.builtin ? '<span class="tag">' + LL('встроенная', 'built-in') + '</span>' : '') + '</div><div class="sc-act">' + (q.builtin ? '<button type="button" class="btn small" data-act="qbcopy" data-id="' + q.id + '">' + LL('Сделать копию', 'Duplicate') + '</button>' : '<button type="button" class="btn small" data-act="qbedit" data-id="' + q.id + '">' + LL('Изменить', 'Edit') + '</button>') + (can('edit') ? '<button type="button" class="btn small primary" data-act="qlnew" data-id="' + q.id + '">' + ico('ext', 14) + LL('Сформировать ссылку', 'Create link') + '</button>' : '') + '</div></div>'; }).join('') + '<button type="button" class="scard new" data-act="qbnew"><span class="sc-ic">' + ico('plus', 20) + '</span><b>' + LL('Новая анкета', 'New questionnaire') + '</b></button></div>';
     return h;
   }
   if (tab === 'inbox') return h + renderQInbox();
@@ -2494,8 +2796,8 @@ function renderQPage() {
     h += qStatsHTML();
     var rgrp = {}, rord = []; rows.forEach(function (x) { if (!rgrp[x.e.tid]) { rgrp[x.e.tid] = []; rord.push(x.e.tid); } rgrp[x.e.tid].push(x); });
     if (!rows.length) h += '<div class="empty">' + LL('Пока нет заполненных анкет в карточках', 'No completed questionnaires in records yet') + '</div>';
-    rord.forEach(function (tid) { var qq = qTpl(tid), rows = rgrp[tid]; h += grpHead(esc(qq ? qName(qq) : '?'), rows.length, 'okg');
-    h += '<div class="tablewrap">' + (rows.length ? '<table class="grid"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + LL('Анкета', 'Questionnaire') + '</th><th>' + LL('Срок', 'Time point') + '</th><th>' + LL('Дата', 'Date') + '</th><th>' + LL('Баллы', 'Score') + '</th><th>' + LL('Вывод', 'Result') + '</th></tr></thead><tbody>' + rows.map(function (x) { var q = qTpl(x.e.tid), b = qBand(q || {}, x.e.score); return '<tr data-act="openp" data-id="' + x.p.id + '" tabindex="0"><td class="mono">' + x.p.id + '</td><td class="strong">' + esc(pName(x.p)) + '</td><td>' + esc(qShort(q)) + '</td><td>' + esc(x.e.label || '') + '</td><td>' + fmtDate(x.e.date) + '</td><td class="num">' + (x.e.score !== null && x.e.score !== undefined ? x.e.score : '') + '</td><td>' + (b ? '<span class="st st-' + (b.c === 'ok' ? 'done' : b.c === 'due' ? 'cancel' : 'prog') + '">' + esc(L(b.t)) + '</span>' : '') + '</td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">' + LL('Пока нет заполненных анкет', 'No completed questionnaires yet') + '</div>') + '</div>';
+    rord.forEach(function (tid) { var qq = qTpl(tid), rows = rgrp[tid]; h += grpHead(esc(qq ? qName(qq) : '?'), rows.length, 'okg', '<button type="button" class="btn small" data-act="qxls" data-id="' + tid + '">' + ico('download', 14) + LL('Excel: шкалы и ответы', 'Excel: scales and answers') + '</button>');
+    h += '<div class="tablewrap">' + (rows.length ? '<table class="grid"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + LL('Анкета', 'Questionnaire') + '</th><th>' + LL('Срок', 'Time point') + '</th><th>' + LL('Дата', 'Date') + '</th><th>' + LL('Баллы', 'Score') + '</th><th>' + LL('Вывод', 'Result') + '</th></tr></thead><tbody>' + rows.map(function (x) { var q = qTpl(x.e.tid), b = qBand(q || {}, x.e.score); return '<tr data-act="openp" data-id="' + x.p.id + '" tabindex="0"><td class="mono">' + x.p.id + '</td><td class="strong">' + esc(pName(x.p)) + '</td><td>' + esc(qShort(q)) + '</td><td>' + esc(x.e.label || '') + '</td><td>' + fmtDate(x.e.date) + '</td><td class="num">' + (x.e.scales && q && q.scales ? qScalesHTML(q, x.e.scales, true) : x.e.score !== null && x.e.score !== undefined ? x.e.score : '') + '</td><td>' + (b ? '<span class="st st-' + (b.c === 'ok' ? 'done' : b.c === 'due' ? 'cancel' : 'prog') + '">' + esc(L(b.t)) + '</span>' : '') + '</td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">' + LL('Пока нет заполненных анкет', 'No completed questionnaires yet') + '</div>') + '</div>';
     });
     return h;
   }
@@ -3147,7 +3449,7 @@ function cloudDocs() {
   DB.registries.forEach(function (r) { m['g_' + r.id] = r; });
   (DB.pending || []).forEach(function (r) { m['x_' + r.id] = r; });
   Object.keys(DB.ms || {}).forEach(function (sid) { var x = DB.ms[sid]; ['papers', 'secs', 'lib', 'cm', 'zcols'].forEach(function (g2) { Object.keys(x[g2] || {}).forEach(function (k) { m['m_' + sid + '__' + g2 + '__' + k] = x[g2][k]; }); }); });
-  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, studySeq: DB.studySeq, importedAt: DB.importedAt };
+  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, qtext: DB.qtext, studySeq: DB.studySeq, importedAt: DB.importedAt };
   var out = {}; Object.keys(m).forEach(function (k) { out[k.replace(/\//g, '_')] = JSON.stringify(m[k]); }); return out;
 }
 function cloudPush() {
@@ -4289,6 +4591,8 @@ function render() {
   if (S.msCite) h += renderCite();
   if (S.libImp) h += renderLibImport();
   if (S.zot) h += renderZotero();
+  if (S.qtx) h += renderQText();
+  if (S.tnt) h += renderTntSet();
   if (!S.drawer && S.wipeAsk !== false && needWipe()) h += renderWipe();
   if (S.rec) h += renderRecord();
   if (S.qlink) h += renderQLink();
@@ -4614,10 +4918,19 @@ document.addEventListener('click', function (ev) {
     case 'qsgo': qSchedGo(); break;
     case 'qsclose': S.qs = null; render(); break;
     case 'qfill': openFill(g('pid'), g('id')); break;
+    case 'qtxopen': { var ovx = (DB.qtext || {})[g('id')], qx = Q_BUILTIN.filter(function (x) { return x.id === g('id'); })[0]; var tx0 = ''; if (ovx && qx) { tx0 = (ovx.sub ? '#инструкция: ' + ovx.sub + '\n' : '') + (ovx.scales || []).map(function (sc) { return '#шкала ' + sc.id + ' ' + L(sc.name) + ': ' + sc.items.map(function (i) { return i.replace(/^[a-z]+/i, ''); }).join(', '); }).join('\n') + ((ovx.scales || []).length ? '\n' : '') + qx.items.filter(function (it) { return !it.app; }).map(function (it, i) { var o = ovx.items[it.id] || {}; return (i + 1) + '. ' + (o.t || '') + (o.opts && o.opts.length ? ' || ' + o.opts.map(function (z) { return z.t + (z.s !== null && z.s !== undefined ? ' = ' + z.s : ''); }).join(' | ') : ''); }).join('\n'); } S.qtx = { qid: g('id'), text: tx0 }; render(); break; }
+    case 'qtxx': S.qtx = null; render(); break;
+    case 'qtxcheck': case 'qtxsave': { var qq2 = Q_BUILTIN.filter(function (x) { return x.id === S.qtx.qid; })[0], ta2 = root.querySelector('#qtxt'); S.qtx.text = ta2 ? ta2.value : S.qtx.text; var res2 = qParseText(qq2, S.qtx.text); S.qtx.res = res2; if (a === 'qtxsave') { if (res2.errs.length && !confirm(LL('Есть замечания: ', 'Issues: ') + res2.errs.slice(0, 3).join('; ') + LL('. Сохранить всё равно?', '. Save anyway?'))) { render(); break; } DB.qtext = DB.qtext || {}; DB.qtext[qq2.id] = { items: res2.items, scales: res2.scales, sub: res2.sub, by: me(), at: nowIso() }; S.qtx = null; save(); toast(LL('Текст сохранён: ', 'Saved: ') + qq2.short + (qTextReady(qq2) ? '' : LL('. Анкета ещё не готова к заполнению: проверьте пункты и баллы.', '. Not ready yet: check items and scores.'))); } render(); break; }
+    case 'qtxdel': if (S.qtx && confirm(LL('Удалить вставленный текст анкеты?', 'Remove pasted text?'))) { delete DB.qtext[S.qtx.qid]; S.qtx = null; save(); render(); } break;
+    case 'tntopen': { var tp = findPat(g('pid')); if (!tp) break; S.tnt = { pid: tp.id, pts: ['base', 'postTnt', 'm3', 'm6', 'm12'], ctcae: true, oxali: /FOLFOX|CAPOX|XELOX|оксали/i.test(JSON.stringify(tp.d)), lars: false, sexEnd: false, hads: false, eq: false }; render(); break; }
+    case 'tntx': S.tnt = null; render(); break;
+    case 'tntpt': { var tpp = S.tnt.pts, ti = tpp.indexOf(g('v')); if (ti >= 0) tpp.splice(ti, 1); else tpp.push(g('v')); render(); break; }
+    case 'tntgo': { var tpt = findPat(S.tnt.pid), add2 = tpt ? tntPlan(S.tnt, tpt) : []; if (!add2.length) break; withPat(tpt.id, function (x) { x.q = (x.q || []).concat(clone(add2)); }); if (S.drawer && S.drawer.p.id === tpt.id) S.drawer.p.q = (S.drawer.p.q || []).concat(clone(add2)); S.tnt = null; save(); toast(LL('Назначено анкет: ', 'Scheduled: ') + add2.length); render(); break; }
+    case 'qxls': qXls(g('id')); break;
     case 'qview': S.qview = S.qview === g('id') ? null : g('id'); render(); break;
     case 'qdel': if (confirm(LL('Удалить анкету из карточки?', 'Remove this questionnaire?'))) { var qid = g('id'); withPat(g('pid'), function (x) { x.q = (x.q || []).filter(function (e) { return e.id !== qid; }); }); save(); render(); } break;
-    case 'fans': { var fq = qTpl(((findPat(S.fill.pid).q || []).filter(function (x) { return x.id === S.fill.eid; })[0] || {}).tid), it = fq.items.filter(function (z) { return z.id === g('q'); })[0], ii = +g('i'); if (it.type === 'multi') { var cur3 = (S.fill.ans[it.id] || []).slice(), k3 = cur3.indexOf(ii); if (k3 >= 0) cur3.splice(k3, 1); else cur3.push(ii); S.fill.ans[it.id] = cur3; render(); } else { S.fill.ans[it.id] = ii; render(); setTimeout(function () { if (S.fill && !S.fill.done) { var vis = qVisible(fq, S.fill.ans); if (S.fill.i < vis.length - 1) { S.fill.i++; render(); } } }, 280); } break; }
-    case 'fillnext': { var fq2 = qTpl(((findPat(S.fill.pid).q || []).filter(function (x) { return x.id === S.fill.eid; })[0] || {}).tid), vis2 = qVisible(fq2, S.fill.ans); if (S.fill.i >= vis2.length - 1) S.fill.done = true; else S.fill.i++; render(); break; }
+    case 'fans': { var fq = qTpl(((findPat(S.fill.pid).q || []).filter(function (x) { return x.id === S.fill.eid; })[0] || {}).tid), it = fq.items.filter(function (z) { return z.id === g('q'); })[0], ii = +g('i'); if (it.type === 'multi') { var cur3 = (S.fill.ans[it.id] || []).slice(), k3 = cur3.indexOf(ii); if (k3 >= 0) cur3.splice(k3, 1); else cur3.push(ii); S.fill.ans[it.id] = cur3; render(); } else { S.fill.ans[it.id] = ii; render(); var at0 = S.fill.i, f0 = S.fill; setTimeout(function () { if (S.fill === f0 && !S.fill.done && S.fill.i === at0) { var vis = fillVis(fq, S.fill); if (S.fill.i < vis.length - 1) { S.fill.i++; render(); } } }, 280); } break; }
+    case 'fillnext': { var fq2 = qTpl(((findPat(S.fill.pid).q || []).filter(function (x) { return x.id === S.fill.eid; })[0] || {}).tid), vis2 = fillVis(fq2, S.fill); if (S.fill.i >= vis2.length - 1) S.fill.done = true; else S.fill.i++; render(); break; }
     case 'fillprev': S.fill.i = Math.max(0, S.fill.i - 1); render(); break;
     case 'fillback': S.fill.done = false; render(); break;
     case 'fillsave': fillSave(); break;
@@ -4773,6 +5086,8 @@ document.addEventListener('input', function (ev) {
 document.addEventListener('change', function (ev) {
   var tg = ev.target, b = tg.getAttribute('data-bind');
   if (tg.id === 'retrofiles') { retroAdd(tg.files); tg.value = ''; return; }
+  if (tg.getAttribute('data-tnt') && S.tnt) { S.tnt[tg.getAttribute('data-tnt')] = tg.checked; render(); return; }
+  if (tg.getAttribute('data-tntd') && S.tnt) { S.tnt[tg.getAttribute('data-tntd')] = tg.value; render(); return; }
   if (tg.getAttribute('data-retrogp')) { var rg0 = RETRO.groups.filter(function (x) { return x.id === tg.getAttribute('data-retrogp'); })[0]; if (rg0) { rg0.pid = tg.value || null; rg0.pidManual = true; } render(); return; }
   if (tg.getAttribute('data-retromv')) { if (tg.value) retroMove(tg.getAttribute('data-retromv'), tg.value); return; }
   if (tg.getAttribute && tg.getAttribute('data-stgpf') && S.mpStage) {
@@ -4976,11 +5291,13 @@ var QL = { resp: [], unsub: null, busy: {} };
 function qlUrl(tok) { return location.origin + location.pathname.replace(/[^\/]*$/, '') + 'q.html#' + tok; }
 function qlToken() { var a = new Uint8Array(16), c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789', o = ''; crypto.getRandomValues(a); for (var i = 0; i < a.length; i++) o += c[a[i] % c.length]; return o; }
 function qlSnapshot(q) {
-  return { name: q.name, short: q.short || '', sub: q.sub || ['', ''], desc: q.desc || ['', ''], items: q.items.map(function (it) { return { id: it.id, type: it.type, text: it.text, opts: (it.opts || []).map(function (o) { return { t: o.t }; }), cond: it.cond && it.cond.q ? { q: it.cond.q, a: it.cond.a } : null }; }) };
+  return { name: q.name, short: q.short || '', sub: q.sub || ['', ''], desc: q.desc || ['', ''], items: q.items.map(function (it) { return { id: it.id, type: it.type, text: it.text, opts: (it.opts || []).map(function (o) { return { t: o.t }; }), cond: it.cond && it.cond.q ? (it.cond.ne !== undefined ? { q: it.cond.q, ne: it.cond.ne } : { q: it.cond.q, a: it.cond.a }) : null }; }) };
 }
 function qlCreate(tid, pid, eid) {
   if (!CLOUD.on || !CLOUD.db) { toast(LL('Ссылки для пациентов работают в общей облачной базе (на сайте)', 'Patient links work in the shared cloud database (on the website)')); return; }
   var q = qTpl(tid); if (!q) return;
+  if (q.clin) { toast(LL('Эту шкалу заполняет врач, ссылка пациенту не нужна', 'Clinician-rated scale: no patient link')); return; }
+  if (!qTextReady(qTpls().filter(function (x) { return x.id === tid; })[0])) { toast(LL('Сначала вставьте официальный текст анкеты (Анкеты → Шаблоны анкет)', 'Paste the official text first')); return; }
   var tok = qlToken(), doc = { tid: tid, tpl: qlSnapshot(q), pid: pid || '', eid: eid || '', active: true, created: nowIso(), by: me() };
   CLOUD.db.collection('qlinks').doc(tok).set(doc).then(function () {
     S.qlink = { url: qlUrl(tok), tok: tok, name: qName(q), pid: pid || '', who: pid && findPat(pid) ? pName(findPat(pid)) : '' }; render();
@@ -5014,6 +5331,14 @@ function qlMatch(r) {
   if (c.length > 1) { var ex = c.filter(function (p) { return qlNormName(p.d.fio) === qlNormName(r.fio); }); if (ex.length === 1) c = ex; }
   return c.length === 1 ? c[0] : null;
 }
+function qXls(tid) {
+  var q = qTpl(tid); if (!q) return; var sc = q.scales || [], its = q.items.filter(function (it) { return !it.app; });
+  var head = ['ID', LL('ФИО', 'Name'), LL('Пол', 'Sex'), LL('Точка', 'Time point'), LL('Срок', 'Due'), LL('Дата', 'Date')].concat(sc.map(function (s) { return s.id; })).concat(q.score ? [LL('Баллы', 'Score')] : []).concat(its.map(function (it) { return it.id; }));
+  var rows = [head];
+  DB.patients.forEach(function (p) { (p.q || []).forEach(function (e) { if (e.tid !== tid || !e.date) return; var scs = e.scales || qScales(q, e.ans || {}) || {}; rows.push([p.id, pName(p), p.d.sex || '', e.label || '', e.due || '', e.date].concat(sc.map(function (s) { var v = scs[s.id]; return v === null || v === undefined ? '' : v; })).concat(q.score ? [e.score === null || e.score === undefined ? '' : e.score] : []).concat(its.map(function (it) { var a = (e.ans || {})[it.id]; if (!has(a)) return ''; if (it.type === 'single') { var o = it.opts[+a]; return o && o.s !== null && o.s !== undefined ? o.s : +a + 1; } return Array.isArray(a) ? a.join(';') : a; }))); }); });
+  downloadBlob(safeName(qShort(q) + ' ' + isoOf(new Date())) + '.xlsx', buildXlsx([{ name: qShort(q).slice(0, 28), rows: rows }, { name: LL('Шкалы', 'Scales'), rows: [[LL('Код', 'Code'), LL('Шкала', 'Scale'), LL('Пункты', 'Items'), LL('Метод', 'Method')]].concat(sc.map(function (s) { return [s.id, L(s.name), (s.items || []).join(', '), s.type]; })) }]));
+  toast(LL('Файл сохранён в «Загрузки»', 'File saved to Downloads'));
+}
 function qlAttach(r, p) {
   var q = qTpl(r.tid); if (!q || !p) return false;
   var ans = r.ans || {}, sc = qScore(q, ans), bd = qBand(q, sc), eid = 'qr_' + r.id, date = String(r.atIso || nowIso()).slice(0, 10);
@@ -5022,7 +5347,7 @@ function qlAttach(r, p) {
     if (x.q.some(function (e) { return e.id === eid || e.rid === r.id; })) return;
     var e = r.eid ? x.q.filter(function (y) { return y.id === r.eid && !y.date; })[0] : null;
     if (!e) { e = { id: eid, tid: r.tid, label: LL('онлайн', 'online') }; x.q.push(e); }
-    e.rid = r.id; e.ans = clone(ans); e.date = date; e.score = sc; e.band = bd ? L(bd.t) : null; e.by = LL('Пациент по ссылке', 'Patient via link'); e.src = 'link';
+    e.rid = r.id; e.ans = clone(ans); e.scales = qScales(q, ans); e.date = date; e.score = sc; e.band = bd ? L(bd.t) : null; e.by = LL('Пациент по ссылке', 'Patient via link'); e.src = 'link';
     if (r.dob && !x.d.dob) x.d.dob = r.dob; if (r.phone && !x.d.phone) x.d.phone = r.phone;
   });
   p = findPat(p.id); if (p) p.log = (p.log || []).concat([{ ts: nowIso(), by: LL('Пациент по ссылке', 'Patient via link'), act: 'q', note: qShort(q) + (sc !== null ? ', ' + sc + LL(' баллов', ' points') : ''), ch: [] }]);

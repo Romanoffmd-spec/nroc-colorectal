@@ -1930,14 +1930,23 @@ html[data-theme="dark"] .rt-view mark,html[data-theme="dark"] .rt-hl{background:
 .stage-l .filechip{display:inline-flex;align-items:center;gap:5px;max-width:100%}.stage-l .fn{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stage-l em{font-style:normal;font-size:11.5px;color:var(--muted)}
 
 .mp-prog{display:flex;align-items:center;gap:10px;margin:8px 0;padding:10px 12px;border-radius:var(--r-l,6px);background:var(--accent-soft,#eef1fa);font-size:13.5px}
+
+/* шкалы анкет */
+.qsc{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.qsc.compact{margin:4px 0 0}
+.qsc-i{display:inline-flex;align-items:baseline;gap:5px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);font-size:12.5px}
+.qsc-i em{font-style:normal;color:var(--muted)}.qsc-i b{font-variant-numeric:tabular-nums}.qsc-i b i{font-style:normal;font-weight:400;color:var(--faint)}.qsc-i span{font-size:11.5px;color:var(--muted)}
+.qsc-i.main{border-color:var(--accent-line,#c9d0ee)}.qsc-i.sc-ok{background:var(--ok-soft,#ecfdf3)}.qsc-i.sc-warn{background:var(--warn-soft,#fff8eb)}.qsc-i.sc-due{background:var(--due-soft,#fef3f2)}
+.fill-done .qsc{justify-content:center;max-width:640px;margin:10px auto}
+.tntq{padding:14px 16px}.tntt td{vertical-align:top}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <input type="file" id="importFile" accept=".json,.js,application/json,text/javascript" hidden>
-<script src="firebase-config.js?v=245a471f"></script>
-<script src="i18n.js?v=245a471f"></script>
-<script src="ai-corpus.js?v=245a471f"></script>
-<script src="app.js?v=245a471f"></script>
+<script src="firebase-config.js"></script>
+<script src="i18n.js"></script>
+<script src="data.js"></script>
+<script src="ai-corpus.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

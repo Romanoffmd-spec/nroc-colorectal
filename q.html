@@ -74,7 +74,7 @@ input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(-
   function T(ru, en) { return LANG === 'en' ? en : ru; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function has(v) { return v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && !v.length); }
-  function vis() { return S.link.tpl.items.filter(function (it) { if (!it.cond || !it.cond.q) return true; var a = S.ans[it.cond.q]; if (!has(a)) return false; return Array.isArray(a) ? a.indexOf(+it.cond.a) >= 0 : +a === +it.cond.a; }); }
+  function vis() { return S.link.tpl.items.filter(function (it) { if (!it.cond || !it.cond.q) return true; var a = S.ans[it.cond.q]; if (!has(a)) return false; if (it.cond.ne !== undefined && it.cond.ne !== null) return +a !== +it.cond.ne; return Array.isArray(a) ? a.indexOf(+it.cond.a) >= 0 : +a === +it.cond.a; }); }
   function msg(t) { app.innerHTML = '<div class="center">' + t + '</div>'; }
   if (!tok) { msg(T('Ссылка неполная. Попросите врача прислать её ещё раз.', 'The link is incomplete. Ask your doctor to send it again.')); return; }
   if (!window.FIREBASE_CONFIG) { msg(T('Сервис временно недоступен.', 'Service unavailable.')); return; }
