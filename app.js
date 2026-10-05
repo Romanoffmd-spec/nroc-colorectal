@@ -1782,7 +1782,7 @@ function savePatient() {
   if (needSum) aiSummaryBg(p.id);
 }
 function openRec(k, id, preset) {
-  S.linkPick = false; S.mpStage = null;
+  S.linkPick = false; S.mpStage = null; if (!S.mpBusy) { S.mpErr = ''; S.mpLast = null; }
   var r = id ? DB.cols[k].filter(function (x) { return x.id === id; })[0] : null;
   S.rec = { k: k, r: r ? clone(r) : (preset || {}), isNew: !r, orig: r ? clone(r) : null }; S.menu = null; S.inline = null; S.cdraft = ''; S.histAll = false; render();
 }
@@ -4062,22 +4062,31 @@ var MP_SYS = 'Ты секретарь мультидисциплинарной �
   'Не используй длинные тире.';
 function mpFromDocs(files) {
   if (!aiReady()) { toast(LL('Подключите ИИ в шапке: протокол МДГ собирает ИИ', 'Connect AI first')); return; }
-  var r = S.rec && S.rec.r; if (!r) return; var docs = [], seq = Promise.resolve();
-  S.mpBusy = true; render(); toast(LL('Читаю документы (', 'Reading documents (') + files.length + ')…');
-  files.forEach(function (f) { seq = seq.then(function () { return dxReadFile(f).then(function (d) { docs.push(d); }).catch(function () {}); }); });
+  var r = S.rec && S.rec.r; if (!r) return; var docs = [], seq = Promise.resolve(), unread = [];
+  S.mpLast = files; S.mpErr = ''; S.mpBusy = true; S.mpProg = LL('Читаю документы: 0 из ', 'Reading documents: 0 of ') + files.length; render();
+  var prog = function (m) { if (S.rec && S.rec.r === r) { S.mpProg = m; render(); } };
+  files.forEach(function (f, i) { seq = seq.then(function () { return dxReadFile(f).then(function (d) { docs.push(d); }).catch(function (e) { unread.push(f.name + ': ' + ((e && e.message) || e)); }).then(function () { prog(LL('Читаю документы: ', 'Reading documents: ') + (i + 1) + LL(' из ', ' of ') + files.length); }); }); });
+  var fails = [];
   seq.then(function () {
-    if (!docs.length) throw new Error(LL('Документы не прочитаны', 'No documents read'));
-    var today = isoOf(new Date()), prompt = 'Сегодня ' + fmtDate(today) + '.' + (r.date ? ' Дата МДГ: ' + fmtDate(r.date) + '.' : '') + ' Пакет документов пациента для МДГ:\n\n{DOCS}\n\nСоставь заключение МДГ по форме и верни JSON.';
-    return dxCallMany(docs, '', '', MP_SYS, prompt).then(dxParseJSON).then(function (res) {
+    if (!docs.length) throw new Error(LL('Ни один документ не прочитан', 'No documents read') + (unread.length ? ': ' + unread.join('; ') : ''));
+    if (!aiNeedsMap(docs)) return docs;
+    prog(LL('ИИ разбирает документы по одному: 0 из ', 'AI reading documents one by one: 0 of ') + docs.length);
+    return aiMapDocs(docs, false, function (n, all) { prog(LL('ИИ разбирает документы по одному: ', 'AI reading documents one by one: ') + n + LL(' из ', ' of ') + all); }).then(function (m) { fails = m.fails; if (!m.docs.length) throw new Error(LL('ИИ не смог разобрать ни один документ: ', 'AI could not read any document: ') + fails.slice(0, 3).join('; ')); return m.docs; });
+  }).then(function (use) {
+    prog(LL('Собираю протокол МДГ из ', 'Building the MDT protocol from ') + use.length + LL(' документов…', ' documents…'));
+    var today = isoOf(new Date()), prompt = 'Сегодня ' + fmtDate(today) + '.' + (r.date ? ' Дата МДГ: ' + fmtDate(r.date) + '.' : '') + ' Пакет документов пациента для МДГ' + (use !== docs ? ' (каждый документ уже сжат до ключевых фактов)' : '') + ':\n\n{DOCS}\n\nСоставь заключение МДГ по форме и верни JSON.';
+    return aiRetry(function () { return dxCallMany(use, '', '', MP_SYS, prompt); }).then(dxParseJSON).then(function (res) {
       var rr = S.rec && S.rec.r; if (rr !== r) return;
       var mp = r.mp = r.mp || {}, n = 0;
       MP.forEach(function (sec) { sec[2].forEach(function (x) { var v = res[x.id]; if (!has(v)) return; if (x.type === 'date') { var nv = dxNorm(x, v); if (nv.err) return; v = nv.v; } else if (x.type === 'num') v = String(v); else if (x.type === 'sel' || x.type === 'seg') { if (x.options.indexOf(String(v)) < 0) return; v = String(v); } else v = String(v).trim(); mp[x.id] = v; n++; }); });
       if (!r.fio && (res.fam || res.nam)) r.fio = [res.fam, res.nam, res.otc].filter(Boolean).join(' ');
-      if (!r.dx && res.refDx) r.dx = String(res.refDx).split('\n')[0].slice(0, 300);
+      if (!r.iin && res.iin && iinValid(String(res.iin).replace(/\D/g, ''))) r.iin = String(res.iin).replace(/\D/g, '');
       var pt = r.pid ? DB.patients.filter(function (x) { return x.id === r.pid; })[0] : null; if (pt) { docs.forEach(function (d) { docArchive(pt, d.name, d.text || '', ''); }); pfStoreTo(pt, files, LL('протокол МДГ', 'MDT protocol')); }
-      S.mpBusy = false; S.mpShow = true; render(); toast(LL('Протокол МДГ сформирован по форме: заполнено полей ', 'MDT protocol built: fields ') + n + LL('. Проверьте и скачайте Word.', '. Check and download Word.'));
+      var miss = unread.concat(fails);
+      S.mpBusy = false; S.mpProg = ''; S.mpShow = true; S.mpErr = miss.length ? LL('Протокол собран, но не учтены документы (', 'Built, but these documents were skipped (') + miss.length + '): ' + miss.join('; ') : ''; S.mpWarnOnly = !!miss.length; render();
+      toast(LL('Протокол МДГ сформирован: заполнено полей ', 'MDT protocol built: fields ') + n + LL('. Проверьте и скачайте Word.', '. Check and download Word.'));
     });
-  }).catch(function (e) { S.mpBusy = false; render(); toast(LL('ИИ не ответил: ', 'AI failed: ') + ((e && e.message) || e)); });
+  }).catch(function (e) { S.mpBusy = false; S.mpProg = ''; S.mpWarnOnly = false; S.mpErr = LL('Не получилось: ', 'Failed: ') + ((e && e.message) || e); render(); });
 }
 function mpWord(r) {
   var mp = r.mp || {}, E = function (v) { return esc(String(v || '')).replace(/\n/g, '<br>'); }, fio = [mp.fam, mp.nam, mp.otc].filter(Boolean).join(' ').toUpperCase() || String(r.fio || '').toUpperCase();
@@ -4134,6 +4143,8 @@ function mpStageHTML(r) {
 function mpCard(r) {
   var mp = r.mp || {}, filled = Object.keys(mp).filter(function (k) { return has(mp[k]); }).length, open = S.mpShow || filled > 0;
   var h = '<section class="card mpcard" id="sec-mp"><h3>' + ico('doc', 18) + LL('Протокол МДГ', 'MDT protocol') + '<span class="h3-note">' + (filled ? LL('заполнено полей: ', 'fields filled: ') + filled : LL('по шаблону центра', 'centre template')) + '</span></h3>';
+  if (S.mpBusy) h += '<div class="mp-prog"><span class="spin"></span><span>' + esc(S.mpProg || LL('Формирую…', 'Building…')) + '</span></div>';
+  if (S.mpErr && !S.mpBusy) h += '<div class="dxprov ' + (S.mpWarnOnly ? 'warn' : 'warn') + ' mp-err" style="margin:8px 0">' + ico('alert', 16) + '<div><b>' + esc(S.mpErr) + '</b>' + (S.mpWarnOnly ? '' : '<span>' + LL('Файлы не потеряны: можно повторить.', 'Files are kept: you can retry.') + '</span>') + '<div class="actions">' + (S.mpLast && !S.mpWarnOnly ? '<button type="button" class="btn small primary" data-act="mpretry">' + LL('Повторить', 'Retry') + '</button>' : '') + '<button type="button" class="btn small ghost" data-act="mperrx">' + LL('Скрыть', 'Dismiss') + '</button></div></div></div>';
   if (S.mpStage) h += mpStageHTML(r);
   if (!open) return h + '<button type="button" class="mp-open" data-act="mpshow">' + ico('plus', 18) + '<span><b>' + LL('Открыть шаблон протокола МДГ', 'Open MDT protocol template') + '</b><em>' + LL('Паспортные данные, диагноз, анамнез, обследования, лечение, причина вынесения, заключение', 'Details, diagnosis, history, work-up, treatment, reason, conclusion') + '</em></span></button><div class="mp-drop"><button type="button" class="btn small ai" data-act="mpdocs">' + ico('upload', 14) + (S.mpBusy ? LL('Формирую…', 'Building…') : LL('Сформировать из документов', 'Build from documents')) + '</button><span>' + LL('или перетащите сюда файлы обследования (PDF, фото, Word): протокол заполнится по форме центра', 'or drop work-up files here to fill the centre form') + '</span></div></section>';
   h += '<div class="mp-bar"><button type="button" class="btn small" data-act="mpfill"' + (r.pid ? '' : ' disabled title="' + LL('Сначала свяжите запись с карточкой пациента', 'Link a patient record first') + '"') + '>' + ico('users', 14) + LL('Заполнить из карточки пациента', 'Fill from patient record') + '</button><button type="button" class="btn small ai" data-act="mpdocs">' + ico('upload', 14) + (S.mpBusy ? LL('Формирую…', 'Building…') : LL('Сформировать из документов', 'Build from documents')) + '</button><button type="button" class="btn small" data-act="mpword">' + ico('doc', 14) + LL('Скачать Word по форме', 'Download Word (official form)') + '</button><button type="button" class="btn small" data-act="mpcopy">' + ico('copy', 14) + LL('Копировать протокол', 'Copy protocol') + '</button><button type="button" class="btn small ai" data-act="mpai">' + ico('sparkle', 14) + LL('Разбор ИИ', 'AI review') + '</button><span class="mp-hint">' + LL('Можно перетащить файлы прямо на карточку', 'You can drop files onto this card') + '</span></div>';
@@ -4697,6 +4708,8 @@ document.addEventListener('click', function (ev) {
     case 'stgclr': stageSet(g('k'), []); render(); break;
     case 'mpgo': { var stf = S.mpStage && S.mpStage.files; if (!stf || !stf.length) { toast(LL('Добавьте файлы', 'Add files')); break; } if (!aiReady()) { toast(LL('Подключите ИИ в шапке: протокол МДГ собирает ИИ. Файлы остаются в списке.', 'Connect AI first; files are kept.')); break; } S.mpStage = null; mpFromDocs(stf); break; }
     case 'mpstx': S.mpStage = null; render(); break;
+    case 'mpretry': if (S.mpLast && !S.mpBusy) mpFromDocs(S.mpLast); break;
+    case 'mperrx': S.mpErr = ''; render(); break;
     case 'mpword': if (S.rec) mpWord(S.rec.r); break;
     case 'mpcopy': { var mt = mdtProtoText(S.rec.r, false); if (navigator.clipboard) navigator.clipboard.writeText(mt).then(function () { toast(LL('Протокол МДГ скопирован', 'MDT protocol copied')); }); break; }
     case 'mpai': { UI.aip = true; saveUI(); if (!aiReady()) { render(); break; } var cx1 = aiCtx(); aiRun(cx1, null, LL('Разбор протокола МДГ', 'MDT protocol review'), 'Проанализируй протокол МДГ целиком. Структура ответа:\n1) Резюме случая (3-4 строки).\n2) Недостающие обследования и данные для принятия решения (по стандарту стадирования колоректального рака: колоноскопия с биопсией, МРТ малого таза для рака прямой кишки с CRM/EMVI, КТ ОГК и ОБП, РЭА, MMR/MSI, RAS/BRAF при метастазах и т.д.) с пометкой, почему важно.\n3) Доступные варианты дальнейшего лечения по NCCN/ESMO/протоколам МЗ РК с уровнем доказательности и ссылками.\n4) Подходящие клинические исследования сектора или международные.\n5) Вопросы для обсуждения на МДГ.\n6) Черновик формулировки заключения МДГ (помеченный как черновик).'); break; }
@@ -5442,6 +5455,47 @@ var DX_BATCH = 'ЭТО ПАКЕТ ИЗ НЕСКОЛЬКИХ ДОКУМЕНТОВ
   '3. Если документы противоречат друг другу, выбери наиболее достоверное (более поздний документ, первичный источник: гистология важнее выписки по гистологии, протокол операции важнее выписки по деталям операции) и опиши противоречие в issues с kind "conflict".\n' +
   '4. В quote указывай, из какого документа цитата: «имя файла: цитата». В note кратко объясняй, как сведения из разных документов сведены вместе.\n' +
   '5. questions задавай только если ответа нет ни в одном документе.';
+/* потоковый ответ Claude: соединение не обрывается на длинных пакетах, обрезанный ответ распознаётся */
+function aiSSE(url, headers, body, fail) {
+  var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, tm = ctl ? setTimeout(function () { ctl.abort(); }, 9 * 60000) : null;
+  return fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body), signal: ctl ? ctl.signal : undefined }).then(function (r) {
+    if (!r.ok) return fail(r);
+    var rd = r.body.getReader(), dec = new TextDecoder(), buf = '', text = '', stop = '', err = '';
+    function pump() { return rd.read().then(function (x) {
+      if (x.done) return;
+      buf += dec.decode(x.value, { stream: true }); var lines = buf.split('\n'); buf = lines.pop();
+      lines.forEach(function (ln) { if (ln.indexOf('data:') !== 0) return; var j; try { j = JSON.parse(ln.slice(5).trim()); } catch (e) { return; } if (j.type === 'content_block_delta' && j.delta && j.delta.type === 'text_delta') text += j.delta.text; else if (j.type === 'message_delta' && j.delta && j.delta.stop_reason) stop = j.delta.stop_reason; else if (j.type === 'error') err = (j.error && j.error.message) || 'error'; });
+      return pump(); }); }
+    return pump().then(function () {
+      if (err) throw new Error(err);
+      if (stop === 'max_tokens') throw new Error(LL('ответ ИИ оказался слишком длинным и обрезан', 'AI answer was cut off (too long)'));
+      return text;
+    });
+  }).catch(function (e) { if (e && e.name === 'AbortError') throw new Error(LL('ИИ не ответил за 9 минут', 'AI did not answer within 9 minutes')); throw e; }).then(function (t) { if (tm) clearTimeout(tm); return t; }, function (e) { if (tm) clearTimeout(tm); throw e; });
+}
+/* большие пакеты: сначала каждый документ отдельно (по 3 параллельно, с повторами), потом сборка из выжимок */
+var AI_MAP_SYS = 'Ты готовишь материалы к мультидисциплинарной группе (МДГ) колоректального сектора онкоцентра. Тебе дан ОДИН медицинский документ (выписка, протокол операции, гистология, МРТ, КТ, колоноскопия, анализы, консультация, заключение МДГ и т. п.). Верни ТОЛЬКО JSON: {"docType":"вид документа","date":"YYYY-MM-DD дата документа или исследования","patient":{"fio":"","iin":"","dob":"YYYY-MM-DD","ib":"","sex":""},"facts":"сжатая, но полная выжимка всех клинически значимых фактов"}. В facts сохраняй заключения исследований близко к тексту, все цифры, размеры, стадии TNM, уровни, даты, названия операций и схем лечения, результаты гистологии и ИГХ/МГИ, лабораторные показатели с датами, ECOG, сопутствующие заболевания, решения и рекомендации. Ничего не придумывай. Длинные тире не используй.';
+function aiRetry(fn, tries) {
+  tries = tries || 3; var wait = [4000, 12000, 30000];
+  function go(i) { return fn().catch(function (e) { var m = String((e && e.message) || e); if (i + 1 >= tries || !/429|500|502|503|504|529|overload|rate|timeout|network|fetch|соединен|перегруж/i.test(m)) throw e; return new Promise(function (res) { setTimeout(res, wait[i] || 30000); }).then(function () { return go(i + 1); }); }); }
+  return go(0);
+}
+function aiNeedsMap(docs) {
+  var inl = docs.filter(function (d) { return d.kind === 'image' || (d.kind === 'pdf' && (d.scanned || !d.text || d.text.replace(/\s/g, '').length < 400)); }).length;
+  var tot = docs.reduce(function (a, d) { return a + String(d.text || '').length; }, 0), pages = docs.reduce(function (a, d) { return a + (inl && d.kind === 'pdf' && d.scanned ? (d.pages || 1) : 0); }, 0);
+  return docs.length > 6 || inl > 3 || tot > 120000 || pages > 40;
+}
+function aiMapDocs(docs, long, onProg) {
+  var out = new Array(docs.length), i = 0, done = 0, fails = [];
+  var prompt = 'Документ:\n\n{DOCS}\n\nВерни JSON. Поле facts до ' + (long ? 5000 : 2500) + ' символов.';
+  function one(k) { var d = docs[k]; return aiRetry(function () { return dxCallMany([d], '', '', AI_MAP_SYS, prompt); }).then(function (t) {
+      var j = null; try { j = dxParseJSON(t); } catch (e) {}
+      var pt = j && j.patient ? [j.patient.fio, j.patient.iin ? 'ИИН ' + j.patient.iin : '', j.patient.dob ? 'д.р. ' + j.patient.dob : '', j.patient.ib ? 'ИБ ' + j.patient.ib : ''].filter(Boolean).join(', ') : '';
+      out[k] = { name: d.name, kind: 'text', scanned: false, text: j ? '[' + [j.docType, j.date].filter(Boolean).join(', ') + ']' + (pt ? '\nПациент: ' + pt : '') + '\n' + (j.facts || '') : String(t || '').slice(0, long ? 6000 : 3000) };
+    }).catch(function (e) { fails.push(d.name + ': ' + ((e && e.message) || e)); }).then(function () { done++; if (onProg) onProg(done, docs.length); }); }
+  function worker() { if (i >= docs.length) return Promise.resolve(); var k = i++; return one(k).then(worker); }
+  return Promise.all([worker(), worker(), worker()]).then(function () { return { docs: out.filter(Boolean), fails: fails }; });
+}
 function dxCallMany(docs, schema, extra, sysO, promptO) {
   var pv = AI.prov, inline = function (d) { return d.kind === 'image' || (d.kind === 'pdf' && (d.scanned || !d.text || d.text.replace(/\s/g, '').length < 400)); };
   var body = docs.map(function (d, i) { return '=== ДОКУМЕНТ ' + (i + 1) + ' из ' + docs.length + ': «' + d.name + '» ===\n' + (inline(d) ? '(см. приложенный файл ' + (i + 1) + ')' : String(d.text || '').slice(0, Math.floor(150000 / docs.length))); }).join('\n\n');
@@ -5460,9 +5514,7 @@ function dxCallMany(docs, schema, extra, sysO, promptO) {
     var content = [];
     docs.forEach(function (d, i) { if (!inline(d)) return; if (d.kind === 'pdf') content.push({ type: 'document', title: d.name, source: { type: 'base64', media_type: 'application/pdf', data: d.b64 } }); else content.push({ type: 'image', source: { type: 'base64', media_type: d.imgType, data: d.images[0] } }); });
     content.push({ type: 'text', text: prompt });
-    return fetch(AI_URL.anthropic + '/messages', { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify({ model: AI.model, max_tokens: 32000, system: SYS, messages: [{ role: 'user', content: content }] }) })
-      .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
-      .then(function (j) { return (j.content || []).map(function (c) { return c.text || ''; }).join(''); });
+    return aiSSE(AI_URL.anthropic + '/messages', aiHeaders(pv), { model: AI.model, max_tokens: 32000, system: SYS, messages: [{ role: 'user', content: content }], stream: true }, fail);
   }
   var imgs = []; docs.forEach(function (d) { if (inline(d)) (d.images || []).forEach(function (b) { imgs.push({ b: b, t: d.imgType || 'image/jpeg' }); }); });
   var visual = pv !== 'deepseek' && imgs.length;
@@ -5938,8 +5990,11 @@ function dxRunManyAI(files, log) {
   seq.then(function () {
     if (!S.dx || S.dx !== dx || !S.drawer) return;
     if (!docs.length) throw new Error(LL('Ни один документ не прочитан', 'No document could be read'));
-    log(LL('Отправляю весь пакет (', 'Sending the whole batch (') + docs.length + LL(' док.) в ', ' docs) to ') + AI_PROV[AI.prov].name + ' · ' + AI.model + LL(': ИИ сверит документы между собой (обычно 30-90 секунд)…', ': cross-checking documents (30-90 s)…'));
-    return dxCallMany(docs, dxSchemaText()).then(dxParseJSON).then(function (res) {
+    var useP = Promise.resolve(docs), mfails = [];
+    if (aiNeedsMap(docs)) { log(LL('Пакет большой: сначала ИИ разберёт каждый документ отдельно (по 3 одновременно)…', 'Large batch: AI reads each document first…')); useP = aiMapDocs(docs, true, function (n0, all0) { log(LL('  разобрано ', '  read ') + n0 + LL(' из ', ' of ') + all0, true); }).then(function (m) { mfails = m.fails; mfails.forEach(function (f) { fails.push(f); }); if (!m.docs.length) throw new Error(LL('ИИ не смог разобрать ни один документ', 'AI could not read any document')); return m.docs; }); }
+    return useP.then(function (use) {
+    log(LL('Отправляю ', 'Sending ') + (use !== docs ? LL('выжимки ', 'summaries of ') : '') + LL('пакет (', 'batch (') + use.length + LL(' док.) в ', ' docs) to ') + AI_PROV[AI.prov].name + ' · ' + AI.model + LL(': ИИ сверит документы между собой (обычно 30-90 секунд)…', ': cross-checking documents (30-90 s)…'));
+    return aiRetry(function () { return dxCallMany(use, dxSchemaText()); }).then(dxParseJSON).then(function (res) {
       if (!S.dx || S.dx !== dx || !S.drawer) return;
       res.fields = res.fields || [];
       docs.forEach(function (d) { if (d.text && !d.scanned) { try { res = dxMerge(res, dxRules(d)); } catch (e) {} } });
@@ -5957,6 +6012,7 @@ function dxRunManyAI(files, log) {
       docs.forEach(function (d) { docArchive(S.drawer.p, d.name, d.text || '', ''); });
       sumLater(S.drawer, LL('документы: ', 'documents: ') + docs.map(function (d) { return d.name; }).join(', '), '(в архиве документов)');
       }; fin();
+    });
     });
   }).catch(function (e) { if (!S.dx) return; dx.step = 'err'; dx.err = LL('ИИ не ответил: ', 'AI failed: ') + ((e && e.message) || String(e)) + LL('. Карточка не изменена.', '. Record unchanged.'); render(); });
 }
