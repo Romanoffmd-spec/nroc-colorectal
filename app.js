@@ -184,7 +184,8 @@ var SECTIONS = [
     f('liverDz', 'Заболевание печени', 'Liver disease', 'seg', { options: YN }),
     f('comorbOther', 'Другие', 'Other', 'text', { wide: true }),
     f('asa', 'ASA', 'ASA', 'sel', { options: ['I', 'II', 'III', 'IV', 'V'] }),
-    f('cci', 'CCI score', 'CCI score', 'num', { unit: 'u.points' })
+    f('cci', 'CCI score', 'CCI score', 'num', { unit: 'u.points' }),
+    f('ecog', 'ECOG (функциональный статус)', 'ECOG performance status', 'seg', { options: ['0', '1', '2', '3', '4'] })
   ]},
   { id: 'hx', phase: 'pre', title: ['Анамнез', 'History'], fields: [
     f('oncoHx', 'Онко анамнез', 'Cancer history', 'text', { wide: true }),
@@ -352,6 +353,17 @@ var SECTIONS = [
     f('lcd4', 'Осложнения CD 4', 'Complications CD 4', 'text', { wide: true }),
     f('lcd5', 'Осложнения CD 5', 'Complications CD 5', 'text', { wide: true })
   ]},
+  { id: 'ichom', phase: 'post', title: ['Исходы по стандарту ICHOM', 'Outcomes (ICHOM standard)'], fields: [
+    f('leak', 'Несостоятельность анастомоза (ISREC)', 'Anastomotic leak (ISREC)', 'seg', { options: ['Нет', 'Степень A', 'Степень B', 'Степень C'], show: function (d) { return d.anast !== 'Нет'; } }),
+    f('readm30', 'Повторная госпитализация (30 д)', 'Readmission (30 d)', 'seg', { options: YN }),
+    f('readm90', 'Повторная госпитализация (90 д)', 'Readmission (90 d)', 'seg', { options: YN }),
+    f('cx90', 'Последствия осложнений за 90 дней', 'Complication consequences, 90 days', 'multi', { options: ['Нет осложнений', 'Потребовалось вмешательство', 'Госпитализация дольше 14 дней', 'Незапланированная повторная госпитализация', 'Перевод в ОАРИТ', 'Прекращение лечения', 'Снижение дозы лечения', 'Смерть', 'Другое'], wide: true }),
+    f('stomaStat', 'Стома через 1 год', 'Stoma at 1 year', 'seg', { options: ['Нет стомы', 'Временная', 'Постоянная'] }),
+    f('stomaRevDate', 'Дата закрытия стомы', 'Stoma reversal date', 'date'),
+    f('lastContact', 'Дата последнего контакта', 'Last contact date', 'date'),
+    f('vital', 'Статус на дату контакта', 'Vital status at contact', 'seg', { options: ['Жив', 'Умер', 'Неизвестно'] }),
+    f('deathCause', 'Причина смерти', 'Cause of death', 'sel', { options: ['Прогрессирование рака', 'Осложнение лечения', 'Другая причина', 'Неизвестно'], show: function (d) { return d.vital === 'Умер' || d.dead === 'Да'; } })
+  ]},
   { id: 'mol', phase: 'post', title: ['Мутационный статус', 'Mutation status'], fields: [
     f('braf', 'BRAF', 'BRAF', 'sel', { options: ['Дикий тип', 'Мутация V600E', 'Мутация (другая)', 'Не исследовался'] }),
     f('kras', 'KRAS', 'KRAS', 'sel', { options: ['Дикий тип', 'Мутация', 'Не исследовался'] }),
@@ -374,11 +386,15 @@ var SECTIONS = [
 ];
 var MODULES = [];
 var MEDIA = [];
-var FU = [['d30', 30, 'fu.d30'], ['d90', 90, 'fu.d90'], ['d365', 365, 'fu.y1']];
+var FU = [['d30', 30, 'fu.d30'], ['d90', 90, 'fu.d90'], ['m6', 182, 'fu.m6'], ['d365', 365, 'fu.y1'], ['y2', 730, 'fu.y2'], ['y3', 1095, 'fu.y3'], ['y5', 1826, 'fu.y5']];
 var FU_ITEMS = {
   d30: [['exam', ['Осмотр хирурга: рана, стома, самочувствие', 'Surgeon review: wound, stoma']], ['cx', ['Осложнения за 30 дней по Clavien-Dindo', '30-day complications (Clavien-Dindo)']], ['readm', ['Повторная госпитализация или реоперация', 'Readmission or reoperation']], ['lab', ['ОАК, биохимия крови', 'Blood count, biochemistry']], ['histo', ['Гистология получена и обсуждена на МДГ', 'Histology received and discussed at MDT']]],
   d90: [['exam', ['Осмотр онколога', 'Oncologist review']], ['cea', ['РЭА', 'CEA']], ['adj', ['Адъювантная химиотерапия: начата или не показана', 'Adjuvant chemotherapy: started or not indicated']], ['stoma', ['Решение по закрытию стомы', 'Stoma closure decision']], ['q', ['Анкеты LARS и Wexner (если стома закрыта)', 'LARS and Wexner questionnaires (if stoma closed)']]],
-  d365: [['exam', ['Осмотр онколога', 'Oncologist review']], ['cea', ['РЭА, СА 19-9', 'CEA, CA 19-9']], ['ct', ['КТ грудной клетки и брюшной полости с контрастом', 'Contrast CT chest and abdomen']], ['mri', ['МРТ малого таза (рак прямой кишки)', 'Pelvic MRI (rectal cancer)']], ['colo', ['Колоноскопия', 'Colonoscopy']], ['q', ['Анкеты LARS и Wexner', 'LARS and Wexner questionnaires']]]
+  m6: [['vital', ['Статус жизни и дата последнего контакта', 'Vital status and last contact date']], ['recur', ['Рецидив: проверен', 'Recurrence checked']], ['cea', ['РЭА', 'CEA']], ['q', ['Анкеты качества жизни (EORTC QLQ-C30, QLQ-CR29)', 'Quality of life (EORTC QLQ-C30, QLQ-CR29)']]],
+  y2: [['vital', ['Статус жизни и дата последнего контакта', 'Vital status and last contact date']], ['recur', ['Рецидив: проверен', 'Recurrence checked']], ['cea', ['РЭА', 'CEA']], ['ct', ['КТ грудной клетки и брюшной полости', 'CT chest and abdomen']], ['q', ['Анкеты качества жизни', 'Quality of life questionnaires']]],
+  y3: [['vital', ['Статус жизни и дата последнего контакта', 'Vital status and last contact date']], ['recur', ['Рецидив: проверен', 'Recurrence checked']], ['cea', ['РЭА', 'CEA']], ['ct', ['КТ грудной клетки и брюшной полости', 'CT chest and abdomen']], ['colo', ['Колоноскопия', 'Colonoscopy']]],
+  y5: [['vital', ['Статус жизни и дата последнего контакта', 'Vital status and last contact date']], ['recur', ['Рецидив: проверен', 'Recurrence checked']], ['cea', ['РЭА', 'CEA']], ['ct', ['КТ грудной клетки и брюшной полости', 'CT chest and abdomen']], ['q', ['Анкеты качества жизни', 'Quality of life questionnaires']]],
+  d365: [['vital', ['Статус жизни, стома через 1 год', 'Vital status, stoma at 1 year']], ['exam', ['Осмотр онколога', 'Oncologist review']], ['cea', ['РЭА, СА 19-9', 'CEA, CA 19-9']], ['ct', ['КТ грудной клетки и брюшной полости с контрастом', 'Contrast CT chest and abdomen']], ['mri', ['МРТ малого таза (рак прямой кишки)', 'Pelvic MRI (rectal cancer)']], ['colo', ['Колоноскопия', 'Colonoscopy']], ['q', ['Анкеты LARS и Wexner', 'LARS and Wexner questionnaires']]]
 };
 function fuItems(p, key) { var c = (p.fuc || {})[key] || {}, all = !!p.fu[key] && !Object.keys(c).length; return (FU_ITEMS[key] || []).map(function (x) { return { id: x[0], label: L(x[1]), done: all || !!c[x[0]], date: typeof c[x[0]] === 'string' ? c[x[0]] : '' }; }); }
 var CF_TYPES = [['num', 'cf.num'], ['text', 'cf.text'], ['yn', 'cf.yn'], ['sel', 'cf.sel'], ['date', 'cf.date']];
@@ -393,6 +409,254 @@ var RULE_FIELDS = [];
 var RF_SEEN = {};
 SECTIONS.forEach(function (s) { s.fields.forEach(function (x) { if (!RF_SEEN[x.id] && /^(sel|seg|num|multi)$/.test(x.type)) { RF_SEEN[x.id] = 1; RULE_FIELDS.push(x); } }); });
 MODULES.forEach(function (m) { m.fields.forEach(function (x) { if (!RF_SEEN[x.id] && /^(sel|seg|multi)$/.test(x.type)) { RF_SEEN[x.id] = 1; RULE_FIELDS.push(x); } }); });
+
+/* ======================= Стандарты: словарь данных, коды, контроль качества, CDISC ODM ======================= */
+var STD = {
+  tnm8: 'UICC/AJCC TNM, 8th ed. (2017)', icd10: 'ICD-10', icdo3: 'ICD-O-3', cd: 'Clavien-Dindo (2004)', asa: 'ASA Physical Status',
+  cci: 'Charlson Comorbidity Index', ecog: 'ECOG Performance Status', isrec: 'ISREC (Rahbari 2010)', quirke: 'Quirke TME grading',
+  cap: 'AJCC/CAP TRG', ichom: 'ICHOM Colorectal Cancer (2017)', mercury: 'MERCURY (MRI)', uicc: 'UICC R classification', iin: 'IIN (Kazakhstan national ID)'
+};
+/* определение поля: [рус, англ, стандарт, ядро] ; ядро = ключевое поле для полноты регистра */
+var DDEF = {
+  iin: ['12-значный индивидуальный идентификационный номер. Проверяется контрольная сумма; из ИИН выводятся дата рождения и пол.', '12-digit national ID; checksum verified; date of birth and sex derived from it.', 'iin', 1],
+  ib: ['Номер медицинской карты стационарного больного ННОЦ для госпитализации, во время которой выполнено основное лечение.', 'NROC inpatient record number of the index admission.', '', 1],
+  dob: ['Дата рождения по документу, удостоверяющему личность (или по ИИН).', 'Date of birth from ID document (or IIN).', '', 1],
+  age: ['Полных лет на дату операции; при отсутствии операции на дату регистрации.', 'Completed years at surgery date (or registration date if no surgery).', ''],
+  regDate: ['Дата включения пациента в регистр.', 'Date the patient was entered into the registry.', ''],
+  fio: ['Фамилия, имя, отчество по документу, удостоверяющему личность.', 'Full name as in ID document.', '', 1],
+  sex: ['Пол по документу, удостоверяющему личность.', 'Sex as in ID document.', '', 1],
+  height: ['Рост при поступлении, см.', 'Height at admission, cm.', ''], weight: ['Вес при поступлении, кг.', 'Weight at admission, kg.', ''],
+  bmi: ['Индекс массы тела = вес (кг) / рост (м)². Рассчитывается автоматически.', 'Body mass index = weight (kg) / height (m)². Calculated.', ''],
+  asa: ['Физический статус по ASA, оценённый анестезиологом перед операцией.', 'ASA physical status assessed by the anaesthetist before surgery.', 'asa', 1],
+  cci: ['Индекс коморбидности Чарлсона на момент поступления (без учёта текущей опухоли).', 'Charlson Comorbidity Index at admission (excluding the index cancer).', 'cci'],
+  smoke: ['Курение на момент постановки диагноза.', 'Current smoking at diagnosis.', ''],
+  famCrc: ['Колоректальный рак у родственника первой линии.', 'Colorectal cancer in a first-degree relative.', ''],
+  loc: ['Локализация первичной опухоли (центр опухоли) по топографии МКБ-О-3. Код МКБ-10 присваивается автоматически.', 'Primary tumour site (tumour centre) by ICD-O-3 topography; ICD-10 code assigned automatically.', 'icdo3', 1],
+  anusDist: ['Расстояние от анального края до нижнего полюса опухоли по ригидной ректоскопии, см.', 'Distance from anal verge to lower tumour edge by rigid proctoscopy, cm.', ''],
+  primary: ['Да: первичная опухоль; Нет: рецидив или метахронная опухоль.', 'Yes: primary tumour; No: recurrence or metachronous tumour.', ''],
+  cT: ['Клиническая категория T до начала любого лечения (по МРТ/КТ, эндоскопии).', 'Clinical T before any treatment (MRI/CT, endoscopy).', 'tnm8', 1],
+  cN: ['Клиническая категория N до начала любого лечения.', 'Clinical N before any treatment.', 'tnm8', 1],
+  cM: ['Клиническая категория M до начала любого лечения.', 'Clinical M before any treatment.', 'tnm8', 1],
+  emvi: ['Экстрамуральная венозная инвазия по МРТ до лечения.', 'Extramural venous invasion on pre-treatment MRI.', 'mercury'],
+  mrCRM: ['Положительный: расстояние от опухоли или узла до мезоректальной фасции 1 мм и менее по МРТ.', 'Positive: tumour or node ≤1 mm from the mesorectal fascia on MRI.', 'mercury'],
+  neoCrt: ['Проводилась ли неоадъювантная химиолучевая или лучевая терапия.', 'Neoadjuvant chemoradiotherapy or radiotherapy given.', 'ichom'],
+  rtStart: ['Дата первой фракции лучевой терапии.', 'Date of first RT fraction.', 'ichom'], rtEnd: ['Дата последней фракции лучевой терапии.', 'Date of last RT fraction.', 'ichom'],
+  sod: ['Суммарная очаговая доза, Гр.', 'Total dose, Gy.', ''],
+  date: ['Дата основной (индексной) операции.', 'Date of the index operation.', 'ichom', 1],
+  proc: ['Вид основной операции.', 'Type of index operation.', 'ichom', 1],
+  urg: ['Экстренная: операция по неотложным показаниям вне плана (непроходимость, перфорация, кровотечение).', 'Emergency: unplanned operation for urgent indication (obstruction, perforation, bleeding).', '', 1],
+  r: ['Радикальность по оценке хирурга и гистологии: R0 нет опухоли в крае, R1 микроскопически в крае, R2 макроскопически остаточная опухоль.', 'R0 no residual tumour; R1 microscopic; R2 macroscopic.', 'uicc', 1],
+  access: ['Доступ, которым начата операция.', 'Approach at the start of surgery.', 'ichom', 1],
+  conv: ['Конверсия: вынужденный переход на открытый доступ или разрез больше запланированного для выполнения основного этапа.', 'Unplanned conversion to open or a larger incision to complete the main step.', ''],
+  opTime: ['От разреза кожи до наложения последнего шва, мин.', 'Skin incision to last stitch, min.', ''],
+  ebl: ['Интраоперационная кровопотеря по протоколу анестезии, мл.', 'Intraoperative blood loss per anaesthesia record, ml.', ''],
+  transf: ['Переливание компонентов крови во время операции или в ту же госпитализацию.', 'Blood product transfusion during surgery or the same admission.', ''],
+  stoma: ['Стома, сформированная во время индексной операции.', 'Stoma created at the index operation.', 'ichom'],
+  admDate: ['Дата поступления в стационар для индексной операции.', 'Admission date for the index operation.', ''],
+  disDate: ['Дата выписки после индексной операции.', 'Discharge date after the index operation.', ''],
+  los: ['Койко-дни от даты поступления до даты выписки.', 'Days from admission to discharge.', ''],
+  icuDays: ['Сутки в ОАРИТ после операции.', 'ICU days after surgery.', ''],
+  cd1: ['Осложнения степени I в течение 30 дней после операции.', 'Grade I complications within 30 days.', 'cd'], cd2: ['Осложнения степени II в течение 30 дней.', 'Grade II within 30 days.', 'cd'],
+  cd3: ['Осложнения степени III (вмешательство под местной или общей анестезией) в течение 30 дней.', 'Grade III (intervention) within 30 days.', 'cd'],
+  cd4: ['Осложнения степени IV (угрожающие жизни, ОРИТ) в течение 30 дней.', 'Grade IV (life-threatening, ICU) within 30 days.', 'cd'], cd5: ['Смерть пациента (степень V) в течение 30 дней.', 'Grade V (death) within 30 days.', 'cd'],
+  reop30: ['Повторная незапланированная операция в течение 30 дней.', 'Unplanned reoperation within 30 days.', 'ichom'],
+  mort30: ['Смерть в течение 30 дней после операции или в ту же госпитализацию.', 'Death within 30 days or during the same admission.', 'ichom', 1],
+  histPost: ['Гистологический тип опухоли по послеоперационному заключению (ВОЗ).', 'Histological type on the resection specimen (WHO).', 'icdo3', 1],
+  tme: ['Качество мезоректумэктомии по макроскопической оценке патоморфолога.', 'Mesorectal excision quality by pathologist macroscopic grading.', 'quirke'],
+  pTRG: ['Степень регресса опухоли после неоадъювантной терапии (0 полный ответ, 3 минимальный).', 'Tumour regression grade after neoadjuvant therapy (0 complete, 3 poor).', 'cap'],
+  pT: ['Патоморфологическая категория T. После неоадъювантной терапии с префиксом y (см. «Префикс TNM»).', 'Pathological T; prefix y after neoadjuvant therapy.', 'tnm8', 1],
+  pN: ['Патоморфологическая категория N.', 'Pathological N.', 'tnm8', 1], pM: ['Патоморфологическая категория M.', 'Pathological M.', 'tnm8'],
+  lnT: ['Число исследованных лимфоузлов в препарате. Показатель качества: 12 и более.', 'Lymph nodes examined. Quality indicator: 12 or more.', 'tnm8', 1],
+  lnP: ['Число лимфоузлов с метастазами.', 'Positive lymph nodes.', 'tnm8', 1],
+  pStage: ['Итоговая стадия по AJCC 8-го издания.', 'Final AJCC 8th edition stage.', 'tnm8'],
+  crmDist: ['Расстояние от опухоли до циркулярного края резекции, см. Положительный край: 0,1 см (1 мм) и менее.', 'Distance to circumferential margin, cm. Positive: ≤0.1 cm (1 mm).', 'ichom'],
+  icdo: ['Морфологический код МКБ-О-3, например 8140/3 аденокарцинома.', 'ICD-O-3 morphology code, e.g. 8140/3 adenocarcinoma.', 'icdo3'],
+  grade: ['Степень дифференцировки по ВОЗ.', 'WHO grade.', ''],
+  pCR: ['Полный патоморфологический ответ: ypT0 ypN0 после неоадъювантной терапии.', 'Pathological complete response: ypT0 ypN0.', 'ichom'],
+  rPath: ['R по гистологическому заключению.', 'R status per pathology report.', 'uicc'],
+  msi: ['Статус микросателлитной нестабильности или MMR.', 'MSI or MMR status.', ''],
+  lastFu: ['Дата последнего визита или контакта с пациентом.', 'Date of last visit or contact.', 'ichom'],
+  recur: ['Рецидив: подтверждённое по визуализации или гистологии возвращение болезни после радикального лечения.', 'Recurrence confirmed by imaging or histology after curative treatment.', 'ichom', 1],
+  recurDate: ['Дата первого подтверждения рецидива (визуализация или гистология).', 'Date recurrence was first confirmed.', 'ichom'],
+  localRec: ['Местный рецидив: в зоне анастомоза, ложе опухоли или малом тазу.', 'Local recurrence: anastomosis, tumour bed or pelvis.', 'ichom'],
+  distMets: ['Отдалённые метастазы, выявленные после радикального лечения.', 'Distant metastases after curative treatment.', 'ichom'],
+  dead: ['Смерть пациента по любой причине на дату последнего контакта.', 'Death from any cause at last contact.', 'ichom', 1], deathDate: ['Дата смерти.', 'Date of death.', 'ichom'],
+  ecog: ['Функциональный статус ECOG на момент постановки диагноза.', 'ECOG performance status at diagnosis.', 'ecog', 1],
+  leak: ['Несостоятельность анастомоза по ISREC: A без изменения лечения, B требует активного лечения без релапаротомии, C требует релапаротомии.', 'Anastomotic leak by ISREC: A no change in management, B active treatment without relaparotomy, C relaparotomy.', 'isrec', 1],
+  readm30: ['Незапланированная повторная госпитализация в течение 30 дней после выписки.', 'Unplanned readmission within 30 days of discharge.', 'ichom'],
+  readm90: ['Незапланированная повторная госпитализация в течение 90 дней после операции.', 'Unplanned readmission within 90 days of surgery.', 'ichom'],
+  cx90: ['Последствия осложнений лечения в течение 90 дней по набору ICHOM.', 'Consequences of treatment complications within 90 days (ICHOM).', 'ichom'],
+  stomaStat: ['Наличие стомы через 1 год после операции: временная (планируется закрытие) или постоянная.', 'Stoma at 1 year: temporary (closure planned) or permanent.', 'ichom', 1],
+  stomaRevDate: ['Дата операции по закрытию стомы.', 'Date of stoma reversal.', 'ichom'],
+  lastContact: ['Дата последнего подтверждённого контакта (визит, звонок, анкета). Нужна для расчёта выживаемости.', 'Date of last confirmed contact; needed for survival analysis.', 'ichom', 1],
+  vital: ['Статус жизни на дату последнего контакта.', 'Vital status at last contact.', 'ichom', 1],
+  deathCause: ['Основная причина смерти.', 'Main cause of death.', 'ichom']
+};
+function ddDef(id) { var o = (DB.dictOv || {})[id]; if (o && (o.ru || o.en)) return LANG === 'en' ? (o.en || o.ru) : (o.ru || o.en); var x = DDEF[id]; if (x) return LANG === 'en' ? x[1] : x[0]; var f = FIELD[id]; if (!f) return ''; return L(f.label) + (f.unit ? ', ' + t(f.unit) : '') + '.'; }
+function ddStd(id) { var x = DDEF[id]; return x && x[2] ? STD[x[2]] : ''; }
+function ddCore(id) { var x = DDEF[id]; return !!(x && x[3]); }
+/* коды МКБ-10 / МКБ-О-3 (топография) по локализации */
+var LOC_ICD = { 'Слепая кишка': 'C18.0', 'Восходящая ободочная': 'C18.2', 'Печёночный изгиб': 'C18.3', 'Поперечная ободочная': 'C18.4', 'Селезёночный изгиб': 'C18.5', 'Нисходящая ободочная': 'C18.6', 'Сигмовидная кишка': 'C18.7', 'Ректосигмоидный отдел': 'C19', 'Прямая кишка': 'C20', 'Анальный канал': 'C21.1' };
+function icd10Of(d) { return LOC_ICD[d.loc] || ''; }
+function icdoTopoOf(d) { var c = LOC_ICD[d.loc]; return !c ? '' : c === 'C19' ? 'C19.9' : c === 'C20' ? 'C20.9' : c; }
+
+/* ---------- контроль качества: логические проверки ---------- */
+function dqv(d, k) { var v = d[k]; return has(v) && !isNA(v) ? v : null; }
+function dqn(d, k) { var v = dqv(d, k); return v === null ? null : num(v); }
+function ddays(a, b) { return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 864e5); }
+var DQ_RULES = [
+  ['e', ['dob', 'date'], ['Дата рождения позже даты операции', 'Date of birth after surgery'], function (d) { return dqv(d, 'dob') && dqv(d, 'date') && d.dob >= d.date; }],
+  ['e', ['age', 'dob'], ['Возраст не совпадает с датой рождения', 'Age does not match date of birth'], function (d) { var a = dqn(d, 'age'), b = dqv(d, 'dob'), r = dqv(d, 'date') || dqv(d, 'regDate'); if (a === null || !b || !r) return false; var y = Math.floor(ddays(b, r) / 365.25); return Math.abs(y - a) > 1; }],
+  ['w', ['age'], ['Возраст вне диапазона 18-100 лет', 'Age outside 18-100'], function (d) { var a = dqn(d, 'age'); return a !== null && (a < 18 || a > 100); }],
+  ['w', ['height'], ['Рост вне диапазона 120-220 см', 'Height outside 120-220 cm'], function (d) { var a = dqn(d, 'height'); return a !== null && (a < 120 || a > 220); }],
+  ['w', ['weight'], ['Вес вне диапазона 30-200 кг', 'Weight outside 30-200 kg'], function (d) { var a = dqn(d, 'weight'); return a !== null && (a < 30 || a > 200); }],
+  ['e', ['bmi', 'height', 'weight'], ['ИМТ не соответствует росту и весу', 'BMI does not match height and weight'], function (d) { var b = dqn(d, 'bmi'), h = dqn(d, 'height'), w = dqn(d, 'weight'); return b !== null && h && w ? Math.abs(w / Math.pow(h / 100, 2) - b) > 1 : false; }],
+  ['e', ['admDate', 'date'], ['Операция раньше даты поступления', 'Surgery before admission'], function (d) { return dqv(d, 'admDate') && dqv(d, 'date') && d.date < d.admDate; }],
+  ['e', ['date', 'disDate'], ['Выписка раньше даты операции', 'Discharge before surgery'], function (d) { return dqv(d, 'disDate') && dqv(d, 'date') && d.disDate < d.date; }],
+  ['e', ['los', 'admDate', 'disDate'], ['Койко-дни не совпадают с датами поступления и выписки', 'Hospital days do not match admission and discharge'], function (d) { var l = dqn(d, 'los'); return l !== null && dqv(d, 'admDate') && dqv(d, 'disDate') ? Math.abs(ddays(d.admDate, d.disDate) - l) > 1 : false; }],
+  ['e', ['rtStart', 'rtEnd'], ['Конец лучевой терапии раньше начала', 'RT end before start'], function (d) { return dqv(d, 'rtStart') && dqv(d, 'rtEnd') && d.rtEnd < d.rtStart; }],
+  ['e', ['rtEnd', 'date'], ['Операция раньше окончания лучевой терапии', 'Surgery before end of RT'], function (d) { return dqv(d, 'rtEnd') && dqv(d, 'date') && d.date < d.rtEnd; }],
+  ['e', ['adjStart', 'adjEnd'], ['Конец адъювантной терапии раньше начала', 'Adjuvant end before start'], function (d) { return dqv(d, 'adjStart') && dqv(d, 'adjEnd') && d.adjEnd < d.adjStart; }],
+  ['e', ['lnT', 'lnP'], ['Метастатических лимфоузлов больше, чем исследованных', 'More positive than examined nodes'], function (d) { var a = dqn(d, 'lnT'), b = dqn(d, 'lnP'); return a !== null && b !== null && b > a; }],
+  ['e', ['lnP', 'pN'], ['pN0, но есть метастатические лимфоузлы', 'pN0 but positive nodes recorded'], function (d) { var b = dqn(d, 'lnP'); return b !== null && b > 0 && d.pN === 'pN0'; }],
+  ['e', ['pCR', 'pT', 'pN'], ['Полный ответ отмечен, но pT или pN не нулевые', 'Complete response but pT or pN not zero'], function (d) { return d.pCR === 'Да' && ((dqv(d, 'pT') && ['pT0', 'pTis'].indexOf(d.pT) < 0) || (dqv(d, 'pN') && d.pN !== 'pN0')); }],
+  ['w', ['r', 'crmDist'], ['R0, но циркулярный край 1 мм и менее (по стандарту это положительный край)', 'R0 but CRM ≤1 mm (positive margin by standard)'], function (d) { var c = dqn(d, 'crmDist'); return d.r === 'R0' && c !== null && c <= 0.1; }],
+  ['w', ['r', 'rPath'], ['R по хирургу и R по гистологии расходятся', 'Surgical and pathological R differ'], function (d) { return dqv(d, 'r') && dqv(d, 'rPath') && d.r !== d.rPath; }],
+  ['e', ['conv', 'access'], ['Конверсия при открытом доступе', 'Conversion with open approach'], function (d) { return d.conv === 'Да' && d.access === 'Открытый'; }],
+  ['e', ['stomaClose', 'stoma'], ['Отмечено закрытие стомы, но стома не формировалась', 'Stoma reversal but no stoma created'], function (d) { return d.stomaClose === 'Да' && d.stoma === 'Нет'; }],
+  ['e', ['leak', 'anast'], ['Несостоятельность анастомоза при отсутствии анастомоза', 'Anastomotic leak without anastomosis'], function (d) { return dqv(d, 'leak') && d.leak !== 'Нет' && d.anast === 'Нет'; }],
+  ['w', ['leak', 'reop30'], ['Несостоятельность степени C без отметки о повторной операции', 'Grade C leak without reoperation'], function (d) { return d.leak === 'Степень C' && d.reop30 === 'Нет'; }],
+  ['w', ['reop30', 'reopDate', 'date'], ['Повторная операция позже 30 дней', 'Reoperation later than 30 days'], function (d) { return d.reop30 === 'Да' && dqv(d, 'reopDate') && dqv(d, 'date') && ddays(d.date, d.reopDate) > 30; }],
+  ['e', ['mort30', 'mortDate'], ['Отмечена 30-дневная смертность без даты смерти', '30-day mortality without date'], function (d) { return d.mort30 === 'Да' && !dqv(d, 'mortDate') && !dqv(d, 'deathDate'); }],
+  ['e', ['mort30', 'mortDate', 'date'], ['Смерть позже 30 дней отмечена как 30-дневная', 'Death after 30 days marked as 30-day'], function (d) { var md = dqv(d, 'mortDate') || dqv(d, 'deathDate'); return d.mort30 === 'Да' && md && dqv(d, 'date') && ddays(d.date, md) > 30 && !(dqv(d, 'disDate') && md <= d.disDate); }],
+  ['e', ['dead', 'deathDate'], ['Смерть отмечена без даты', 'Death without date'], function (d) { return d.dead === 'Да' && !dqv(d, 'deathDate'); }],
+  ['e', ['deathDate', 'date'], ['Дата смерти раньше операции', 'Death before surgery'], function (d) { return dqv(d, 'deathDate') && dqv(d, 'date') && d.deathDate < d.date; }],
+  ['e', ['vital', 'dead'], ['Статус жизни и отметка о смерти противоречат друг другу', 'Vital status contradicts death field'], function (d) { return (d.vital === 'Умер' && d.dead === 'Нет') || (d.vital === 'Жив' && d.dead === 'Да'); }],
+  ['e', ['recur', 'localRec', 'distMets'], ['Местный рецидив или метастазы отмечены, но «Рецидив» не отмечен', 'Local recurrence or metastases without recurrence flag'], function (d) { return (d.localRec === 'Да' || d.distMets === 'Да') && d.recur === 'Нет'; }],
+  ['e', ['recurDate', 'date'], ['Дата рецидива раньше операции', 'Recurrence before surgery'], function (d) { return dqv(d, 'recurDate') && dqv(d, 'date') && d.recurDate < d.date; }],
+  ['e', ['lastFu', 'date'], ['Последний визит раньше операции', 'Last visit before surgery'], function (d) { return dqv(d, 'lastFu') && dqv(d, 'date') && d.lastFu < d.date; }],
+  ['w', ['cM', 'mets'], ['cM1 без описания метастазов', 'cM1 without metastasis description'], function (d) { return /^cM1/.test(d.cM || '') && !dqv(d, 'mets'); }],
+  ['w', ['tnmPre', 'neoCrt'], ['Префикс yp без неоадъювантной терапии', 'yp prefix without neoadjuvant therapy'], function (d) { return /y/.test(d.tnmPre || '') && d.neoCrt === 'Нет' && !hasTac(d, NEO_T); }],
+  ['w', ['stomaStat', 'stoma'], ['Стома через 1 год отмечена, но при операции стома не формировалась', 'Stoma at 1 year but none created'], function (d) { return dqv(d, 'stomaStat') && d.stomaStat !== 'Нет стомы' && d.stoma === 'Нет'; }]
+];
+function dqCheck(p) { var d = p.d || {}, out = []; DQ_RULES.forEach(function (r, i) { try { if (r[3](d)) out.push({ i: i, sev: r[0], f: r[1], m: L(r[2]) }); } catch (e) {} }); return out; }
+/* ключевые поля для полноты: послеоперационные учитываются только после выполненной операции (не эндоскопической) */
+var DQ_PRE = ['fio', 'iin', 'dob', 'sex', 'asa', 'ecog', 'loc', 'cT', 'cN', 'cM'];
+var DQ_OP = ['date', 'proc', 'urg', 'access', 'r', 'histPost', 'pT', 'pN', 'lnT', 'lnP', 'mort30'];
+var DQ_FU = ['lastContact', 'vital'];
+function dqCore(p) { var d = p.d || {}, l = DQ_PRE.slice(); if (d.date && !isEndo(d)) { l = l.concat(DQ_OP); if (d.anast === 'Да') l.push('leak'); if (ddays(d.date, isoOf(today())) > 365) l = l.concat(DQ_FU, ['stomaStat', 'recur']); } return l.filter(function (id) { return FIELD[id]; }); }
+function dqFilled(p, id) { return has(p.d[id]) && !(Array.isArray(p.d[id]) && !p.d[id].length); }
+function dqIsNa(p, id) { return isNA(p.d[id]) || !!(p.na && p.na[id]); }
+function dqStats() {
+  var per = {}, tot = 0, ok = 0, errP = 0, warnP = 0, list = [];
+  DB.patients.forEach(function (p) {
+    dqCore(p).forEach(function (id) { var s = per[id] || (per[id] = { n: 0, f: 0, na: 0 }); s.n++; tot++; if (dqIsNa(p, id)) { s.na++; ok++; } else if (dqFilled(p, id)) { s.f++; ok++; } });
+    var c = dqCheck(p); if (c.some(function (x) { return x.sev === 'e'; })) errP++; else if (c.length) warnP++; if (c.length) list.push({ p: p, c: c });
+  });
+  return { per: per, pct: tot ? Math.round(ok / tot * 100) : 100, errP: errP, warnP: warnP, list: list };
+}
+/* последовательность: все прооперированные по планировщику должны быть в регистре */
+function dqMissing() {
+  var idx = {}; DB.patients.forEach(function (p) { if (p.d.iin) idx['i' + p.d.iin] = 1; if (p.d.fio) idx['f' + String(p.d.fio).toLowerCase().replace(/\s+/g, ' ').trim()] = 1; });
+  return (DB.cols.planner || []).filter(function (r) { if (r.status !== 'Завершено' || !r.surgeryDate) return false; var k = 'f' + String(r.fio || '').toLowerCase().replace(/\s+/g, ' ').trim(); return !(r.iin && idx['i' + r.iin]) && !idx[k]; });
+}
+function dqBox(p) {
+  var c = dqCheck(p); if (!c.length) return '';
+  var ne = c.filter(function (x) { return x.sev === 'e'; }).length, open = S.dqOpen === p.id;
+  var h = '<div class="dqbox' + (ne ? ' err' : '') + '"><button type="button" class="dq-h" data-act="dqtog" data-id="' + p.id + '">' + ico('alert', 15) + '<b>' + LL('Проверка данных: ', 'Data check: ') + (ne ? ne + LL(' ошиб.', ' error(s)') : '') + (ne && c.length > ne ? ', ' : '') + (c.length > ne ? (c.length - ne) + LL(' предупр.', ' warning(s)') : '') + '</b>' + ico(open ? 'up' : 'down', 14) + '</button>';
+  if (open) h += '<ul>' + c.map(function (x) { return '<li class="' + x.sev + '">' + esc(x.m) + '<span class="muted"> · ' + x.f.map(function (id) { return FIELD[id] ? esc(L(FIELD[id].label)) : id; }).join(', ') + '</span></li>'; }).join('') + '</ul>';
+  return h + '</div>';
+}
+/* ---------- сверка с первичной документацией (SDV) ---------- */
+function sdvBanner(p) {
+  if (!p.sdv || !p.sdv.sel) return '';
+  if (p.sdv.done) return '<div class="sdvb done">' + ico('check', 15) + LL('Сверено с первичной документацией ', 'Verified against source documents ') + fmtDate(p.sdv.done) + (p.sdv.diff ? LL(': найдены расхождения', ': discrepancies found') + (p.sdv.note ? ' (' + esc(p.sdv.note) + ')' : '') : LL(': совпадает', ': matches')) + (can('edit') ? ' <button type="button" class="linkbtn" data-act="sdvreset" data-id="' + p.id + '">' + LL('сверить заново', 'verify again') + '</button>' : '') + '</div>';
+  return '<div class="sdvb">' + ico('search', 15) + '<span>' + LL('Карточка попала в выборку для сверки с первичной документацией (история болезни, протоколы, гистология).', 'This record is in the source-verification sample (case notes, reports, histology).') + '</span>' + (can('edit') ? '<span class="sdv-a"><button type="button" class="btn small" data-act="sdvok" data-id="' + p.id + '">' + LL('Совпадает', 'Matches') + '</button><button type="button" class="btn small" data-act="sdvdiff" data-id="' + p.id + '">' + LL('Есть расхождения', 'Discrepancies') + '</button></span>' : '') + '</div>';
+}
+function sdvSample() {
+  var pool = DB.patients.filter(function (p) { return !(p.sdv && p.sdv.sel && !p.sdv.done); }), n = Math.max(1, Math.ceil(DB.patients.length * 0.1));
+  pool = shuffleCrypto(pool.slice()).slice(0, n); pool.forEach(function (p) { p.sdv = { sel: isoOf(today()), by: me() }; }); return pool.length;
+}
+
+/* ---------- страница «Качество данных» ---------- */
+function renderDQ() {
+  var st = dqStats(), miss = dqMissing(), samp = DB.patients.filter(function (p) { return p.sdv && p.sdv.sel; }), done = samp.filter(function (p) { return p.sdv.done; }), diff = done.filter(function (p) { return p.sdv.diff; });
+  var h = '<div class="pad"><div class="ph"><div><div class="kicker">' + LL('Регистр', 'Registry') + '</div><h1>' + LL('Качество данных', 'Data quality') + '</h1><p class="sub">' + LL('Полнота ключевых полей, логические проверки, сверка с первичной документацией и включение всех пациентов подряд.', 'Key-field completeness, logic checks, source verification and consecutive inclusion.') + '</p></div><div class="actions"><button type="button" class="btn" data-act="view" data-v="dict">' + ico('book', 16) + LL('Словарь данных', 'Data dictionary') + '</button></div></div>';
+  function kpi(v, l, cls) { return '<div class="dq-k' + (cls ? ' ' + cls : '') + '"><b>' + v + '</b><span>' + l + '</span></div>'; }
+  h += '<div class="dq-kpis">' + kpi(st.pct + '%', LL('полнота ключевых полей', 'key-field completeness'), st.pct >= 95 ? 'ok' : st.pct >= 80 ? '' : 'bad') + kpi(st.errP, LL('карточек с ошибками', 'records with errors'), st.errP ? 'bad' : 'ok') + kpi(st.warnP, LL('с предупреждениями', 'with warnings')) + kpi(done.length + ' / ' + samp.length, LL('сверено с первичкой', 'source-verified')) + kpi(miss.length, LL('прооперированы, но нет в регистре', 'operated, not in registry'), miss.length ? 'bad' : 'ok') + '</div>';
+  /* полнота по полям */
+  var ids = Object.keys(st.per).sort(function (a, b) { var A = st.per[a], B = st.per[b]; return (A.f + A.na) / A.n - (B.f + B.na) / B.n; });
+  h += '<section class="card"><h3>' + LL('Полнота ключевых полей', 'Key-field completeness') + '<span class="h3-note">' + LL('«нет информации» считается заполненным осознанно; послеоперационные поля учитываются после операции', '"no information" counts as deliberately filled; post-op fields count after surgery') + '</span></h3><div class="dq-bars">' + ids.map(function (id) { var s = st.per[id], pf = Math.round(s.f / s.n * 100), pn = Math.round(s.na / s.n * 100); return '<div class="dq-row"><span class="dq-l" title="' + esc(ddDef(id)) + '">' + esc(L(FIELD[id].label)) + '</span><span class="dq-bar"><i style="width:' + pf + '%"></i><i class="na" style="width:' + pn + '%"></i></span><span class="dq-v">' + (pf + pn) + '%<em> ' + (s.n - s.f - s.na) + LL(' пусто', ' empty') + '</em></span></div>'; }).join('') + '</div></section>';
+  /* ошибки */
+  h += '<section class="card"><h3>' + LL('Логические проверки', 'Logic checks') + '<span class="h3-note">' + DQ_RULES.length + LL(' правил', ' rules') + '</span></h3>' + (st.list.length ? '<div class="dq-list">' + st.list.slice(0, 200).map(function (x) { return '<div class="dq-it"><button type="button" class="linkbtn" data-act="dqopen" data-id="' + x.p.id + '"><b>' + esc(pName(x.p)) + '</b> <span class="muted">' + x.p.id + '</span></button><ul>' + x.c.map(function (c) { return '<li class="' + c.sev + '">' + esc(c.m) + '</li>'; }).join('') + '</ul></div>'; }).join('') + '</div>' : '<p class="hint ok">' + LL('Противоречий не найдено.', 'No inconsistencies found.') + '</p>') + '</section>';
+  /* последовательность */
+  h += '<section class="card"><h3>' + LL('Все пациенты подряд', 'Consecutive inclusion') + '<span class="h3-note">' + LL('операции, завершённые в планировщике, без карточки в регистре', 'operations completed in the planner without a registry record') + '</span></h3>' + (miss.length ? '<div class="dq-list">' + miss.slice(0, 50).map(function (r) { return '<div class="dq-it row"><span><b>' + esc(r.fio || '?') + '</b> <span class="muted">' + LL('операция ', 'surgery ') + fmtDate(r.surgeryDate) + (r.dx ? ' · ' + esc(r.dx) : '') + '</span></span>' + (can('edit') ? '<button type="button" class="btn small" data-act="dqmk" data-id="' + r.id + '">' + ico('plus', 14) + LL('Создать карточку', 'Create record') + '</button>' : '') + '</div>'; }).join('') + '</div>' + (miss.length > 50 ? '<p class="hint">' + LL('Показаны первые 50 из ', 'First 50 of ') + miss.length + '</p>' : '') : '<p class="hint ok">' + LL('Все прооперированные пациенты внесены в регистр.', 'All operated patients are in the registry.') + '</p>') + '</section>';
+  /* сверка */
+  h += '<section class="card"><h3>' + LL('Сверка с первичной документацией', 'Source data verification') + '<span class="h3-note">' + LL('случайная выборка 10% карточек; проверяющий сравнивает карточку с историей болезни', 'random 10% sample; the reviewer compares the record with the case notes') + '</span></h3>';
+  h += '<p class="hint">' + LL('Сверено: ', 'Verified: ') + done.length + LL(' из ', ' of ') + samp.length + (done.length ? LL('; с расхождениями: ', '; with discrepancies: ') + diff.length + ' (' + Math.round(diff.length / done.length * 100) + '%)' : '') + '</p>';
+  if (can('edit')) h += '<button type="button" class="btn" data-act="sdvgo">' + ico('search', 15) + LL('Сформировать выборку 10%', 'Draw a 10% sample') + '</button>';
+  var pend = samp.filter(function (p) { return !p.sdv.done; });
+  if (pend.length) h += '<div class="dq-list">' + pend.map(function (p) { return '<div class="dq-it row"><button type="button" class="linkbtn" data-act="dqopen" data-id="' + p.id + '"><b>' + esc(pName(p)) + '</b> <span class="muted">' + p.id + '</span></button><span class="muted">' + LL('в выборке с ', 'sampled ') + fmtDate(p.sdv.sel) + '</span></div>'; }).join('') + '</div>';
+  return h + '</section></div>';
+}
+
+/* ---------- страница «Словарь данных» ---------- */
+function renderDict() {
+  var q = String(S.dictQ || '').toLowerCase().trim();
+  var h = '<div class="pad"><div class="ph"><div><div class="kicker">' + LL('Регистр', 'Registry') + '</div><h1>' + LL('Словарь данных', 'Data dictionary') + '</h1><p class="sub">' + LL('Определение каждого поля, единицы, допустимые значения и стандарт, по которому оно кодируется. Одно определение для всех, кто заполняет регистр.', 'Definition, units, allowed values and coding standard for every field, one definition for everyone who fills the registry.') + '</p></div><div class="actions"><button type="button" class="btn" data-act="dictxl">' + ico('sheet', 16) + 'Excel</button><button type="button" class="btn" data-act="view" data-v="dq">' + ico('check', 16) + LL('Качество данных', 'Data quality') + '</button></div></div>';
+  h += '<div class="dict-s"><input type="search" data-sb="dictQ" value="' + esc(S.dictQ || '') + '" placeholder="' + LL('Поиск поля', 'Search field') + '"></div>';
+  h += '<p class="hint">' + LL('Стандарты: ', 'Standards: ') + 'UICC/AJCC TNM 8, ICD-10, ICD-O-3, Clavien-Dindo, ISREC, ASA, ECOG, MERCURY, ICHOM Colorectal Cancer. ' + LL('Экспорт: CSV/Excel с кодбуком и CDISC ODM 1.3.2.', 'Export: CSV/Excel with codebook and CDISC ODM 1.3.2.') + '</p>';
+  SECTIONS.forEach(function (s) {
+    var fl = s.fields.filter(function (x) { return x.type !== 'files' && (!q || (L(x.label) + ' ' + x.id + ' ' + ddDef(x.id)).toLowerCase().indexOf(q) >= 0); }); if (!fl.length) return;
+    h += '<section class="card dict-c"><h3>' + esc(L(s.title)) + '</h3>' + fl.map(function (x) {
+      var opts = x.type === 'nodes' ? [] : fieldOpts(x), ed = S.dictEd === x.id, ov2 = (DB.dictOv || {})[x.id];
+      return '<div class="dict-r"><div class="dict-n"><b>' + esc(L(x.label)) + '</b>' + (ddCore(x.id) ? '<span class="tag ok">' + LL('ключевое', 'key') + '</span>' : '') + '<code>' + x.id + '</code></div><div class="dict-d">' + (ed ? '<textarea id="dicted" rows="3">' + esc(ddDef(x.id)) + '</textarea><div class="actions"><button type="button" class="btn small primary" data-act="dictsave" data-id="' + x.id + '">' + t('b.save') + '</button><button type="button" class="btn small" data-act="dictcancel">' + t('b.cancel') + '</button>' + (ov2 ? '<button type="button" class="btn small ghost" data-act="dictreset" data-id="' + x.id + '">' + LL('Вернуть стандартное', 'Restore default') + '</button>' : '') + '</div>' : esc(ddDef(x.id)) + (isAdmin() ? ' <button type="button" class="linkbtn" data-act="dictedit" data-id="' + x.id + '">' + LL('изменить', 'edit') + '</button>' : '')) + '<div class="dict-m">' + esc(dictType(x)) + (x.unit ? ' · ' + esc(t(x.unit)) : '') + (ddStd(x.id) ? ' · <b>' + esc(ddStd(x.id)) + '</b>' : '') + (opts.length ? '<br>' + opts.map(function (o, i) { return (i + 1) + ' = ' + esc(ov(o)); }).join('; ') : '') + '</div></div></div>';
+    }).join('') + '</section>';
+  });
+  return h + '</div>';
+}
+function dictType(x) { return { text: LL('текст', 'text'), long: LL('текст', 'text'), num: LL('число', 'number'), date: LL('дата (ГГГГ-ММ-ДД)', 'date (YYYY-MM-DD)'), sel: LL('один из списка', 'single choice'), seg: LL('один из списка', 'single choice'), multi: LL('несколько из списка', 'multiple choice'), nodes: LL('группы лимфоузлов', 'node stations') }[x.type] || x.type; }
+function dictXlsx() {
+  var rows = [[LL('Раздел', 'Section'), LL('Переменная', 'Variable'), LL('Поле', 'Field'), LL('Определение', 'Definition'), LL('Тип', 'Type'), LL('Единицы', 'Units'), LL('Допустимые значения (код = значение)', 'Allowed values (code = value)'), LL('Стандарт', 'Standard'), LL('Ключевое', 'Key')]];
+  SECTIONS.forEach(function (s) { s.fields.forEach(function (x) { if (x.type === 'files') return; var opts = x.type === 'nodes' ? nodeCodes() : fieldOpts(x); rows.push([L(s.title), x.id, L(x.label), ddDef(x.id), dictType(x), x.unit ? t(x.unit) : '', opts.map(function (o, i) { return (i + 1) + ' = ' + ov(o); }).join('; '), ddStd(x.id), ddCore(x.id) ? LL('да', 'yes') : '']); }); });
+  rows.push(['', 'icd10', LL('Код МКБ-10 (рассчитывается)', 'ICD-10 code (derived)'), LL('Присваивается по локализации опухоли.', 'Assigned from tumour site.'), LL('текст', 'text'), '', '', 'ICD-10', '']);
+  rows.push(['', 'icdo_topo', LL('Топография МКБ-О-3 (рассчитывается)', 'ICD-O-3 topography (derived)'), LL('Присваивается по локализации опухоли.', 'Assigned from tumour site.'), LL('текст', 'text'), '', '', 'ICD-O-3', '']);
+  downloadBlob(safeName(LL('Словарь данных регистра ', 'Registry data dictionary ') + isoOf(new Date())) + '.xlsx', buildXlsx([{ name: LL('Словарь', 'Dictionary'), rows: rows }]));
+}
+
+/* ---------- CDISC ODM 1.3.2 ---------- */
+function xmlEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function odmBuild(list, reg, o, cols) {
+  var secOf = {}; SECTIONS.forEach(function (s) { s.fields.forEach(function (x) { secOf[x.id] = s; }); });
+  var groups = [], gmap = {};
+  cols.forEach(function (c) { if (c.id === 'record_id') return; var base = c.id.split('___')[0], s = secOf[base], gid = s ? s.id : (/^fu_/.test(c.id) ? 'fu' : 'other'); if (!gmap[gid]) { gmap[gid] = { id: gid, name: s ? L(s.title) : gid === 'fu' ? LL('Контрольные сроки', 'Follow-up') : LL('Прочее', 'Other'), cols: [] }; groups.push(gmap[gid]); } gmap[gid].cols.push(c); });
+  function dtype(c) { var base = c.id.split('___')[0], x = FIELD[base]; if (c.id !== base || /^fu_/.test(c.id)) return 'integer'; if (!x) return 'text'; if (x.type === 'num') return 'float'; if (x.type === 'date') return 'date'; if (x.type === 'sel' || x.type === 'seg') return 'integer'; return 'text'; }
+  var now = new Date().toISOString().replace(/\.\d+Z$/, ''), sname = reg ? regName(reg) : t('nav.allPatients');
+  var x = '<?xml version="1.0" encoding="UTF-8"?>\n<ODM xmlns="http://www.cdisc.org/ns/odm/v1.3" ODMVersion="1.3.2" FileType="Snapshot" FileOID="NROC.' + Date.now() + '" CreationDateTime="' + now + '" SourceSystem="NROC registry platform">\n';
+  x += '<Study OID="NROC.REG"><GlobalVariables><StudyName>' + xmlEsc(sname) + '</StudyName><StudyDescription>' + xmlEsc(LL('Клинический регистр ННОЦ', 'NROC clinical registry')) + (o.anon ? xmlEsc(LL(' (обезличено)', ' (anonymised)')) : '') + '</StudyDescription><ProtocolName>' + xmlEsc(sname) + '</ProtocolName></GlobalVariables>\n';
+  x += '<MetaDataVersion OID="MDV.1" Name="' + xmlEsc(sname) + ' ' + isoOf(new Date()) + '">\n<Protocol><StudyEventRef StudyEventOID="SE.REG" OrderNumber="1" Mandatory="Yes"/></Protocol>\n';
+  x += '<StudyEventDef OID="SE.REG" Name="Registry" Repeating="No" Type="Common"><FormRef FormOID="F.REG" OrderNumber="1" Mandatory="No"/></StudyEventDef>\n<FormDef OID="F.REG" Name="' + xmlEsc(sname) + '" Repeating="No">' + groups.map(function (g, i) { return '<ItemGroupRef ItemGroupOID="IG.' + g.id + '" OrderNumber="' + (i + 1) + '" Mandatory="No"/>'; }).join('') + '</FormDef>\n';
+  groups.forEach(function (g) { x += '<ItemGroupDef OID="IG.' + g.id + '" Name="' + xmlEsc(g.name) + '" Repeating="No">' + g.cols.map(function (c, i) { return '<ItemRef ItemOID="I.' + c.id + '" OrderNumber="' + (i + 1) + '" Mandatory="No"/>'; }).join('') + '</ItemGroupDef>\n'; });
+  var cls = '';
+  cols.forEach(function (c) {
+    if (c.id === 'record_id') return; var base = c.id.split('___')[0], dt = dtype(c), fx = FIELD[base], def = c.id === base ? ddDef(base) : '', std = c.id === base ? ddStd(base) : '';
+    x += '<ItemDef OID="I.' + c.id + '" Name="' + c.id + '" DataType="' + dt + '">' + (def ? '<Description><TranslatedText xml:lang="' + LANG + '">' + xmlEsc(def) + '</TranslatedText></Description>' : '') + '<Question><TranslatedText xml:lang="' + LANG + '">' + xmlEsc(c.cb[1]) + '</TranslatedText></Question>';
+    var opts = null; if (c.id !== base || /^fu_/.test(c.id)) opts = [LL('нет', 'no'), LL('да', 'yes')]; else if (fx && (fx.type === 'sel' || fx.type === 'seg')) opts = fieldOpts(fx).map(ov);
+    if (opts) { x += '<CodeListRef CodeListOID="CL.' + c.id + '"/>'; cls += '<CodeList OID="CL.' + c.id + '" Name="' + c.id + '" DataType="integer">' + opts.map(function (z, i) { return '<CodeListItem CodedValue="' + (c.id !== base || /^fu_/.test(c.id) ? i : i + 1) + '"><Decode><TranslatedText xml:lang="' + LANG + '">' + xmlEsc(z) + '</TranslatedText></Decode></CodeListItem>'; }).join('') + '</CodeList>\n'; }
+    if (std) x += '<Alias Context="Standard" Name="' + xmlEsc(std) + '"/>';
+    x += '</ItemDef>\n';
+  });
+  x += cls + '</MetaDataVersion></Study>\n<ClinicalData StudyOID="NROC.REG" MetaDataVersionOID="MDV.1">\n';
+  list.forEach(function (p) {
+    x += '<SubjectData SubjectKey="' + xmlEsc(p.id) + '"><StudyEventData StudyEventOID="SE.REG"><FormData FormOID="F.REG">';
+    groups.forEach(function (g) {
+      var items = g.cols.map(function (c) { var v = c.get(p), dt = dtype(c); if (v === undefined || v === null || v === '') return ''; if (dt === 'integer' && !/^-?\d+$/.test(String(v))) return ''; if (dt === 'float' && isNaN(+v)) return ''; if (dt === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(String(v))) return ''; return '<ItemData ItemOID="I.' + c.id + '" Value="' + xmlEsc(v) + '"/>'; }).join('');
+      if (items) x += '<ItemGroupData ItemGroupOID="IG.' + g.id + '">' + items + '</ItemGroupData>';
+    });
+    x += '</FormData></StudyEventData></SubjectData>\n';
+  });
+  return x + '</ClinicalData>\n</ODM>\n';
+}
 
 /* ======================= Collections schema ======================= */
 var COLS = {
@@ -994,6 +1258,8 @@ function fieldHTML(x, val, path, d, attrs) {
   var af = S.drawer && S.drawer.aiFilled && path === 'd.' + x.id ? S.drawer.aiFilled[x.id] : null;
   if (af) out = out.replace('class="fld', 'title="' + esc(LL('Заполнено из документа', 'Filled from document') + ' (' + Math.round(af.c * 100) + '%): ' + (af.q || '')) + '" class="fld aifill' + (af.c < 0.7 ? ' ailow' : ''));
   var fl = has(val);
+  if (path === 'd.' + x.id) { var dfn = ddDef(x.id); if (dfn) { var lb = esc(L(x.label)); var ip = out.indexOf(lb + '</'); if (ip >= 0) out = out.slice(0, ip + lb.length) + '<i class="ddq" data-ddq="' + x.id + '" title="' + esc(dfn + (ddStd(x.id) ? ' [' + ddStd(x.id) + ']' : '')) + '">?</i>' + out.slice(ip + lb.length); }
+    if (x.id === 'loc' && icd10Of(d)) out = out.replace(/<\/div>$/, '<p class="fcode">' + LL('МКБ-10 ', 'ICD-10 ') + icd10Of(d) + ' · ' + LL('МКБ-О-3 ', 'ICD-O-3 ') + icdoTopoOf(d) + '</p></div>'); }
   out = out.replace('class="fld', 'class="fld f-' + x.type + (fl ? ' filled' : ''));
   if (x.type === 'sel' && !fl) out = out.replace('<select ', '<select class="empty" ');
   if (!fl && /^(num|text|long|date|sel)$/.test(x.type) && /^[dc]\./.test(path) && !x.calc) out = out.replace(/<\/div>$/, '<button type="button" class="na-set" data-naset="' + path + '">' + LL('нет информации', 'no information') + '</button></div>');
@@ -1425,6 +1691,7 @@ function cardTabBody(dr, tab, tags) {
   var p = dr.p, d = p.d, h = '<div class="pbody tabbed"><div class="dbody">';
   if (isStudent()) h += '<div class="lockbox">' + ico('lock', 15) + LL('Режим студента: данные обезличены, изменения не сохраняются.', 'Student mode: anonymised, changes are not saved.') + '</div>';
   if (dr.errs) h += '<div class="errbox"><b>' + ico('alert', 16) + LL('Карточку нельзя сохранить', 'Cannot save the record') + '</b><ul>' + dr.errs.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></div>';
+  if (!dr.isNew) h += sdvBanner(p) + dqBox(p);
   h += ctxBanner(dr);
   if (tab !== 'more') {
     var ss = viewSecs(dr).filter(function (s) { return s.phase === tab; });
@@ -1445,7 +1712,8 @@ function cardTabBody(dr, tab, tags) {
     }
   } else {
     h += ptagPicker(dr);
-    var enr = Object.keys(p.enroll || {}).map(function (sid) { var r = regOf(sid); return r ? { r: r, e: p.enroll[sid] } : null; }).filter(Boolean);
+    if (!dr.isNew) h += sdvBanner(p) + dqBox(p);
+  var enr = Object.keys(p.enroll || {}).map(function (sid) { var r = regOf(sid); return r ? { r: r, e: p.enroll[sid] } : null; }).filter(Boolean);
     if (enr.length) h += '<section class="card enrc"><h3>' + ico('flask', 18) + LL('Участие в исследованиях', 'Study participation') + '</h3>' + enr.map(function (x) { return '<div class="enr-row"><div><b>' + esc(regName(x.r)) + '</b><span class="mono">' + esc(x.e.no) + '</span></div><span class="muted">' + LL('включён ', 'enrolled ') + fmtDate(x.e.date) + '</span>' + (x.e.arm ? '<span class="armtag">' + esc(x.e.arm) + '</span>' : '') + '</div>'; }).join('') + '</section>';
     h += '<section class="card" id="sec-links"><h3>' + t('lk.title') + '</h3>' + (dr.isNew ? '<p class="hint">' + t(dr.linkRec ? 'lk.willLink' : 'lk.saveFirst') + '</p>' : '<p class="hint">' + t('lk.hint') + '</p>' + linkedBlock(p.id, true)) + '</section>';
     DB.registries.forEach(function (r) {
@@ -2151,6 +2419,7 @@ function exportCols(list, reg, o) {
     var arms = ((reg.proto || {}).arms || []).map(function (a) { return a.name; });
     cols.push({ id: 'arm', lab: LL('Группа', 'Arm'), get: function (p) { var v = ((p.enroll || {})[reg.id] || {}).arm; if (!v) return ''; if (o.mode === 'codes') { var i = arms.indexOf(v); return i >= 0 ? i + 1 : v; } return v; }, cb: ['arm', LL('Группа рандомизации', 'Randomisation arm'), 'dropdown', arms.map(function (z, i) { return (i + 1) + ' = ' + z; }).join('; ')] });
   }
+  if (seen.loc) { cols.push({ id: 'icd10', lab: LL('Код МКБ-10', 'ICD-10 code'), get: function (p) { return icd10Of(p.d); }, cb: ['icd10', LL('Код МКБ-10', 'ICD-10 code'), LL('текст', 'text'), 'ICD-10'] }); cols.push({ id: 'icdo_topo', lab: LL('Топография МКБ-О-3', 'ICD-O-3 topography'), get: function (p) { return icdoTopoOf(p.d); }, cb: ['icdo_topo', LL('Топография МКБ-О-3', 'ICD-O-3 topography'), LL('текст', 'text'), 'ICD-O-3'] }); }
   FU.forEach(function (x) { var vid = 'fu_' + x[0]; cols.push({ id: vid, lab: t(x[2]), get: function (p) { return p.fu[x[0]] ? (o.mode === 'codes' ? 1 : t('fu.done')) : (o.mode === 'codes' ? 0 : ''); }, cb: [vid, t(x[2]), 'checkbox', LL('0 = нет; 1 = выполнен', '0 = no; 1 = done')] }); });
   return cols;
 }
@@ -2161,12 +2430,13 @@ function doExport(fmt) {
   var head = cols.map(function (c) { return o.mode === 'codes' ? c.id : c.lab; });
   var rows = [head].concat(list.map(function (p) { return cols.map(function (c) { var v = c.get(p); return v === undefined ? '' : v; }); }));
   var base = safeName((reg ? regName(reg) : t('nav.allPatients')) + (o.anon ? LL(' обезличено', ' anonymised') : '') + ' ' + isoOf(new Date()));
+  if (fmt === 'odm') { var oc = exportCols(list, reg, Object.assign({}, o, { mode: 'codes' })); download(base + '.odm.xml', odmBuild(list, reg, o, oc), 'application/xml;charset=utf-8'); S.xport = null; toast(LL('Файл сохранён в «Загрузки»', 'File saved to Downloads')); render(); return; }
   if (fmt === 'csv') {
     var cell = function (v) { v = v == null ? '' : String(v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
     download(base + '.csv', '﻿' + rows.map(function (r) { return r.map(cell).join(';'); }).join('\r\n'), 'text/csv;charset=utf-8');
   } else {
     var sheets = [{ name: LL('Данные', 'Data'), rows: rows }];
-    if (o.book) sheets.push({ name: LL('Кодбук', 'Codebook'), rows: [[LL('Переменная', 'Variable'), LL('Название', 'Label'), LL('Тип', 'Type'), LL('Коды и единицы', 'Codes and units')]].concat(cols.map(function (c) { return c.cb; })) });
+    if (o.book) sheets.push({ name: LL('Кодбук', 'Codebook'), rows: [[LL('Переменная', 'Variable'), LL('Название', 'Label'), LL('Тип', 'Type'), LL('Коды и единицы', 'Codes and units'), LL('Определение', 'Definition'), LL('Стандарт', 'Standard')]].concat(cols.map(function (c) { var b = c.id.split('___')[0]; return c.cb.concat([c.id === b && FIELD[b] ? ddDef(b) : '', c.id === b ? ddStd(b) : '']); })) });
     sheets.push({ name: LL('Сведения', 'About'), rows: [[LL('Параметр', 'Item'), LL('Значение', 'Value')], [LL('Регистр', 'Registry'), reg ? regName(reg) : t('nav.allPatients')], [LL('Записей', 'Records'), list.length], [LL('Формат значений', 'Value format'), o.mode === 'codes' ? LL('коды (см. лист «Кодбук»)', 'codes (see Codebook sheet)') : LL('текстовые метки', 'text labels')], [LL('Обезличено', 'Anonymised'), o.anon ? LL('да: ФИО и № ИБ удалены', 'yes: name and case no. removed') : LL('нет', 'no')], [LL('Выгружено', 'Exported'), fmtDT(nowIso()) + ', ' + me()], ['NROC', LL('Национальный научный онкологический центр, Астана', 'National Research Oncology Center, Astana')]] });
     downloadBlob(base + '.xlsx', buildXlsx(sheets));
   }
@@ -2180,7 +2450,7 @@ function renderExport() {
   h += '<div class="xgrp"><div class="xlab">' + LL('Какие записи', 'Which records') + '</div>' + opt('sel', 'view', LL('Как на экране', 'As on screen'), LL('с учётом поиска и фильтров: ', 'with current search and filters: ') + plural(lr.list.length, 'pl.patient')) + opt('sel', 'all', LL('Все записи регистра', 'All registry records'), plural(all, 'pl.patient')) + '</div>';
   h += '<div class="xgrp"><div class="xlab">' + LL('Формат значений', 'Value format') + '</div>' + opt('mode', 'labels', LL('Текстовые метки', 'Text labels'), LL('удобно читать: «Лапароскопический», «Да»', 'easy to read: "Laparoscopic", "Yes"')) + opt('mode', 'codes', LL('Числовые коды для статистики', 'Numeric codes for statistics'), LL('1, 2, 3; флажки в отдельных столбцах 0/1; как в REDCap, SPSS, R', '1, 2, 3; checkboxes as separate 0/1 columns; like REDCap, SPSS, R')) + '</div>';
   h += '<div class="xgrp"><div class="xlab">' + LL('Параметры', 'Options') + '</div><label class="chk big"><input type="checkbox" data-sb="xport.anon"' + (o.anon ? ' checked' : '') + '><span><b>' + LL('Обезличить', 'Anonymise') + '</b><em>' + LL('убрать ФИО и № ИБ; ID записи сохраняется', 'remove name and case no.; record ID is kept') + '</em></span></label><label class="chk big"><input type="checkbox" data-sb="xport.book"' + (o.book ? ' checked' : '') + '><span><b>' + LL('Добавить кодбук', 'Include codebook') + '</b><em>' + LL('отдельный лист: переменная, название, тип, расшифровка кодов', 'separate sheet: variable, label, type, code meanings') + '</em></span></label></div>';
-  h += '</div><div class="dfoot"><div><button type="button" class="btn ghost" data-act="xdo" data-f="csv">' + LL('Скачать CSV', 'Download CSV') + '</button></div><div class="actions"><button type="button" class="btn" data-act="xclose">' + t('b.cancel') + '</button><button type="button" class="btn primary" data-act="xdo" data-f="xlsx">' + ico('download', 16) + LL('Скачать Excel', 'Download Excel') + '</button></div></div></section>';
+  h += '</div><div class="dfoot"><div><button type="button" class="btn ghost" data-act="xdo" data-f="csv">' + LL('Скачать CSV', 'Download CSV') + '</button><button type="button" class="btn ghost" data-act="xdo" data-f="odm" title="' + LL('Международный стандарт обмена данными исследований: открывается в OpenClinica, REDCap, Castor, SAS, R', 'International research data exchange standard: opens in OpenClinica, REDCap, Castor, SAS, R') + '">CDISC ODM</button></div><div class="actions"><button type="button" class="btn" data-act="xclose">' + t('b.cancel') + '</button><button type="button" class="btn primary" data-act="xdo" data-f="xlsx">' + ico('download', 16) + LL('Скачать Excel', 'Download Excel') + '</button></div></div></section>';
   return h;
 }
 
@@ -3449,7 +3719,7 @@ function cloudDocs() {
   DB.registries.forEach(function (r) { m['g_' + r.id] = r; });
   (DB.pending || []).forEach(function (r) { m['x_' + r.id] = r; });
   Object.keys(DB.ms || {}).forEach(function (sid) { var x = DB.ms[sid]; ['papers', 'secs', 'lib', 'cm', 'zcols'].forEach(function (g2) { Object.keys(x[g2] || {}).forEach(function (k) { m['m_' + sid + '__' + g2 + '__' + k] = x[g2][k]; }); }); });
-  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, qtext: DB.qtext, studySeq: DB.studySeq, importedAt: DB.importedAt };
+  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, qtext: DB.qtext, dictOv: DB.dictOv, studySeq: DB.studySeq, importedAt: DB.importedAt };
   var out = {}; Object.keys(m).forEach(function (k) { out[k.replace(/\//g, '_')] = JSON.stringify(m[k]); }); return out;
 }
 function cloudPush() {
@@ -4561,6 +4831,8 @@ function viewTitle() {
   if (v === 'q') return LL('Анкеты', 'Questionnaires');
   if (v === 'appr') return LL('На одобрении', 'Awaiting approval');
   if (v === 'write') return LL('Рукописи и литература', 'Manuscripts and library');
+  if (v === 'dq') return LL('Качество данных', 'Data quality');
+  if (v === 'dict') return LL('Словарь данных', 'Data dictionary');
   if (v.indexOf('col:') === 0 && COLS[v.slice(4)]) return L(COLS[v.slice(4)].title);
   if (v.indexOf('reg:') === 0) { var r = regOf(v.slice(4)); return r ? regName(r) : t('nav.allPatients'); }
   return '';
@@ -4679,6 +4951,8 @@ function renderMain() {
   if (v === 'retro') return renderRetro();
   if (v === 'studies') return renderStudies();
   if (v === 'q') return renderQPage();
+  if (v === 'dq') return renderDQ();
+  if (v === 'dict') return renderDict();
   if (v.indexOf('col:') === 0) { var k = v.slice(4); if (COLS[k]) return renderCol(k); }
   if (v.indexOf('reg:') === 0) return renderRegistry();
   S.view = 'home'; return renderHome();
@@ -4900,6 +5174,17 @@ document.addEventListener('click', function (ev) {
     case 'unlockf': if (confirm(LL('Разблокировать поле для исправления? Старое и новое значения будут записаны в историю изменений.', 'Unlock this field? Old and new values will be written to the change history.'))) { S.drawer.unl = S.drawer.unl || {}; S.drawer.unl[g('id')] = true; render(); var ui = root.querySelector('#f_d_' + g('id')); if (ui) ui.focus(); } break;
     case 'xset': S.xport[g('k')] = g('v'); render(); break;
     case 'xdo': doExport(g('f')); break;
+    case 'dqtog': S.dqOpen = S.dqOpen === g('id') ? null : g('id'); render(); break;
+    case 'dqopen': openPatient(g('id')); break;
+    case 'dqmk': { var pr0 = (DB.cols.planner || []).filter(function (z) { return z.id === g('id'); })[0]; if (pr0) openPatient(null, { fio: pr0.fio || '', iin: pr0.iin || '', date: pr0.surgeryDate || '', admDate: pr0.date || '' }); break; }
+    case 'sdvgo': { var n0 = sdvSample(); save(); toast(LL('В выборку для сверки добавлено карточек: ', 'Records sampled for verification: ') + n0); render(); break; }
+    case 'sdvok': case 'sdvdiff': { var ps = findPat(g('id')); if (!ps) break; var note = ''; if (a === 'sdvdiff') { note = prompt(LL('Какие поля расходятся с первичной документацией?', 'Which fields differ from the source documents?'), '') || ''; } ps.sdv = Object.assign({}, ps.sdv, { done: isoOf(today()), diff: a === 'sdvdiff', note: note, by: me() }); save(); render(); break; }
+    case 'sdvreset': { var pr2 = findPat(g('id')); if (pr2) { pr2.sdv = { sel: isoOf(today()), by: me() }; save(); render(); } break; }
+    case 'dictedit': S.dictEd = g('id'); render(); break;
+    case 'dictcancel': S.dictEd = null; render(); break;
+    case 'dictsave': { var tx = root.querySelector('#dicted'); DB.dictOv = DB.dictOv || {}; var o0 = DB.dictOv[g('id')] || {}; o0[LANG === 'en' ? 'en' : 'ru'] = tx ? tx.value.trim() : ''; o0.by = me(); o0.at = nowIso(); DB.dictOv[g('id')] = o0; S.dictEd = null; save(); render(); break; }
+    case 'dictreset': if (DB.dictOv) delete DB.dictOv[g('id')]; S.dictEd = null; save(); render(); break;
+    case 'dictxl': dictXlsx(); break;
     case 'xclose': S.xport = null; render(); break;
     case 'imp': { var fi2 = document.createElement('input'); fi2.type = 'file'; fi2.accept = '.xlsx,.csv'; fi2.onchange = function () { if (fi2.files[0]) startImport(fi2.files[0]); }; fi2.click(); break; }
     case 'impgo': applyImport(); break;
@@ -5692,7 +5977,7 @@ function dxSchemaText() {
   return dxFields().map(function (o) {
     var x = o.x, head = o.sec !== cur ? '\n# ' + (cur = o.sec) + '\n' : '';
     if (x.type === 'nodes') return head + x.id + ' | ' + x.label[0] + ' | массив кодов групп лимфоузлов по JSCCR (rt = справа, lt = слева); заполняй только если в документе явно названы удалённые группы или их анатомия (например «запирательные слева» = "283 lt", «внутренние подвздошные проксимальные справа» = "263P rt") | ' + LN_ST.map(function (st) { return st[0] + ' ' + st[1].toLowerCase(); }).join('; ') + ' | коды: ' + nodeCodes().map(function (v) { return '"' + v + '"'; }).join(', ');
-    return head + x.id + ' | ' + x.label[0] + ' | ' + (TY[x.type] || x.type) + (x.unit ? ' (' + t(x.unit) + ')' : '') + (x.options ? ' | ' + x.options.map(function (v) { return '"' + v + '"'; }).join(', ') : '');
+    return head + x.id + ' | ' + x.label[0] + ' | ' + (TY[x.type] || x.type) + (x.unit ? ' (' + t(x.unit) + ')' : '') + (x.options ? ' | ' + x.options.map(function (v) { return '"' + v + '"'; }).join(', ') : '') + (DDEF[x.id] ? ' | определение: ' + ((DB.dictOv || {})[x.id] && DB.dictOv[x.id].ru || DDEF[x.id][0]) : '');
   }).join('\n');
 }
 var DX_SYS = 'Ты модуль извлечения данных колоректального регистра ННОЦ (Астана). На вход: медицинский документ (выписной эпикриз, первичный осмотр, консультативный лист, протокол операции, гистология, заключение МРТ/КТ, эндоскопия) и схема карточки пациента. ' +
@@ -7613,6 +7898,7 @@ function navGroups() {
   var pts = [{ v: 'reg:all', icon: 'users', label: t('nav.allPatients'), cnt: DB.patients.length }, { sep: LL('По решению МДГ', 'By MDT decision') }];
   TRACKS.forEach(function (tk) { var rr = regOf('trk_' + tk.key); if (rr) pts.push({ v: 'reg:' + rr.id, icon: tk.icon, label: LL(tk.ru, tk.en), cnt: regCount(rr), depth: 1 }); });
   pts.push({ sep: LL('Ещё', 'More') }); pts.push({ v: 'fu', icon: 'clock', label: t('nav.followup'), badge: fuDueAll().length || null });
+  pts.push({ v: 'dq', icon: 'check', label: LL('Качество данных', 'Data quality'), badge: DB.patients.filter(function (p) { return dqCheck(p).some(function (x) { return x.sev === 'e'; }); }).length || null }); pts.push({ v: 'dict', icon: 'book', label: LL('Словарь данных', 'Data dictionary') });
   if (can('edit') && !isStudent()) pts.push({ v: 'retro', icon: 'upload', label: LL('Ретро-загрузка документов', 'Retrospective import'), cnt: RETRO.items.length || undefined });
   g.push({ id: 'pts', label: t('nav.allPatients'), icon: 'users', items: pts, split: 'reg:all' });
   var regs = [];

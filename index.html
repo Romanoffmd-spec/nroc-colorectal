@@ -1938,14 +1938,36 @@ html[data-theme="dark"] .rt-view mark,html[data-theme="dark"] .rt-hl{background:
 .qsc-i.main{border-color:var(--accent-line,#c9d0ee)}.qsc-i.sc-ok{background:var(--ok-soft,#ecfdf3)}.qsc-i.sc-warn{background:var(--warn-soft,#fff8eb)}.qsc-i.sc-due{background:var(--due-soft,#fef3f2)}
 .fill-done .qsc{justify-content:center;max-width:640px;margin:10px auto}
 .tntq{padding:14px 16px}.tntt td{vertical-align:top}
+
+/* стандарты: словарь, качество данных */
+.ddq{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:5px;border-radius:50%;border:1px solid var(--line);font-size:10px;font-style:normal;font-weight:600;color:var(--muted);cursor:help;vertical-align:1px}
+.ddq:hover{color:var(--accent);border-color:var(--accent)}
+.fcode{margin:3px 0 0;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.dqbox{margin:0 0 12px;border:1px solid #F5C26B;background:#FFF8EB;border-radius:10px;padding:2px 12px}.dqbox.err{border-color:#F3A29B;background:#FEF3F2}
+.dq-h{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:8px 0;cursor:pointer;color:inherit;font:inherit;text-align:left}.dq-h b{flex:1;font-size:13px}
+.dqbox ul,.dq-it ul{margin:0 0 8px;padding-left:18px;font-size:13px}.dqbox li.e,.dq-it li.e{color:#B42318}.dqbox li.w,.dq-it li.w{color:#93370D}
+.sdvb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);font-size:13px}.sdvb.done{color:var(--muted)}.sdv-a{display:flex;gap:6px;margin-left:auto}
+.dq-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 14px}
+.dq-k{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface)}.dq-k b{display:block;font-size:22px;font-variant-numeric:tabular-nums}.dq-k span{font-size:12px;color:var(--muted)}.dq-k.ok b{color:#067647}.dq-k.bad b{color:#B42318}
+.dq-bars{display:flex;flex-direction:column;gap:6px}.dq-row{display:grid;grid-template-columns:minmax(120px,240px) 1fr 120px;gap:10px;align-items:center;font-size:13px}
+.dq-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dq-bar{display:flex;height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}.dq-bar i{display:block;height:100%;background:#12B76A}.dq-bar i.na{background:#98A2B3}
+.dq-v{font-variant-numeric:tabular-nums}.dq-v em{font-style:normal;color:var(--muted);font-size:11.5px}
+.dq-list{display:flex;flex-direction:column;gap:8px;margin-top:6px}.dq-it{border-top:1px solid var(--line);padding-top:8px}.dq-it.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.dict-s{margin:0 0 10px}.dict-s input{width:100%;max-width:420px}
+.dict-c h3{margin-bottom:6px}.dict-r{display:grid;grid-template-columns:minmax(160px,260px) 1fr;gap:14px;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
+.dict-n b{display:block}.dict-n code{display:inline-block;margin-top:3px;font-size:11.5px;color:var(--muted)}.dict-n .tag{margin-left:6px}
+.dict-m{margin-top:4px;font-size:12px;color:var(--muted)}.dict-d textarea{width:100%}
+@media (max-width:640px){.dq-row{grid-template-columns:1fr 70px}.dq-bar{grid-column:1/-1;order:3}.dict-r{grid-template-columns:1fr;gap:4px}}
+[data-theme="dark"] .dqbox{background:#2A2210;border-color:#7A5A1A}[data-theme="dark"] .dqbox.err{background:#2B1513;border-color:#7A2E28}
+[data-theme="dark"] .dqbox li.e,[data-theme="dark"] .dq-it li.e{color:#F97066}[data-theme="dark"] .dqbox li.w,[data-theme="dark"] .dq-it li.w{color:#FDB022}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <input type="file" id="importFile" accept=".json,.js,application/json,text/javascript" hidden>
-<script src="firebase-config.js?v=60e994e9"></script>
-<script src="i18n.js?v=60e994e9"></script>
-<script src="ai-corpus.js?v=60e994e9"></script>
-<script src="app.js?v=60e994e9"></script>
+<script src="firebase-config.js?v=24040eff"></script>
+<script src="i18n.js?v=24040eff"></script>
+<script src="ai-corpus.js?v=24040eff"></script>
+<script src="app.js?v=24040eff"></script>
 </body>
 </html>
