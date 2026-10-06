@@ -160,109 +160,109 @@ var PHASES = [['pre', 'ph.pre', 'ph.preSub'], ['op', 'ph.op', 'ph.opSub'], ['pos
 var SECTIONS = [
   /* Строго поля таблицы регистра 2021 (145 столбцов), в том же порядке и с теми же названиями */
   { id: 'pat', phase: 'pre', title: ['Данные о пациенте', 'Patient data'], fields: [
-    f('iin', 'ИИН', 'National ID (IIN)', 'text', { ph: ['12 цифр', '12 digits'] }),
-    f('phone', 'Контактный телефон', 'Contact phone', 'text', { ph: '+7 7__ ___ __ __' }),
-    f('ib', 'Номер истории болезни', 'Case record no.', 'text', { ph: '2026/12345', lock: true, check: ibCheck }),
+    f('iin', 'ИИН', 'Individual identification number (IIN)', 'text', { ph: ['12 цифр', '12 digits'] }),
+    f('phone', 'Контактный телефон', 'Contact telephone', 'text', { ph: '+7 7__ ___ __ __' }),
+    f('ib', 'Номер истории болезни', 'Medical record number', 'text', { ph: '2026/12345', lock: true, check: ibCheck }),
     f('dob', 'Дата рождения', 'Date of birth', 'date'),
     f('age', 'Возраст', 'Age', 'num', { unit: 'u.years' }),
-    f('regDate', 'Дата регистрации', 'Registration date', 'date'),
+    f('regDate', 'Дата регистрации', 'Date of registry entry', 'date'),
     f('fio', 'ФИО', 'Full name', 'text', { wide: true }),
     f('address', 'Адрес м/ж', 'Home address', 'text', { wide: true }),
     f('nation', 'Национальность', 'Ethnicity', 'text'),
     f('sex', 'Пол', 'Sex', 'seg', { options: ['М', 'Ж'] }),
     f('height', 'Рост', 'Height', 'num', { unit: 'u.cm' }),
-    f('weight', 'Вес', 'Weight', 'num', { unit: 'u.kg' }),
-    f('bmi', 'ИМТ', 'BMI', 'num', { hint: 'f.bmiAuto' })
+    f('weight', 'Вес', 'Body weight', 'num', { unit: 'u.kg' }),
+    f('bmi', 'ИМТ', 'Body mass index (BMI)', 'num', { hint: 'f.bmiAuto' })
   ]},
   { id: 'comorb', phase: 'pre', title: ['Коморбидность', 'Comorbidity'], fields: [
     f('comorb', 'Коморбидность', 'Comorbidity', 'seg', { options: YN }),
-    f('diab', 'СД', 'Diabetes', 'seg', { options: YN }),
-    f('htn', 'АГ', 'Hypertension', 'seg', { options: YN }),
+    f('diab', 'СД', 'Diabetes mellitus', 'seg', { options: YN }),
+    f('htn', 'АГ', 'Arterial hypertension', 'seg', { options: YN }),
     f('cvd', 'Заболевание ССС', 'Cardiovascular disease', 'seg', { options: YN }),
-    f('lung', 'Заболевание легких', 'Lung disease', 'seg', { options: YN }),
+    f('lung', 'Заболевание легких', 'Chronic lung disease', 'seg', { options: YN }),
     f('cvb', 'ЦВБ', 'Cerebrovascular disease', 'seg', { options: YN }),
-    f('liverDz', 'Заболевание печени', 'Liver disease', 'seg', { options: YN }),
-    f('comorbOther', 'Другие', 'Other', 'text', { wide: true }),
-    f('asa', 'ASA', 'ASA', 'sel', { options: ['I', 'II', 'III', 'IV', 'V'] }),
-    f('cci', 'CCI score', 'CCI score', 'num', { unit: 'u.points' }),
+    f('liverDz', 'Заболевание печени', 'Chronic liver disease', 'seg', { options: YN }),
+    f('comorbOther', 'Другие', 'Other comorbidities', 'text', { wide: true }),
+    f('asa', 'ASA', 'ASA physical status', 'sel', { options: ['I', 'II', 'III', 'IV', 'V'] }),
+    f('cci', 'CCI score', 'Charlson Comorbidity Index (CCI)', 'num', { unit: 'u.points' }),
     f('ecog', 'ECOG (функциональный статус)', 'ECOG performance status', 'seg', { options: ['0', '1', '2', '3', '4'] })
   ]},
   { id: 'hx', phase: 'pre', title: ['Анамнез', 'History'], fields: [
-    f('oncoHx', 'Онко анамнез', 'Cancer history', 'text', { wide: true }),
-    f('smoke', 'Курение', 'Smoking', 'seg', { options: YN }),
-    f('ecig', 'Курение электронных сигарет', 'E-cigarettes', 'seg', { options: YN }),
-    f('smokeYrs', 'Стаж курения', 'Smoking history', 'num', { unit: 'u.years' }),
+    f('oncoHx', 'Онко анамнез', 'Previous malignancy', 'text', { wide: true }),
+    f('smoke', 'Курение', 'Current smoking', 'seg', { options: YN }),
+    f('ecig', 'Курение электронных сигарет', 'E-cigarette use', 'seg', { options: YN }),
+    f('smokeYrs', 'Стаж курения', 'Smoking duration', 'num', { unit: 'u.years' }),
     f('alcohol', 'Употребление алкоголя', 'Alcohol use', 'seg', { options: YN }),
     f('famCa', 'Семейный анамнез по раку', 'Family history of cancer', 'seg', { options: YN }),
-    f('famCrc', 'Семейный анамнез по КРР', 'Family history of CRC', 'seg', { options: YN }),
-    f('prevOps', 'Предыдущие операции', 'Previous surgery', 'text', { wide: true })
+    f('famCrc', 'Семейный анамнез по КРР', 'Family history of colorectal cancer', 'seg', { options: YN }),
+    f('prevOps', 'Предыдущие операции', 'Previous abdominal surgery', 'text', { wide: true })
   ]},
-  { id: 'tumor', phase: 'pre', title: ['Характеристики опухоли', 'Tumour'], fields: [
-    f('loc', 'КРР локализация', 'CRC location', 'sel', { options: LOCS }),
+  { id: 'tumor', phase: 'pre', title: ['Характеристики опухоли', 'Tumour characteristics'], fields: [
+    f('loc', 'КРР локализация', 'Primary tumour site', 'sel', { options: LOCS }),
     f('anusDist', 'Расстояние от ануса', 'Distance from anal verge', 'num', { unit: 'u.cm' }),
-    f('multiPrim', 'Первично-множественный рак', 'Multiple primary cancer', 'seg', { options: YN }),
-    f('otherTumor', 'Локализация другой опухоли', 'Other tumour site', 'text', { wide: true }),
-    f('hist', 'ПГЗ до операции', 'Histology before surgery', 'text', { wide: true }),
-    f('symptoms', 'Симптомы', 'Symptoms', 'text', { wide: true }),
-    f('primary', 'Первичная', 'Primary', 'seg', { options: YN })
+    f('multiPrim', 'Первично-множественный рак', 'Multiple primary malignancies', 'seg', { options: YN }),
+    f('otherTumor', 'Локализация другой опухоли', 'Site of other primary tumour', 'text', { wide: true }),
+    f('hist', 'ПГЗ до операции', 'Preoperative biopsy histology', 'text', { wide: true }),
+    f('symptoms', 'Симптомы', 'Presenting symptoms', 'text', { wide: true }),
+    f('primary', 'Первичная', 'Primary tumour (not recurrence)', 'seg', { options: YN })
   ]},
   { id: 'tnm', phase: 'pre', title: ['TNM классификация', 'TNM classification'], fields: [
-    f('cT', 'cT stage', 'cT stage', 'sel', { options: ['cTx', 'cT0', 'cTis', 'cT1', 'cT2', 'cT3', 'cT4a', 'cT4b'] }),
-    f('cN', 'cN stage', 'cN stage', 'sel', { options: ['cNx', 'cN0', 'cN1', 'cN1a', 'cN1b', 'cN1c', 'cN2', 'cN2a', 'cN2b'] }),
-    f('cM', 'cM stage', 'cM stage', 'sel', { options: ['cM0', 'cM1', 'cM1a', 'cM1b', 'cM1c'] }),
-    f('mets', 'Метастазы', 'Metastases', 'text', { wide: true })
+    f('cT', 'cT stage', 'Clinical T category (cT)', 'sel', { options: ['cTx', 'cT0', 'cTis', 'cT1', 'cT2', 'cT3', 'cT4a', 'cT4b'] }),
+    f('cN', 'cN stage', 'Clinical N category (cN)', 'sel', { options: ['cNx', 'cN0', 'cN1', 'cN1a', 'cN1b', 'cN1c', 'cN2', 'cN2a', 'cN2b'] }),
+    f('cM', 'cM stage', 'Clinical M category (cM)', 'sel', { options: ['cM0', 'cM1', 'cM1a', 'cM1b', 'cM1c'] }),
+    f('mets', 'Метастазы', 'Distant metastases at staging', 'text', { wide: true })
   ]},
-  { id: 'lab0', phase: 'pre', title: ['Лаб.данные (до операции)', 'Labs (before surgery)'], fields: [
-    f('cea0', 'РЭА до операции', 'CEA before surgery', 'num', { unit: 'u.ngml' }),
-    f('ca199_0', 'СА19-9 до операции', 'CA 19-9 before surgery', 'num', { unit: 'u.uml' }),
-    f('hb0', 'Hb (до операции)', 'Hb (before surgery)', 'num', { unit: 'u.gl' })
+  { id: 'lab0', phase: 'pre', title: ['Лаб.данные (до операции)', 'Laboratory tests (preoperative)'], fields: [
+    f('cea0', 'РЭА до операции', 'Preoperative CEA', 'num', { unit: 'u.ngml' }),
+    f('ca199_0', 'СА19-9 до операции', 'Preoperative CA 19-9', 'num', { unit: 'u.uml' }),
+    f('hb0', 'Hb (до операции)', 'Preoperative haemoglobin', 'num', { unit: 'u.gl' })
   ]},
-  { id: 'neo', phase: 'pre', title: ['НАПХТ/ЛТ', 'Neoadjuvant chemo/RT'], fields: [
-    f('neoCrt', 'Неоадъювантная ХЛТ', 'Neoadjuvant CRT', 'seg', { options: YN }),
-    f('rtStart', 'Начало ЛТ', 'RT start', 'date'),
-    f('rtEnd', 'Конец ЛТ', 'RT end', 'date'),
-    f('sod', 'СОД', 'Total dose', 'num', { unit: 'u.gy' }),
-    f('crtRegimen', 'Режим ХЛТ', 'CRT regimen', 'text', { wide: true }),
-    f('crtInterval', 'Интервал ХЛТ', 'CRT interval', 'num', { unit: 'u.days' })
+  { id: 'neo', phase: 'pre', title: ['НАПХТ/ЛТ', 'Neoadjuvant chemoradiotherapy'], fields: [
+    f('neoCrt', 'Неоадъювантная ХЛТ', 'Neoadjuvant chemoradiotherapy', 'seg', { options: YN }),
+    f('rtStart', 'Начало ЛТ', 'Radiotherapy start date', 'date'),
+    f('rtEnd', 'Конец ЛТ', 'Radiotherapy end date', 'date'),
+    f('sod', 'СОД', 'Total radiation dose', 'num', { unit: 'u.gy' }),
+    f('crtRegimen', 'Режим ХЛТ', 'Chemoradiotherapy regimen', 'text', { wide: true }),
+    f('crtInterval', 'Интервал ХЛТ', 'Interval from chemoradiotherapy to surgery', 'num', { unit: 'u.days' })
   ]},
-  { id: 'mri', phase: 'pre', title: ['МРТ до операции/ХЛТ', 'MRI before surgery/CRT'], fields: [
-    f('emvi', 'EMVI', 'EMVI', 'seg', { options: ['Отрицательный', 'Положительный'] }),
-    f('mrCRM', 'CRM', 'CRM', 'seg', { options: ['Отрицательный', 'Положительный'] }),
-    f('rHeight', 'Расстояние от ануса до нижнего края опухоли', 'Anal verge to lower tumour edge', 'num', { unit: 'u.cm' }),
-    f('mrLen', 'Продольный размер опухоли', 'Tumour length', 'num', { unit: 'u.cm' }),
-    f('mrLat', 'ЭкстраМР ЛУ', 'Extramesorectal nodes', 'seg', { options: YN }),
-    f('llBefore', 'Размеры ЭМР ЛУ', 'Extramesorectal node size', 'num', { unit: 'u.mm' }),
-    f('mrLN', 'МР ЛУ', 'Mesorectal nodes', 'seg', { options: YN }),
-    f('mrLNsize', 'Размеры МР ЛУ', 'Mesorectal node size', 'num', { unit: 'u.mm' })
+  { id: 'mri', phase: 'pre', title: ['МРТ до операции/ХЛТ', 'Baseline MRI (before surgery or chemoradiotherapy)'], fields: [
+    f('emvi', 'EMVI', 'Extramural venous invasion (mrEMVI)', 'seg', { options: ['Отрицательный', 'Положительный'] }),
+    f('mrCRM', 'CRM', 'MRI circumferential resection margin (mrCRM)', 'seg', { options: ['Отрицательный', 'Положительный'] }),
+    f('rHeight', 'Расстояние от ануса до нижнего края опухоли', 'Distance from anal verge to lower tumour edge (MRI)', 'num', { unit: 'u.cm' }),
+    f('mrLen', 'Продольный размер опухоли', 'Craniocaudal tumour length', 'num', { unit: 'u.cm' }),
+    f('mrLat', 'ЭкстраМР ЛУ', 'Lateral (extramesorectal) lymph nodes', 'seg', { options: YN }),
+    f('llBefore', 'Размеры ЭМР ЛУ', 'Lateral lymph node short-axis diameter', 'num', { unit: 'u.mm' }),
+    f('mrLN', 'МР ЛУ', 'Mesorectal lymph nodes', 'seg', { options: YN }),
+    f('mrLNsize', 'Размеры МР ЛУ', 'Mesorectal lymph node short-axis diameter', 'num', { unit: 'u.mm' })
   ]},
   { id: 'op', phase: 'op', title: ['Информация об операции', 'Operation'], fields: [
     f('date', 'Дата операции', 'Date of surgery', 'date'),
-    f('surgeon', 'Врач', 'Surgeon', 'sel', { options: SURGEONS }),
-    f('proc', 'Название операции', 'Operation', 'sel', { options: PROCS, groups: PROC_GROUPS, wide: true }),
-    f('urg', 'Характер операции', 'Urgency', 'seg', { options: ['Плановая', 'Экстренная'] }),
-    f('r', 'R статус', 'R status', 'seg', { options: ['R0', 'R1', 'R2'] }),
-    f('anast', 'Анастомоз', 'Anastomosis', 'seg', { options: YN }),
-    f('llnd', 'ЛД', 'Lymph node dissection', 'seg', { options: YN }),
-    f('llSt', 'Удалённые группы лимфоузлов (JSCCR)', 'Node stations removed (JSCCR)', 'nodes', { wide: true, show: function (d) { return d.llnd === 'Да' || d.sLndPelv === 'Да'; } }),
+    f('surgeon', 'Врач', 'Operating surgeon', 'sel', { options: SURGEONS }),
+    f('proc', 'Название операции', 'Procedure', 'sel', { options: PROCS, groups: PROC_GROUPS, wide: true }),
+    f('urg', 'Характер операции', 'Urgency of surgery', 'seg', { options: ['Плановая', 'Экстренная'] }),
+    f('r', 'R статус', 'Residual tumour (R) classification', 'seg', { options: ['R0', 'R1', 'R2'] }),
+    f('anast', 'Анастомоз', 'Primary anastomosis', 'seg', { options: YN }),
+    f('llnd', 'ЛД', 'Lateral lymph node dissection', 'seg', { options: YN }),
+    f('llSt', 'Удалённые группы лимфоузлов (JSCCR)', 'Lymph node stations dissected (JSCCR)', 'nodes', { wide: true, show: function (d) { return d.llnd === 'Да' || d.sLndPelv === 'Да'; } }),
     f('opTime', 'Длительность операции', 'Operative time', 'num', { unit: 'u.min' }),
-    f('ebl', 'Объем кровопотери', 'Blood loss', 'num', { unit: 'u.ml' }),
-    f('transf', 'Гемотрансфузия', 'Blood transfusion', 'seg', { options: YN }),
-    f('access', 'Вид операции', 'Access', 'sel', { options: ACCESS }),
-    f('conv', 'Конверсия', 'Conversion', 'seg', { options: YN }),
-    f('anDet', 'Анастомоз (вид)', 'Anastomosis (type)', 'multi', { options: AN_ALL, groups: AN_GROUPS, dd: true, wide: true }),
-    f('imaHigh', 'Перевязка НБА (высокая)', 'IMA ligation (high)', 'seg', { options: YN }),
-    f('imaLow', 'Перевязка НБА (низкая)', 'IMA ligation (low)', 'seg', { options: YN })
+    f('ebl', 'Объем кровопотери', 'Estimated blood loss', 'num', { unit: 'u.ml' }),
+    f('transf', 'Гемотрансфузия', 'Perioperative blood transfusion', 'seg', { options: YN }),
+    f('access', 'Вид операции', 'Surgical approach', 'sel', { options: ACCESS }),
+    f('conv', 'Конверсия', 'Conversion to open surgery', 'seg', { options: YN }),
+    f('anDet', 'Анастомоз (вид)', 'Anastomotic technique', 'multi', { options: AN_ALL, groups: AN_GROUPS, dd: true, wide: true }),
+    f('imaHigh', 'Перевязка НБА (высокая)', 'High ligation of the inferior mesenteric artery', 'seg', { options: YN }),
+    f('imaLow', 'Перевязка НБА (низкая)', 'Low ligation of the inferior mesenteric artery', 'seg', { options: YN })
   ]},
   { id: 'simult', phase: 'op', title: ['Симультанная операция', 'Simultaneous procedure'], fields: [
-    f('simult', 'Cимультанная операция', 'Simultaneous procedure', 'seg', { options: YN }),
-    f('sLiver', 'Печень', 'Liver', 'seg', { options: YN }),
-    f('sBladder', 'Мочевой пузырь', 'Bladder', 'seg', { options: YN }),
-    f('sGyn', 'Гинекологические', 'Gynaecological', 'seg', { options: YN }),
-    f('sLnd', 'ЛД', 'Lymph node dissection', 'seg', { options: YN }),
-    f('sLndPelv', 'ЛД (тазовая)', 'Pelvic LND', 'seg', { options: YN }),
-    f('sLndIng', 'ЛД (паховая)', 'Inguinal LND', 'seg', { options: YN }),
-    f('sGi', 'ЖКТ', 'GI tract', 'seg', { options: YN }),
-    f('sOther', 'Другие', 'Other', 'text', { wide: true }),
+    f('simult', 'Симультанная операция', 'Synchronous combined procedure', 'seg', { options: YN }),
+    f('sLiver', 'Печень', 'Liver resection', 'seg', { options: YN }),
+    f('sBladder', 'Мочевой пузырь', 'Bladder resection', 'seg', { options: YN }),
+    f('sGyn', 'Гинекологические', 'Gynaecological procedure', 'seg', { options: YN }),
+    f('sLnd', 'ЛД', 'Lymphadenectomy', 'seg', { options: YN }),
+    f('sLndPelv', 'ЛД (тазовая)', 'Pelvic lymphadenectomy', 'seg', { options: YN }),
+    f('sLndIng', 'ЛД (паховая)', 'Inguinal lymphadenectomy', 'seg', { options: YN }),
+    f('sGi', 'ЖКТ', 'Other gastrointestinal procedure', 'seg', { options: YN }),
+    f('sOther', 'Другие', 'Other procedure', 'text', { wide: true }),
     f('stoma', 'Превентивная стома', 'Diverting stoma', 'sel', { options: STOMAS }),
     f('stomaClose', 'Устранение стомы', 'Stoma reversal', 'seg', { options: YN }),
     f('intraCx', 'Интраоперационные осложнения', 'Intraoperative complications', 'multi', { options: IC_ALL, optionsFn: intraOpts, dd: true, none: 'f.ddNone', wide: true })
@@ -270,55 +270,55 @@ var SECTIONS = [
   { id: 'hosp', phase: 'op', title: ['Госпитализация', 'Hospital stay'], fields: [
     f('admDate', 'Дата поступления', 'Admission date', 'date'),
     f('disDate', 'Дата выписки', 'Discharge date', 'date'),
-    f('los', 'Kойко-дни в стационаре', 'Hospital days', 'num', { unit: 'u.days' }),
-    f('icuDays', 'Койко-дни в ОАРИТ', 'ICU days', 'num', { unit: 'u.days' })
+    f('los', 'Койко-дни в стационаре', 'Length of hospital stay', 'num', { unit: 'u.days' }),
+    f('icuDays', 'Койко-дни в ОАРИТ', 'Length of ICU stay', 'num', { unit: 'u.days' })
   ]},
-  { id: 'cx', phase: 'post', title: ['Осложнения послеоперационные (в течение 30 дней) по Clavien-Dindo', 'Postoperative complications (30 days), Clavien-Dindo'], fields: [
-    f('cd1', 'Осложнения CD 1', 'Complications CD 1', 'text', { wide: true }),
-    f('cd2', 'Осложнения CD 2', 'Complications CD 2', 'text', { wide: true }),
-    f('cd3', 'Осложнения CD 3', 'Complications CD 3', 'text', { wide: true }),
-    f('cd4', 'Осложнения CD 4', 'Complications CD 4', 'text', { wide: true }),
-    f('cd5', 'Осложнения CD 5', 'Complications CD 5', 'text', { wide: true }),
-    f('reop30', 'Повторная операция (30 д)', 'Reoperation (30 d)', 'seg', { options: YN }),
-    f('reopName', 'Название повторной операции', 'Reoperation', 'text', { wide: true }),
-    f('reopDate', 'Дата операции', 'Reoperation date', 'date'),
-    f('mort30', 'Послеоперационная смертность', 'Postoperative mortality', 'seg', { options: YN }),
+  { id: 'cx', phase: 'post', title: ['Осложнения послеоперационные (в течение 30 дней) по Clavien-Dindo', 'Postoperative complications within 30 days (Clavien-Dindo)'], fields: [
+    f('cd1', 'Осложнения CD 1', 'Clavien-Dindo grade I complications', 'text', { wide: true }),
+    f('cd2', 'Осложнения CD 2', 'Clavien-Dindo grade II complications', 'text', { wide: true }),
+    f('cd3', 'Осложнения CD 3', 'Clavien-Dindo grade III complications', 'text', { wide: true }),
+    f('cd4', 'Осложнения CD 4', 'Clavien-Dindo grade IV complications', 'text', { wide: true }),
+    f('cd5', 'Осложнения CD 5', 'Clavien-Dindo grade V (death)', 'text', { wide: true }),
+    f('reop30', 'Повторная операция (30 д)', 'Unplanned reoperation within 30 days', 'seg', { options: YN }),
+    f('reopName', 'Название повторной операции', 'Reoperation procedure', 'text', { wide: true }),
+    f('reopDate', 'Дата операции', 'Date of reoperation', 'date'),
+    f('mort30', 'Послеоперационная смертность', '30-day postoperative mortality', 'seg', { options: YN }),
     f('mortDate', 'Дата смерти', 'Date of death', 'date'),
     f('mortCause', 'Причина смерти', 'Cause of death', 'text', { wide: true })
   ]},
-  { id: 'lab1', phase: 'post', title: ['Лаб.данные (после операции)', 'Labs (after surgery)'], fields: [
-    f('cea1', 'РЭА после операции', 'CEA after surgery', 'num', { unit: 'u.ngml' }),
-    f('ca199_1', 'СА 19-9 после операции', 'CA 19-9 after surgery', 'num', { unit: 'u.uml' }),
-    f('crp3', 'СРБ (3 сутки после операции)', 'CRP (day 3)', 'num', { unit: 'u.mgl' }),
-    f('crp5', 'СРБ (5 сутки после операции)', 'CRP (day 5)', 'num', { unit: 'u.mgl' }),
-    f('hb1', 'Hb (после операции)', 'Hb (after surgery)', 'num', { unit: 'u.gl' })
+  { id: 'lab1', phase: 'post', title: ['Лаб.данные (после операции)', 'Laboratory tests (postoperative)'], fields: [
+    f('cea1', 'РЭА после операции', 'Postoperative CEA', 'num', { unit: 'u.ngml' }),
+    f('ca199_1', 'СА 19-9 после операции', 'Postoperative CA 19-9', 'num', { unit: 'u.uml' }),
+    f('crp3', 'СРБ (3 сутки после операции)', 'C-reactive protein, postoperative day 3', 'num', { unit: 'u.mgl' }),
+    f('crp5', 'СРБ (5 сутки после операции)', 'C-reactive protein, postoperative day 5', 'num', { unit: 'u.mgl' }),
+    f('hb1', 'Hb (после операции)', 'Postoperative haemoglobin', 'num', { unit: 'u.gl' })
   ]},
   { id: 'adj', phase: 'post', title: ['Адъювантная терапия', 'Adjuvant therapy'], fields: [
     f('adj', 'Адъювантная терапия', 'Adjuvant therapy', 'seg', { options: YN }),
-    f('adjRegimen', 'Режим терапии', 'Regimen', 'text', { wide: true }),
-    f('adjComplete', 'Полноценность ХТ', 'Chemotherapy completed', 'seg', { options: YN }),
-    f('adjStart', 'Начало терапии', 'Start', 'date'),
-    f('adjEnd', 'Конец терапии', 'End', 'date')
+    f('adjRegimen', 'Режим терапии', 'Adjuvant regimen', 'text', { wide: true }),
+    f('adjComplete', 'Полноценность ХТ', 'Adjuvant chemotherapy completed as planned', 'seg', { options: YN }),
+    f('adjStart', 'Начало терапии', 'Adjuvant therapy start date', 'date'),
+    f('adjEnd', 'Конец терапии', 'Adjuvant therapy end date', 'date')
   ]},
   { id: 'path', phase: 'post', title: ['Патоморфология', 'Pathology'], fields: [
-    f('histPost', 'ПГЗ после операции', 'Histology after surgery', 'text', { wide: true }),
-    f('tme', 'Качество ТМЕ', 'TME quality', 'sel', { options: ['Полное (мезоректум цел)', 'Почти полное (дефекты до 5 мм)', 'Неполное (дефекты до мышечного слоя)'] }),
-    f('pTRG', 'AJCC TRG', 'AJCC TRG', 'sel', { options: ['0', '1', '2', '3'] }),
-    f('tumSize', 'Размеры опухоли', 'Tumour size', 'num', { unit: 'u.cm' }),
-    f('pT', 'pT stage', 'pT stage', 'sel', { options: ['pTx', 'pT0', 'pTis', 'pT1', 'pT2', 'pT3', 'pT4a', 'pT4b'] }),
-    f('pN', 'pN stage', 'pN stage', 'sel', { options: ['pNx', 'pN0', 'pN1a', 'pN1b', 'pN1c', 'pN2a', 'pN2b'] }),
-    f('pM', 'pM stage', 'pM stage', 'sel', { options: ['pM0', 'pM1a', 'pM1b', 'pM1c'] }),
-    f('lnT', 'Количество ЛУ', 'Lymph nodes', 'num'),
+    f('histPost', 'ПГЗ после операции', 'Histological type (resection specimen)', 'text', { wide: true }),
+    f('tme', 'Качество ТМЕ', 'Quality of mesorectal excision', 'sel', { options: ['Полное (мезоректум цел)', 'Почти полное (дефекты до 5 мм)', 'Неполное (дефекты до мышечного слоя)'] }),
+    f('pTRG', 'AJCC TRG', 'Tumour regression grade (AJCC/CAP)', 'sel', { options: ['0', '1', '2', '3'] }),
+    f('tumSize', 'Размеры опухоли', 'Tumour size (greatest dimension)', 'num', { unit: 'u.cm' }),
+    f('pT', 'pT stage', 'Pathological T category (pT)', 'sel', { options: ['pTx', 'pT0', 'pTis', 'pT1', 'pT2', 'pT3', 'pT4a', 'pT4b'] }),
+    f('pN', 'pN stage', 'Pathological N category (pN)', 'sel', { options: ['pNx', 'pN0', 'pN1a', 'pN1b', 'pN1c', 'pN2a', 'pN2b'] }),
+    f('pM', 'pM stage', 'Pathological M category (pM)', 'sel', { options: ['pM0', 'pM1a', 'pM1b', 'pM1c'] }),
+    f('lnT', 'Количество ЛУ', 'Lymph nodes examined', 'num'),
     f('lnP', 'Количество метастатических ЛУ', 'Positive lymph nodes', 'num'),
-    f('pStage', 'AJCC стадия (2017)', 'AJCC stage (2017)', 'sel', { options: ['0', 'I', 'IIA', 'IIB', 'IIC', 'IIIA', 'IIIB', 'IIIC', 'IVA', 'IVB', 'IVC'] }),
-    f('prm', 'PRM', 'PRM', 'num', { unit: 'u.cm' }),
-    f('drm', 'DRM', 'DRM', 'num', { unit: 'u.cm' }),
-    f('crmDist', 'CRM', 'CRM', 'num', { unit: 'u.cm' }),
+    f('pStage', 'AJCC стадия (2017)', 'AJCC stage group (8th edition)', 'sel', { options: ['0', 'I', 'IIA', 'IIB', 'IIC', 'IIIA', 'IIIB', 'IIIC', 'IVA', 'IVB', 'IVC'] }),
+    f('prm', 'PRM', 'Proximal resection margin', 'num', { unit: 'u.cm' }),
+    f('drm', 'DRM', 'Distal resection margin', 'num', { unit: 'u.cm' }),
+    f('crmDist', 'CRM', 'Circumferential resection margin', 'num', { unit: 'u.cm' }),
     /* расширенная патоморфология: сворачиваемые подгруппы, основа выше как в таблице 2021 */
-    f('icdo', 'Код ICD-O', 'ICD-O code', 'text', { grp: 'bio', ph: '8140/3' }),
-    f('grade', 'Степень злокачественности', 'Grade', 'sel', { grp: 'bio', options: ['G1', 'G2', 'G3', 'Low grade', 'High grade'] }),
+    f('icdo', 'Код ICD-O', 'ICD-O-3 morphology code', 'text', { grp: 'bio', ph: '8140/3' }),
+    f('grade', 'Степень злокачественности', 'Histological grade', 'sel', { grp: 'bio', options: ['G1', 'G2', 'G3', 'Low grade', 'High grade'] }),
     f('mucin', 'Муцинозный компонент', 'Mucinous component', 'seg', { grp: 'bio', options: ['Нет', '<50%', '≥50%'] }),
-    f('lvi', 'Лимфоваскулярная инвазия (L)', 'Lymphovascular invasion (L)', 'seg', { grp: 'bio', options: YN }),
+    f('lvi', 'Лимфоваскулярная инвазия (L)', 'Lymphatic invasion (L)', 'seg', { grp: 'bio', options: YN }),
     f('vInv', 'Венозная инвазия (V)', 'Venous invasion (V)', 'sel', { grp: 'bio', options: ['Нет', 'Интрамуральная', 'EMVI'] }),
     f('pni', 'Периневральная инвазия (Pn)', 'Perineural invasion (Pn)', 'seg', { grp: 'bio', options: YN }),
     f('budding', 'Tumor budding', 'Tumour budding', 'seg', { grp: 'bio', options: ['Bd1', 'Bd2', 'Bd3'] }),
@@ -333,7 +333,7 @@ var SECTIONS = [
     f('lnApex', 'Апикальные ЛУ (+/всего)', 'Apical nodes (+/total)', 'text', { grp: 'ln', ph: '0/2' }),
     f('lnLat', 'Латеральные тазовые ЛУ (+/всего, где)', 'Lateral pelvic nodes (+/total, where)', 'text', { grp: 'ln', wide: true, ph: ['3/11, запирательные слева', '3/11, left obturator'] }),
     f('lnNonReg', 'Нерегионарные ЛУ (+/всего, где)', 'Non-regional nodes (+/total, where)', 'text', { grp: 'ln', wide: true, ph: ['2/11, паховые', '2/11, inguinal'] }),
-    f('rPath', 'R по гистологии', 'R status (pathology)', 'seg', { grp: 'mrg', options: ['R0', 'R1', 'R2'] }),
+    f('rPath', 'R по гистологии', 'R classification (pathology)', 'seg', { grp: 'mrg', options: ['R0', 'R1', 'R2'] }),
     f('marginPos', 'Положительный край', 'Positive margin', 'multi', { grp: 'mrg', options: ['Проксимальный', 'Дистальный', 'Циркулярный (латеральный)', 'Край соседнего органа'], show: function (d) { return d.rPath === 'R1' || d.rPath === 'R2'; } }),
     f('specLen', 'Длина препарата', 'Specimen length', 'num', { grp: 'mrg', unit: 'u.cm' }),
     f('perf', 'Перфорация опухоли', 'Tumour perforation', 'seg', { grp: 'mrg', options: YN }),
@@ -341,45 +341,45 @@ var SECTIONS = [
     f('adenomas', 'Аденомы и полипы в препарате', 'Adenomas and polyps', 'text', { grp: 'find', wide: true }),
     f('secTumor', 'Вторая опухоль: гистология и стадия', 'Second tumour: histology and stage', 'text', { grp: 'find', wide: true }),
     f('otherTissue', 'Другие удалённые ткани', 'Other resected tissues', 'text', { grp: 'find', wide: true }),
-    f('pathNo', '№ исследования', 'Report number', 'text', { grp: 'req' }),
-    f('pathDate', 'Дата заключения', 'Report date', 'date', { grp: 'req' }),
-    f('ihc', 'ИГХ (номер, маркеры, MMR)', 'IHC (number, markers, MMR)', 'text', { grp: 'req', wide: true })
+    f('pathNo', '№ исследования', 'Pathology report number', 'text', { grp: 'req' }),
+    f('pathDate', 'Дата заключения', 'Pathology report date', 'date', { grp: 'req' }),
+    f('ihc', 'ИГХ (номер, маркеры, MMR)', 'Immunohistochemistry (incl. MMR status)', 'text', { grp: 'req', wide: true })
   ]},
-  { id: 'late', phase: 'post', title: ['Поздние осложнения (после 30 д) по Clavien-Dindo', 'Late complications (after 30 d), Clavien-Dindo'], fields: [
-    f('lastFu', 'Дата последнего визита', 'Last visit', 'date'),
-    f('lcd1', 'Осложнения CD 1', 'Complications CD 1', 'text', { wide: true }),
-    f('lcd2', 'Осложнения CD 2', 'Complications CD 2', 'text', { wide: true }),
-    f('lcd3', 'Осложнения CD 3', 'Complications CD 3', 'text', { wide: true }),
-    f('lcd4', 'Осложнения CD 4', 'Complications CD 4', 'text', { wide: true }),
-    f('lcd5', 'Осложнения CD 5', 'Complications CD 5', 'text', { wide: true })
+  { id: 'late', phase: 'post', title: ['Поздние осложнения (после 30 д) по Clavien-Dindo', 'Late complications after 30 days (Clavien-Dindo)'], fields: [
+    f('lastFu', 'Дата последнего визита', 'Date of last follow-up visit', 'date'),
+    f('lcd1', 'Осложнения CD 1', 'Late Clavien-Dindo grade I complications', 'text', { wide: true }),
+    f('lcd2', 'Осложнения CD 2', 'Late Clavien-Dindo grade II complications', 'text', { wide: true }),
+    f('lcd3', 'Осложнения CD 3', 'Late Clavien-Dindo grade III complications', 'text', { wide: true }),
+    f('lcd4', 'Осложнения CD 4', 'Late Clavien-Dindo grade IV complications', 'text', { wide: true }),
+    f('lcd5', 'Осложнения CD 5', 'Late Clavien-Dindo grade V (death)', 'text', { wide: true })
   ]},
   { id: 'ichom', phase: 'post', title: ['Исходы по стандарту ICHOM', 'Outcomes (ICHOM standard)'], fields: [
     f('leak', 'Несостоятельность анастомоза (ISREC)', 'Anastomotic leak (ISREC)', 'seg', { options: ['Нет', 'Степень A', 'Степень B', 'Степень C'], show: function (d) { return d.anast !== 'Нет'; } }),
-    f('readm30', 'Повторная госпитализация (30 д)', 'Readmission (30 d)', 'seg', { options: YN }),
-    f('readm90', 'Повторная госпитализация (90 д)', 'Readmission (90 d)', 'seg', { options: YN }),
-    f('cx90', 'Последствия осложнений за 90 дней', 'Complication consequences, 90 days', 'multi', { options: ['Нет осложнений', 'Потребовалось вмешательство', 'Госпитализация дольше 14 дней', 'Незапланированная повторная госпитализация', 'Перевод в ОАРИТ', 'Прекращение лечения', 'Снижение дозы лечения', 'Смерть', 'Другое'], wide: true }),
+    f('readm30', 'Повторная госпитализация (30 д)', 'Unplanned readmission within 30 days', 'seg', { options: YN }),
+    f('readm90', 'Повторная госпитализация (90 д)', 'Unplanned readmission within 90 days', 'seg', { options: YN }),
+    f('cx90', 'Последствия осложнений за 90 дней', 'Consequences of complications within 90 days', 'multi', { options: ['Нет осложнений', 'Потребовалось вмешательство', 'Госпитализация дольше 14 дней', 'Незапланированная повторная госпитализация', 'Перевод в ОАРИТ', 'Прекращение лечения', 'Снижение дозы лечения', 'Смерть', 'Другое'], wide: true }),
     f('stomaStat', 'Стома через 1 год', 'Stoma at 1 year', 'seg', { options: ['Нет стомы', 'Временная', 'Постоянная'] }),
     f('stomaRevDate', 'Дата закрытия стомы', 'Stoma reversal date', 'date'),
     f('lastContact', 'Дата последнего контакта', 'Last contact date', 'date'),
-    f('vital', 'Статус на дату контакта', 'Vital status at contact', 'seg', { options: ['Жив', 'Умер', 'Неизвестно'] }),
+    f('vital', 'Статус на дату контакта', 'Vital status at last contact', 'seg', { options: ['Жив', 'Умер', 'Неизвестно'] }),
     f('deathCause', 'Причина смерти', 'Cause of death', 'sel', { options: ['Прогрессирование рака', 'Осложнение лечения', 'Другая причина', 'Неизвестно'], show: function (d) { return d.vital === 'Умер' || d.dead === 'Да'; } })
   ]},
-  { id: 'mol', phase: 'post', title: ['Мутационный статус', 'Mutation status'], fields: [
-    f('braf', 'BRAF', 'BRAF', 'sel', { options: ['Дикий тип', 'Мутация V600E', 'Мутация (другая)', 'Не исследовался'] }),
-    f('kras', 'KRAS', 'KRAS', 'sel', { options: ['Дикий тип', 'Мутация', 'Не исследовался'] }),
-    f('msi', 'MSI', 'MSI', 'sel', { options: ['MSS / pMMR', 'MSI-L', 'MSI-H / dMMR', 'Не исследовался'] }),
-    f('nras', 'N-RAS', 'N-RAS', 'sel', { options: ['Дикий тип', 'Мутация', 'Не исследовался'] })
+  { id: 'mol', phase: 'post', title: ['Мутационный статус', 'Molecular profile'], fields: [
+    f('braf', 'BRAF', 'BRAF mutation status', 'sel', { options: ['Дикий тип', 'Мутация V600E', 'Мутация (другая)', 'Не исследовался'] }),
+    f('kras', 'KRAS', 'KRAS mutation status', 'sel', { options: ['Дикий тип', 'Мутация', 'Не исследовался'] }),
+    f('msi', 'MSI', 'Microsatellite instability (MSI/MMR)', 'sel', { options: ['MSS / pMMR', 'MSI-L', 'MSI-H / dMMR', 'Не исследовался'] }),
+    f('nras', 'N-RAS', 'NRAS mutation status', 'sel', { options: ['Дикий тип', 'Мутация', 'Не исследовался'] })
   ]},
   { id: 'recur', phase: 'post', title: ['Рецидив', 'Recurrence'], fields: [
     f('recur', 'Рецидив', 'Recurrence', 'seg', { options: YN }),
     f('recurDate', 'Дата рецидива', 'Recurrence date', 'date'),
-    f('recurMethod', 'Метод выявления', 'How detected', 'text', { wide: true }),
+    f('recurMethod', 'Метод выявления', 'Method of detection', 'text', { wide: true }),
     f('localRec', 'Местный рецидив', 'Local recurrence', 'seg', { options: YN }),
     f('localRecLoc', 'Локализация местного рецидива', 'Local recurrence site', 'text', { wide: true }),
     f('localRecDate', 'Дата местного рецидива', 'Local recurrence date', 'date'),
     f('distMets', 'Отдаленные метастазы', 'Distant metastases', 'seg', { options: YN }),
     f('metDate', 'Дата отдаленного метастаза', 'Distant metastasis date', 'date'),
-    f('metLoc', 'Локализация отдаленного рецидива', 'Distant recurrence site', 'text', { wide: true }),
+    f('metLoc', 'Локализация отдаленного рецидива', 'Site of distant recurrence', 'text', { wide: true }),
     f('dead', 'Смерть', 'Death', 'seg', { options: YN }),
     f('deathDate', 'Дата смерти', 'Date of death', 'date')
   ]}
@@ -662,12 +662,16 @@ function odmBuild(list, reg, o, cols) {
   x += '<MetaDataVersion OID="MDV.1" Name="' + xmlEsc(sname) + ' ' + isoOf(new Date()) + '">\n<Protocol><StudyEventRef StudyEventOID="SE.REG" OrderNumber="1" Mandatory="Yes"/></Protocol>\n';
   x += '<StudyEventDef OID="SE.REG" Name="Registry" Repeating="No" Type="Common"><FormRef FormOID="F.REG" OrderNumber="1" Mandatory="No"/></StudyEventDef>\n<FormDef OID="F.REG" Name="' + xmlEsc(sname) + '" Repeating="No">' + groups.map(function (g, i) { return '<ItemGroupRef ItemGroupOID="IG.' + g.id + '" OrderNumber="' + (i + 1) + '" Mandatory="No"/>'; }).join('') + '</FormDef>\n';
   groups.forEach(function (g) { x += '<ItemGroupDef OID="IG.' + g.id + '" Name="' + xmlEsc(g.name) + '" Repeating="No">' + g.cols.map(function (c, i) { return '<ItemRef ItemOID="I.' + c.id + '" OrderNumber="' + (i + 1) + '" Mandatory="No"/>'; }).join('') + '</ItemGroupDef>\n'; });
-  var cls = '';
+  var cls = '', L0 = LANG, LGS = ['ru', 'en'], BI = {};
+  LGS.forEach(function (lg) { LANG = lg; var m = BI[lg] = {}; exportCols(list, reg, o).forEach(function (c) { var base = c.id.split('___')[0], fx = FIELD[base], opts = null; if (c.id !== base || /^fu_/.test(c.id)) opts = [LL('нет', 'no'), LL('да', 'yes')]; else if (fx && (fx.type === 'sel' || fx.type === 'seg')) opts = fieldOpts(fx).map(ov); m[c.id] = { q: c.cb[1], d: c.id === base ? ddDef(base) : '', o: opts }; }); });
+  LANG = L0;
+  function tt(fn) { return LGS.map(function (lg) { var v = fn(BI[lg]); return v ? '<TranslatedText xml:lang="' + lg + '">' + xmlEsc(v) + '</TranslatedText>' : ''; }).join(''); }
   cols.forEach(function (c) {
-    if (c.id === 'record_id') return; var base = c.id.split('___')[0], dt = dtype(c), fx = FIELD[base], def = c.id === base ? ddDef(base) : '', std = c.id === base ? ddStd(base) : '';
-    x += '<ItemDef OID="I.' + c.id + '" Name="' + c.id + '" DataType="' + dt + '">' + (def ? '<Description><TranslatedText xml:lang="' + LANG + '">' + xmlEsc(def) + '</TranslatedText></Description>' : '') + '<Question><TranslatedText xml:lang="' + LANG + '">' + xmlEsc(c.cb[1]) + '</TranslatedText></Question>';
-    var opts = null; if (c.id !== base || /^fu_/.test(c.id)) opts = [LL('нет', 'no'), LL('да', 'yes')]; else if (fx && (fx.type === 'sel' || fx.type === 'seg')) opts = fieldOpts(fx).map(ov);
-    if (opts) { x += '<CodeListRef CodeListOID="CL.' + c.id + '"/>'; cls += '<CodeList OID="CL.' + c.id + '" Name="' + c.id + '" DataType="integer">' + opts.map(function (z, i) { return '<CodeListItem CodedValue="' + (c.id !== base || /^fu_/.test(c.id) ? i : i + 1) + '"><Decode><TranslatedText xml:lang="' + LANG + '">' + xmlEsc(z) + '</TranslatedText></Decode></CodeListItem>'; }).join('') + '</CodeList>\n'; }
+    if (c.id === 'record_id') return; var base = c.id.split('___')[0], dt = dtype(c), std = c.id === base ? ddStd(base) : '', b0 = BI[LANG][c.id] || { q: c.cb[1], d: '', o: null }, g = function (m) { return m[c.id] || b0; };
+    var dsc = tt(function (m) { return g(m).d; }), qq = tt(function (m) { return g(m).q; });
+    x += '<ItemDef OID="I.' + c.id + '" Name="' + c.id + '" DataType="' + dt + '">' + (dsc ? '<Description>' + dsc + '</Description>' : '') + '<Question>' + qq + '</Question>';
+    var opts = b0.o;
+    if (opts) { x += '<CodeListRef CodeListOID="CL.' + c.id + '"/>'; cls += '<CodeList OID="CL.' + c.id + '" Name="' + c.id + '" DataType="integer">' + opts.map(function (z, i) { return '<CodeListItem CodedValue="' + (c.id !== base || /^fu_/.test(c.id) ? i : i + 1) + '"><Decode>' + tt(function (m) { var oo = g(m).o; return oo ? oo[i] : z; }) + '</Decode></CodeListItem>'; }).join('') + '</CodeList>\n'; }
     if (std) x += '<Alias Context="Standard" Name="' + xmlEsc(std) + '"/>';
     x += '</ItemDef>\n';
   });
@@ -946,7 +950,7 @@ function migrate(db) {
   plannerAuto(db);
   return db;
 }
-var LINKED = ['planner', 'mdt', 'mm', 'redcap'];
+var LINKED = ['planner', 'mdt', 'mm'];
 function recName(k, r) { return k === 'mm' ? r.title : r.fio; }
 function nameTokens(s) { return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-яәіңғүұқөһ\s-]/g, ' ').split(/[\s-]+/).filter(Boolean); }
 function guessPatient(list, name, exact) {
@@ -2456,13 +2460,18 @@ function exportCols(list, reg, o) {
   return cols;
 }
 function doExport(fmt) {
+  var L0 = LANG; LANG = (S.xport && S.xport.lang) || L0;
+  try { doExport0(fmt); } finally { LANG = L0; }
+  S.xport = null; toast(LL('Файл сохранён в «Загрузки»', 'File saved to Downloads')); render();
+}
+function doExport0(fmt) {
   var o = S.xport, lr = listForReg(), reg = lr.reg, list = lr.list;
   if (o.sel === 'all') { list = reg ? DB.patients.filter(function (p) { return inReg(p, reg); }) : DB.patients.slice(); }
   var cols = exportCols(list, reg, o);
   var head = cols.map(function (c) { return o.mode === 'codes' ? c.id : c.lab; });
   var rows = [head].concat(list.map(function (p) { return cols.map(function (c) { var v = c.get(p); return v === undefined ? '' : v; }); }));
   var base = safeName((reg ? regName(reg) : t('nav.allPatients')) + (o.anon ? LL(' обезличено', ' anonymised') : '') + ' ' + isoOf(new Date()));
-  if (fmt === 'odm') { var oc = exportCols(list, reg, Object.assign({}, o, { mode: 'codes' })); download(base + '.odm.xml', odmBuild(list, reg, o, oc), 'application/xml;charset=utf-8'); S.xport = null; toast(LL('Файл сохранён в «Загрузки»', 'File saved to Downloads')); render(); return; }
+  if (fmt === 'odm') { var oc = exportCols(list, reg, Object.assign({}, o, { mode: 'codes' })); download(base + '.odm.xml', odmBuild(list, reg, o, oc), 'application/xml;charset=utf-8'); return; }
   if (fmt === 'csv') {
     var cell = function (v) { v = v == null ? '' : String(v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
     download(base + '.csv', '﻿' + rows.map(function (r) { return r.map(cell).join(';'); }).join('\r\n'), 'text/csv;charset=utf-8');
@@ -2472,7 +2481,6 @@ function doExport(fmt) {
     sheets.push({ name: LL('Сведения', 'About'), rows: [[LL('Параметр', 'Item'), LL('Значение', 'Value')], [LL('Регистр', 'Registry'), reg ? regName(reg) : t('nav.allPatients')], [LL('Записей', 'Records'), list.length], [LL('Формат значений', 'Value format'), o.mode === 'codes' ? LL('коды (см. лист «Кодбук»)', 'codes (see Codebook sheet)') : LL('текстовые метки', 'text labels')], [LL('Обезличено', 'Anonymised'), o.anon ? LL('да: ФИО и № ИБ удалены', 'yes: name and case no. removed') : LL('нет', 'no')], [LL('Выгружено', 'Exported'), fmtDT(nowIso()) + ', ' + me()], ['NROC', LL('Национальный научный онкологический центр, Астана', 'National Research Oncology Center, Astana')]] });
     downloadBlob(base + '.xlsx', buildXlsx(sheets));
   }
-  S.xport = null; toast(LL('Файл сохранён в «Загрузки»', 'File saved to Downloads')); render();
 }
 function renderExport() {
   var o = S.xport, lr = listForReg(), reg = lr.reg, all = reg ? DB.patients.filter(function (p) { return inReg(p, reg); }).length : DB.patients.length;
@@ -2481,6 +2489,7 @@ function renderExport() {
   function opt(key, val, title, sub) { var on = o[key] === val; return '<button type="button" class="xopt' + (on ? ' on' : '') + '" data-act="xset" data-k="' + key + '" data-v="' + val + '"><span class="xr"></span><span><b>' + title + '</b><em>' + sub + '</em></span></button>'; }
   h += '<div class="xgrp"><div class="xlab">' + LL('Какие записи', 'Which records') + '</div>' + opt('sel', 'view', LL('Как на экране', 'As on screen'), LL('с учётом поиска и фильтров: ', 'with current search and filters: ') + plural(lr.list.length, 'pl.patient')) + opt('sel', 'all', LL('Все записи регистра', 'All registry records'), plural(all, 'pl.patient')) + '</div>';
   h += '<div class="xgrp"><div class="xlab">' + LL('Формат значений', 'Value format') + '</div>' + opt('mode', 'labels', LL('Текстовые метки', 'Text labels'), LL('удобно читать: «Лапароскопический», «Да»', 'easy to read: "Laparoscopic", "Yes"')) + opt('mode', 'codes', LL('Числовые коды для статистики', 'Numeric codes for statistics'), LL('1, 2, 3; флажки в отдельных столбцах 0/1; как в REDCap, SPSS, R', '1, 2, 3; checkboxes as separate 0/1 columns; like REDCap, SPSS, R')) + '</div>';
+  h += '<div class="xgrp"><div class="xlab">' + LL('Язык выгрузки', 'Export language') + '</div>' + opt('lang', 'ru', 'Русский', LL('названия полей, значения и кодбук на русском', 'field names, values and codebook in Russian')) + opt('lang', 'en', 'English', LL('названия полей, значения и кодбук на английском (международная терминология). ODM всегда содержит оба языка', 'field names, values and codebook in English (international terminology). ODM always carries both languages')) + '</div>';
   h += '<div class="xgrp"><div class="xlab">' + LL('Параметры', 'Options') + '</div><label class="chk big"><input type="checkbox" data-sb="xport.anon"' + (o.anon ? ' checked' : '') + '><span><b>' + LL('Обезличить', 'Anonymise') + '</b><em>' + LL('убрать ФИО и № ИБ; ID записи сохраняется', 'remove name and case no.; record ID is kept') + '</em></span></label><label class="chk big"><input type="checkbox" data-sb="xport.book"' + (o.book ? ' checked' : '') + '><span><b>' + LL('Добавить кодбук', 'Include codebook') + '</b><em>' + LL('отдельный лист: переменная, название, тип, расшифровка кодов', 'separate sheet: variable, label, type, code meanings') + '</em></span></label></div>';
   h += '</div><div class="dfoot"><div><button type="button" class="btn ghost" data-act="xdo" data-f="csv">' + LL('Скачать CSV', 'Download CSV') + '</button><button type="button" class="btn ghost" data-act="xdo" data-f="odm" title="' + LL('Международный стандарт обмена данными исследований: открывается в OpenClinica, REDCap, Castor, SAS, R', 'International research data exchange standard: opens in OpenClinica, REDCap, Castor, SAS, R') + '">CDISC ODM</button></div><div class="actions"><button type="button" class="btn" data-act="xclose">' + t('b.cancel') + '</button><button type="button" class="btn primary" data-act="xdo" data-f="xlsx">' + ico('download', 16) + LL('Скачать Excel', 'Download Excel') + '</button></div></div></section>';
   return h;
@@ -2952,7 +2961,30 @@ function qDueAll(days) {
   DB.patients.forEach(function (p) { (p.q || []).forEach(function (e) { if (e.date) return; var n = daysTo(e.due); if (n !== null && n <= lim) out.push({ p: p, e: e, n: n }); }); });
   return out.sort(function (a, b) { return a.n - b.n; });
 }
-function qStatusTag(e) {
+
+/* ---------- анкеты через WhatsApp (пилот): ссылка уходит в мессенджер, ответы идут сразу на сервер ---------- */
+function waPhone(ph) { var d = String(ph || '').replace(/\D/g, ''); if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1); if (d.length === 10) d = '7' + d; return d.length >= 11 ? d : ''; }
+function qWaText(p, q, url) { var parts = String(p.d.fio || '').trim().split(/\s+/), nm = parts.length > 1 ? parts.slice(1).join(' ') : (p.d.fio || ''); return LL('Здравствуйте', 'Hello') + (nm ? ', ' + nm : '') + '! ' + LL('Национальный научный онкологический центр просит вас заполнить анкету «', 'The National Research Oncology Centre kindly asks you to complete the questionnaire "') + qShort(q) + LL('». Это займёт около 10 минут. Ответы сразу попадут вашему лечащему врачу: ', '". It takes about 10 minutes. Your answers go directly to your doctor: ') + url; }
+function qSentDays(e) { return e && e.sent && !e.date ? Math.floor((Date.now() - new Date(e.sent).getTime()) / 864e5) : null; }
+function qWaTag(e) { var n = qSentDays(e); if (n === null) return ''; return n >= 7 ? '<span class="tag due" title="' + LL('Анкета не заполнена неделю после отправки', 'Not completed a week after sending') + '">' + LL('не заполнена 7+ дн.: позвоните пациенту', 'no reply 7+ days: call the patient') + '</span>' : '<span class="tag">' + LL('отправлена ', 'sent ') + fmtDate(String(e.sent).slice(0, 10)) + '</span>'; }
+function qWaBtn(p, e) { var q = qTpl(e.tid); if (!CLOUD.on || e.date || !q || q.clin || !can('edit')) return ''; return '<button type="button" class="btn small wa" data-act="qwa" data-pid="' + p.id + '" data-eid="' + e.id + '" title="' + LL('Отправить ссылку на анкету в WhatsApp', 'Send the questionnaire link via WhatsApp') + '">' + ico('send', 14) + (e.sent ? LL('Отправить снова', 'Send again') : 'WhatsApp') + '</button>'; }
+function qWaSend(pid, eid) {
+  var p = findPat(pid), e = p && (p.q || []).filter(function (x) { return x.id === eid; })[0]; if (!e) return;
+  var q = qTpl(e.tid), ph = waPhone(p.d.phone);
+  if (!CLOUD.on || !CLOUD.db) { toast(LL('Ссылки для пациентов работают в общей облачной базе (на сайте)', 'Patient links work in the shared cloud database')); return; }
+  if (!qTextReady(qTpls().filter(function (x) { return x.id === e.tid; })[0])) { toast(LL('Сначала вставьте официальный текст анкеты (Анкеты → Шаблоны анкет)', 'Paste the official text first')); return; }
+  var w = window.open('', '_blank');
+  var tok = qlToken(), doc = { tid: e.tid, tpl: qlSnapshot(q), pid: pid, eid: eid, active: true, created: nowIso(), by: me(), via: 'whatsapp' };
+  CLOUD.db.collection('qlinks').doc(tok).set(doc).then(function () {
+    var url = qlUrl(tok), txt = qWaText(p, q, url), wa = 'https://wa.me/' + (ph || '') + '?text=' + encodeURIComponent(txt);
+    if (w) w.location = wa; else location.href = wa;
+    withPat(pid, function (x) { var y = (x.q || []).filter(function (z) { return z.id === eid; })[0]; if (y) { y.sent = nowIso(); y.tok = tok; y.sentBy = me(); } });
+    save(); render();
+    if (!ph) toast(LL('В карточке нет телефона: выберите контакт в WhatsApp вручную', 'No phone in the record: pick the contact in WhatsApp'));
+  }).catch(function (er) { if (w) w.close(); toast(LL('Не удалось создать ссылку: ', 'Could not create link: ') + (er.code || er.message)); });
+}
+function qStatusTag(e) { return qStatusTag0(e) + qWaTag(e); }
+function qStatusTag0(e) {
   var st = qStatus(e), q = qTpl(e.tid);
   if (st === 'done' && e.scales && q && q.scales) return '<span class="tag ok">' + LL('Заполнена ', 'Done ') + fmtDate(e.date) + '</span>' + qScalesHTML(q, e.scales, true);
   if (st === 'done') { var b = qBand(q || {}, e.score); return '<span class="tag ok">' + LL('Заполнена ', 'Done ') + fmtDate(e.date) + '</span>' + (e.score !== null && e.score !== undefined ? '<span class="score' + (b ? ' sc-' + b.c : '') + '">' + e.score + (q && q.max ? '<i>/' + q.max + '</i>' : '') + (b ? ' · ' + esc(L(b.t)) : '') + '</span>' : ''); }
@@ -2967,7 +2999,7 @@ function qCard(p, isNew) {
   else h += '<div class="qlist">' + list.map(function (e) {
     var q = qTpl(e.tid), open = S.qview === e.id;
     var r = '<div class="qrow"><div class="qn"><b>' + esc(qShort(q)) + '</b>' + (e.label ? '<span>' + esc(e.label) + '</span>' : '') + '</div><div class="qs">' + qStatusTag(e) + '</div><div class="qa">';
-    r += e.date ? '<button type="button" class="btn small ghost" data-act="qview" data-id="' + e.id + '">' + (open ? LL('Скрыть ответы', 'Hide answers') : LL('Ответы', 'Answers')) + '</button>' : '<button type="button" class="btn small primary" data-act="qfill" data-pid="' + p.id + '" data-id="' + e.id + '">' + ico('tablet', 15) + LL('Заполнить', 'Fill in') + '</button>' + (CLOUD.on ? '<button type="button" class="btn small" data-act="qlnew" data-id="' + e.tid + '" data-pid="' + p.id + '" data-eid="' + e.id + '">' + ico('ext', 14) + LL('Ссылка пациенту', 'Link for patient') + '</button>' : '');
+    r += e.date ? '<button type="button" class="btn small ghost" data-act="qview" data-id="' + e.id + '">' + (open ? LL('Скрыть ответы', 'Hide answers') : LL('Ответы', 'Answers')) + '</button>' : '<button type="button" class="btn small primary" data-act="qfill" data-pid="' + p.id + '" data-id="' + e.id + '">' + ico('tablet', 15) + LL('Заполнить', 'Fill in') + '</button>' + (CLOUD.on ? '<button type="button" class="btn small" data-act="qlnew" data-id="' + e.tid + '" data-pid="' + p.id + '" data-eid="' + e.id + '">' + ico('ext', 14) + LL('Ссылка пациенту', 'Link for patient') + '</button>' : '') + qWaBtn(p, e);
     r += '<button type="button" class="iconbtn sm" aria-label="' + LL('Удалить', 'Delete') + '" data-act="qdel" data-pid="' + p.id + '" data-id="' + e.id + '">' + ico('x', 15) + '</button></div></div>';
     if (open && q && e.scales) r += qScalesHTML(q, e.scales, false);
     if (open && q) r += '<ol class="qans">' + qVisible(q, e.ans || {}).map(function (it) { var a = (e.ans || {})[it.id]; var txt = !has(a) ? '' : it.type === 'single' ? L(it.opts[+a].t) + (q.score ? ' (' + (it.opts[+a].s || 0) + ')' : '') : it.type === 'multi' ? a.map(function (i) { return L(it.opts[+i].t); }).join(', ') : String(a); return '<li><span>' + esc(L(it.text)) + '</span><b>' + esc(txt || LL('нет ответа', 'no answer')) + '</b></li>'; }).join('') + '</ol>';
@@ -3103,7 +3135,7 @@ function renderQPage() {
     });
     return h;
   }
-  h += '<div class="tablewrap">' + (due.length ? '<table class="grid"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + LL('Анкета', 'Questionnaire') + '</th><th>' + LL('Срок', 'Time point') + '</th><th>' + LL('Заполнить до', 'Due') + '</th><th></th></tr></thead><tbody>' + due.map(function (x) { return '<tr data-act="openp" data-id="' + x.p.id + '" tabindex="0"><td class="mono">' + x.p.id + '</td><td class="strong">' + esc(pName(x.p)) + '</td><td>' + esc(qShort(qTpl(x.e.tid))) + '</td><td>' + esc(x.e.label || '') + '</td><td>' + (x.n < 0 ? '<span class="tag due">' + fmtDate(x.e.due) + ' · ' + daysLabel(x.n) + '</span>' : '<span class="tag">' + fmtDate(x.e.due) + ' · ' + daysLabel(x.n) + '</span>') + '</td><td><button type="button" class="btn small primary" data-act="qfill" data-pid="' + x.p.id + '" data-id="' + x.e.id + '">' + ico('tablet', 15) + LL('Заполнить', 'Fill in') + '</button></td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">' + LL('На ближайшие 30 дней анкет нет. Назначить анкету можно в карточке пациента, раздел «После операции».', 'Nothing due in the next 30 days. Schedule questionnaires in the patient card, After surgery section.') + '</div>') + '</div>';
+  h += '<div class="tablewrap">' + (due.length ? '<table class="grid"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + LL('Анкета', 'Questionnaire') + '</th><th>' + LL('Срок', 'Time point') + '</th><th>' + LL('Заполнить до', 'Due') + '</th><th></th></tr></thead><tbody>' + due.map(function (x) { return '<tr data-act="openp" data-id="' + x.p.id + '" tabindex="0"><td class="mono">' + x.p.id + '</td><td class="strong">' + esc(pName(x.p)) + '</td><td>' + esc(qShort(qTpl(x.e.tid))) + '</td><td>' + esc(x.e.label || '') + '</td><td>' + (x.n < 0 ? '<span class="tag due">' + fmtDate(x.e.due) + ' · ' + daysLabel(x.n) + '</span>' : '<span class="tag">' + fmtDate(x.e.due) + ' · ' + daysLabel(x.n) + '</span>') + '</td><td><div class="qa"><button type="button" class="btn small primary" data-act="qfill" data-pid="' + x.p.id + '" data-id="' + x.e.id + '">' + ico('tablet', 15) + LL('Заполнить', 'Fill in') + '</button>' + qWaBtn(x.p, x.e) + '</div>' + qWaTag(x.e) + '</td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">' + LL('На ближайшие 30 дней анкет нет. Назначить анкету можно в карточке пациента, раздел «После операции».', 'Nothing due in the next 30 days. Schedule questionnaires in the patient card, After surgery section.') + '</div>') + '</div>';
   return h;
 }
 
@@ -3607,7 +3639,8 @@ function notifs() {
   apprMine().forEach(function (r) { out.push({ id: 'ap:' + r.id, ic: 'check', lvl: 'soon', t: (r.kind === 'study' ? LL('Одобрить исследование: ', 'Approve study: ') : LL('Одобрить регистр: ', 'Approve registry: ')) + regName(r), s: LL('создал(а) ', 'by ') + (r.appr.by || ''), go: ['v', 'appr'] }); });
   fuDueAll().forEach(function (x) { if (x.f.st === 'overdue') out.push({ id: 'fu:' + x.p.id + ':' + x.f.key, ic: 'clock', lvl: 'due', t: LL('Просрочен контроль: ', 'Follow-up overdue: ') + x.f.label, s: pName(x.p) + ' · ' + daysLabel(x.f.days), go: ['p', x.p.id] }); });
   qDueAll(3).forEach(function (x) { out.push({ id: 'q:' + x.p.id + ':' + x.e.id, ic: 'clipboard', lvl: x.n < 0 ? 'due' : 'soon', t: LL('Анкета ', 'Questionnaire ') + qShort(qTpl(x.e.tid)) + (x.n < 0 ? LL(' просрочена', ' overdue') : LL(' к заполнению', ' due')), s: pName(x.p) + ' · ' + daysLabel(x.n), go: ['p', x.p.id] }); });
-  (DB.cols.redcap || []).forEach(function (r) { if (r.done !== 'Заполнено' && r.contact && r.contact <= td) out.push({ id: 'rc:' + r.id, ic: 'flask', lvl: r.contact < td ? 'due' : 'soon', t: LL('RedCap: связаться с пациентом', 'RedCap: contact the patient'), s: (r.fio || '') + ' · ' + fmtDate(r.contact), go: ['r', 'redcap', r.id] }); });
+  ([]).forEach(function (r) { if (r.done !== 'Заполнено' && r.contact && r.contact <= td) out.push({ id: 'rc:' + r.id, ic: 'flask', lvl: r.contact < td ? 'due' : 'soon', t: LL('RedCap: связаться с пациентом', 'RedCap: contact the patient'), s: (r.fio || '') + ' · ' + fmtDate(r.contact), go: ['r', 'redcap', r.id] }); });
+  DB.patients.forEach(function (p) { (p.q || []).forEach(function (e) { var n = qSentDays(e); if (n !== null && n >= 7) out.push({ id: 'qw:' + p.id + ':' + e.id + ':' + String(e.sent).slice(0, 10), ic: 'phone', lvl: 'due', t: LL('Анкета не заполнена ', 'Questionnaire not completed ') + n + LL(' дн.: свяжитесь с пациентом', ' d: contact the patient'), s: pName(p) + ' · ' + qShort(qTpl(e.tid)) + (p.d.phone ? ' · ' + p.d.phone : ''), go: ['p', p.id] }); }); });
   (DB.cols.planner || []).forEach(function (r) { if ((r.surgeryDate === tm || r.surgeryDate === td) && r.status !== 'Отменено' && r.status !== 'Завершено') out.push({ id: 'op:' + r.id + ':' + r.surgeryDate, ic: 'knife', lvl: 'info', t: (r.surgeryDate === td ? LL('Операция сегодня: ', 'Surgery today: ') : LL('Операция завтра: ', 'Surgery tomorrow: ')) + (r.fio || ''), s: [r.dx, r.surgeon ? ov(r.surgeon) : ''].filter(Boolean).join(' · '), go: ['r', 'planner', r.id] }); });
   (DB.cols.mdt || []).forEach(function (r) { if (r.date === td && mdtWaiting(r)) out.push({ id: 'mdt:' + r.id, ic: 'mdt', lvl: 'info', t: LL('Сегодня на МДГ: ', 'At MDT today: ') + (r.fio || ''), s: r.dx || '', go: ['r', 'mdt', r.id] }); });
   studies().forEach(function (r) {
@@ -4558,7 +4591,7 @@ function briefing(forAI) {
   DB.cols.mdt.forEach(function (r) { if (r.date === td) out.mdt.push(nm(r.fio, r.pid) + (r.rec ? ': ' + String(r.rec).slice(0, 80) : ' (' + LL('ожидает решения', 'awaiting decision') + ')')); });
   fuDueAll().forEach(function (x) { if (x.f.st === 'overdue') out.due.push(LL('Контроль ', 'Follow-up ') + x.f.label + ': ' + nm(pName(x.p), x.p.id) + ', ' + daysLabel(x.f.days)); });
   qDueAll(0).forEach(function (x) { out.due.push(LL('Анкета ', 'Questionnaire ') + qShort(qTpl(x.e.tid)) + ': ' + nm(pName(x.p), x.p.id) + ', ' + daysLabel(x.n)); });
-  DB.cols.redcap.forEach(function (r) { if (r.done !== 'Заполнено' && r.contact && r.contact <= td) out.due.push('RedCap: ' + nm(r.fio, r.pid) + ', ' + fmtDate(r.contact)); });
+  [].forEach(function (r) { if (r.done !== 'Заполнено' && r.contact && r.contact <= td) out.due.push('RedCap: ' + nm(r.fio, r.pid) + ', ' + fmtDate(r.contact)); });
   studies().forEach(function (r) { (stProto(r).cps || []).forEach(function (c) { if (!c.done && c.date && daysTo(c.date) <= 7) out.cps.push(regName(r) + ': ' + (c.title || '') + ', ' + daysLabel(daysTo(c.date))); }); });
   out.sum = briefSum(nm);
   return out;
@@ -4586,7 +4619,7 @@ function briefSum(nm) {
     disch: P.filter(function (r) { return live(r) && r.discharge === td; }).map(function (r) { return it(r, ''); }),
     alerts: ward.filter(function (r) { return r.alert; }).map(function (r) { return it(r, r.alertComment || ''); }),
     mdtT: DB.cols.mdt.filter(function (r) { return r.date === td; }).map(function (r) { return { k: 'mdt', id: r.id, name: nm(r.fio, r.pid), x: r.dx || '' }; }),
-    mdtNext: null, mm: [], rc: DB.cols.redcap.filter(function (r) { return r.done !== 'Заполнено' && r.contact === td; }).map(function (r) { return { k: 'redcap', id: r.id, name: nm(r.fio, r.pid), x: r.rid || '' }; })
+    mdtNext: null, mm: [], rc: [].filter(function (r) { return r.done !== 'Заполнено' && r.contact === td; }).map(function (r) { return { k: 'redcap', id: r.id, name: nm(r.fio, r.pid), x: r.rid || '' }; })
   };
   if (!S2.mdtT.length) { var nx = DB.cols.mdt.filter(function (r) { return r.date && r.date > td; }).map(function (r) { return r.date; }).sort()[0]; if (nx) S2.mdtNext = { date: nx, list: DB.cols.mdt.filter(function (r) { return r.date === nx; }).map(function (r) { return { k: 'mdt', id: r.id, name: nm(r.fio, r.pid), x: r.dx || '' }; }) }; }
   var mmUp = DB.cols.mm.filter(function (r) { return r.date && r.date >= td && r.status !== 'Разобран' && daysTo(r.date) <= 14; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; });
@@ -4964,7 +4997,7 @@ function renderSide() {
   if (can('edit')) h += '<button type="button" class="nav add" data-act="newstudy">' + ico('plus', 16) + '<span class="nl">' + t('nav.newStudy') + '</span></button>';
   var qd = qDueAll(0).length;
   h += navBtn('q', 'clipboard', LL('Анкеты', 'Questionnaires'), undefined, qd || null);
-  ['mm', 'pubs', 'redcap', 'goals'].forEach(function (k) { h += navBtn('col:' + k, COLS[k].icon, L(COLS[k].title), DB.cols[k].length); });
+  ['mm', 'pubs', 'goals'].forEach(function (k) { h += navBtn('col:' + k, COLS[k].icon, L(COLS[k].title), DB.cols[k].length); });
   if (isAdmin()) { h += '<div class="side-h">' + LL('Администрирование', 'Admin') + '</div>' + navBtn('users', 'shield', LL('Пользователи', 'Users')); }
   h += '<div class="side-foot"><span class="dot-live' + (CLOUD.on ? ' cloud' : '') + '"></span>' + (CLOUD.on ? LL('Облако · общая база', 'Cloud · shared database') : LL('Локально в этом браузере', 'Local, this browser')) + '</div></div></nav>';
   return h;
@@ -4986,6 +5019,7 @@ function renderMain() {
   if (v === 'q') return renderQPage();
   if (v === 'dq') return renderDQ();
   if (v === 'dict') return renderDict();
+  if (v === 'col:redcap') { S.view = 'home'; return renderHome(); }
   if (v.indexOf('col:') === 0) { var k = v.slice(4); if (COLS[k]) return renderCol(k); }
   if (v.indexOf('reg:') === 0) return renderRegistry();
   S.view = 'home'; return renderHome();
@@ -5144,7 +5178,7 @@ document.addEventListener('click', function (ev) {
       break;
     case 'fudone': { ev.stopPropagation(); var p = DB.patients.filter(function (x) { return x.id === g('id'); })[0]; if (p) { p.fu[g('k')] = isoOf(new Date()); save(); toast(t('toast.fuDone')); render(); } break; }
     case 'sort': { var sc = g('scope'), sk = g('k'), s = S.sort[sc]; S.sort[sc] = { k: sk, d: s && s.k === sk ? -s.d : 1 }; render(); break; }
-    case 'csv': S.menu = null; S.xport = { mode: 'labels', anon: false, book: true, sel: 'view' }; render(); break;
+    case 'csv': S.menu = null; S.xport = { mode: 'labels', anon: false, book: true, sel: 'view', lang: LANG }; render(); break;
     case 'cview': UI.colView[g('k')] = g('v'); saveUI(); S.inline = null; render(); break;
     case 'newrec': { var k = g('k'), pre = {}; if (COLS[k].statusField) pre[COLS[k].statusField] = COLS[k].F[COLS[k].statusField].options[0]; openRec(k, null, pre); break; }
     case 'openrec': if (tg.classList.contains('dragging')) return; openRec(g('k'), g('id')); break;
@@ -5318,6 +5352,7 @@ document.addEventListener('click', function (ev) {
     case 'aiprov': aiSetProv(g('v')); break;
     case 'theme': UI.theme = themeCur() === 'dark' ? 'light' : 'dark'; saveUI(); themeApply(); render(); break;
     case 'qlnew': qlCreate(g('id'), g('pid'), g('eid')); break;
+    case 'qwa': qWaSend(g('pid'), g('eid')); break;
     case 'qlclose': S.qlink = null; render(); break;
     case 'qlcopy': { var qu = S.qlink.url; if (navigator.clipboard) navigator.clipboard.writeText(qu).then(function () { toast(LL('Ссылка скопирована', 'Link copied')); }); else { var qi = document.getElementById('qlurl'); qi.select(); document.execCommand('copy'); toast(LL('Ссылка скопирована', 'Link copied')); } break; }
     case 'qlshare': navigator.share({ title: S.qlink.name, url: S.qlink.url }).catch(function () {}); break;
@@ -7947,7 +7982,7 @@ function navGroups() {
   if (can('edit')) sci.push({ act: 'newstudy', icon: 'plus', label: t('nav.newStudy') });
   sci.push({ sep: LL('Материалы', 'Materials') });
   sci.push({ v: 'q', icon: 'clipboard', label: LL('Анкеты', 'Questionnaires'), badge: qDueAll(0).length || null });
-  ['mm', 'pubs', 'redcap', 'goals'].forEach(function (k) { sci.push({ v: 'col:' + k, icon: COLS[k].icon, label: L(COLS[k].title), cnt: DB.cols[k].length }); });
+  ['mm', 'pubs', 'goals'].forEach(function (k) { sci.push({ v: 'col:' + k, icon: COLS[k].icon, label: L(COLS[k].title), cnt: DB.cols[k].length }); });
   g.push({ id: 'sci', label: LL('Наука', 'Research'), icon: 'flask', items: sci, wide: true });
   if (isAdmin()) g.push({ id: 'adm', label: LL('Администрирование', 'Admin'), v: 'users', icon: 'shield' });
   return g;
