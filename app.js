@@ -5150,6 +5150,7 @@ document.addEventListener('click', function (ev) {
   if (msAct(a, g)) return;
   if (NEED[a] && !can(NEED[a])) { toast(LL('Недостаточно прав для роли «', 'Not allowed for role "') + (SESSION ? roleName(SESSION.role) : '') + LL('»', '"')); return; }
   switch (a) {
+    case 'nstog': S.nsOpen = S.nsOpen || {}; S.nsOpen[g('k')] = g('o') !== '1'; render(); break;
     case 'side': S.sideMob = !S.sideMob; S.menu = null; render(); break;
     case 'authshow': S.lpop = null; S.auth = S.auth || { mode: 'login', role: 'resident' }; S.auth.show = true; render(); break;
     case 'lpop': S.lpop = g('id'); render(); var lb = root.querySelector('.lpop .lp-b'); if (lb) lb.scrollTop = 0; break;
@@ -8305,8 +8306,9 @@ function navGroups() {
   (function walk(list, d) { list.forEach(function (r) { regs.push({ v: 'reg:' + r.id, icon: d ? 'dot' : (r.id === 'g_endo' ? 'scope' : r.id === 'g_surg' ? 'knife' : 'tag'), label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, false), d + 1); }); })(kids(null, false), 0);
   if (can('edit')) regs.push({ act: 'newreg', icon: 'plus', label: t('nav.newRegistry') });
   g.push({ id: 'regs', label: LL('Регистры', 'Registries'), icon: 'tag', items: regs, wide: true });
-  var sci = [{ v: 'studies', icon: 'flask', label: t('nav.studies') }, { v: 'write', icon: 'doc', label: LL('Рукописи и литература', 'Manuscripts and library') }];
+  var sci = [{ v: 'studies', icon: 'flask', label: t('nav.studies') }];
   (function walk(list, d) { list.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'dot', label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, true), d + 1); }); })(kids(null, true), 1);
+  sci.push({ v: 'write', icon: 'doc', label: LL('Рукописи и литература', 'Manuscripts and library') });
   var sreg = kids(null, false, true);
   if (sreg.length) { sci.push({ sep: LL('Научные регистры', 'Research registries') }); sreg.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'dot', label: regName(r), cnt: regCount(r), depth: 1 }); }); }
   if ((DB.pending || []).length) sci.push({ v: 'appr', icon: 'check', label: LL('На одобрении', 'Awaiting approval'), badge: apprMine().length || null });
@@ -8332,9 +8334,28 @@ function renderMainNav() {
   }).join('') + '</div></nav>';
 }
 function renderNavSheet() {
+  var O = S.nsOpen = S.nsOpen || {};
+  function isOpen(k, def) { return O[k] === undefined ? def : O[k]; }
+  function car(k, open) { return '<button type="button" class="ns-car' + (open ? ' open' : '') + '" data-act="nstog" data-k="' + k + '" data-o="' + (open ? 1 : 0) + '" aria-expanded="' + open + '" aria-label="' + LL('Развернуть', 'Expand') + '">' + ico('down', 16) + '</button>'; }
+  function items(list) {
+    list = list.filter(function (x) { return !x.sep; });
+    var h = '', i = 0;
+    while (i < list.length) {
+      var x = list[i], d = x.depth || 0, j = i + 1;
+      while (j < list.length && (list[j].depth || 0) > d) j++;
+      var kidsL = list.slice(i + 1, j);
+      if (!kidsL.length) { h += navItemHTML(x); i++; continue; }
+      var k = 'i:' + (x.v || x.label), open = isOpen(k, kidsL.some(function (z) { return z.v && z.v === S.view; }));
+      h += '<div class="ns-row">' + navItemHTML(x) + car(k, open) + '</div>';
+      if (open) h += '<div class="ns-kids">' + items(kidsL) + '</div>';
+      i = j;
+    }
+    return h;
+  }
   return '<div class="dim" data-act="side"></div><aside class="nsheet" aria-label="' + t('a11y.sections') + '"><div class="ns-h">' + aaMark(34) + aaWord() + '<b>' + LL('Колоректальный сектор', 'Colorectal unit') + '</b><button type="button" class="iconbtn" data-act="side" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="ns-b">' + navGroups().map(function (g) {
     if (g.v) return navItemHTML({ v: g.v, icon: g.icon, label: g.label });
-    return '<div class="ns-g"><div class="mn-sep">' + esc(g.label) + '</div>' + g.items.filter(function (x) { return !x.sep; }).map(navItemHTML).join('') + '</div>';
+    var k = 'g:' + g.id, open = isOpen(k, g.items.some(function (x) { return x.v && x.v === S.view; })), badge = g.items.reduce(function (a, x) { return a + (+x.badge || 0); }, 0);
+    return '<div class="ns-g' + (open ? ' open' : '') + '"><button type="button" class="ns-gh" data-act="nstog" data-k="' + k + '" data-o="' + (open ? 1 : 0) + '" aria-expanded="' + open + '">' + ico(g.icon, 16) + '<span>' + esc(g.label) + '</span>' + (badge ? '<i class="badge">' + badge + '</i>' : '') + ico('down', 16) + '</button>' + (open ? '<div class="ns-gb">' + items(g.items) + '</div>' : '') + '</div>';
   }).join('') + '</div></aside>';
 }
 function renderTop2() {

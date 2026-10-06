@@ -7,9 +7,9 @@
 <script>try{var u=JSON.parse(localStorage.getItem('crr.ui')||'{}');document.documentElement.setAttribute('data-theme',u.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'))}catch(e){}</script>
 
 <title>AddAll · Колоректальный регистр ННОЦ</title>
-<link rel="icon" type="image/svg+xml" href="media/addall-icon.svg?v=b0c15b27">
-<link rel="icon" type="image/png" href="media/addall-icon-64.png?v=b0c15b27">
-<link rel="apple-touch-icon" href="media/addall-icon-180.png?v=b0c15b27">
+<link rel="icon" type="image/svg+xml" href="media/addall-icon.svg">
+<link rel="icon" type="image/png" href="media/addall-icon-64.png">
+<link rel="apple-touch-icon" href="media/addall-icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
@@ -2124,14 +2124,26 @@ html[data-theme="dark"] .foot .aa-inst{filter:brightness(0) invert(1)}
 html[data-theme="dark"]{--aa-a:#95A3FF;--aa-b:#C9D0FF}
 @media (prefers-color-scheme:dark){html:not([data-theme="light"]){--aa-a:#95A3FF;--aa-b:#C9D0FF}}
 .h9 .hero-k .aa-mark{box-shadow:none}
+
+/* мобильное меню: группы и вложенные пункты сворачиваются */
+.ns-gh{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;padding:13px 16px;font:inherit;font-size:15px;font-weight:600;color:var(--ink);text-align:left;cursor:pointer;border-top:1px solid var(--line2)}
+.ns-gh span{flex:1}
+.ns-gh>svg:last-child{color:var(--muted);transition:transform .15s}
+.ns-g.open .ns-gh>svg:last-child{transform:rotate(180deg)}
+.ns-gh .badge{margin-right:4px}
+.ns-gb{padding:0 0 8px}
+.ns-row{display:flex;align-items:center}
+.ns-row .mn-it{flex:1;min-width:0}
+.ns-car{flex:none;width:44px;height:44px;border:0;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.ns-car svg{transition:transform .15s}.ns-car.open svg{transform:rotate(180deg)}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <input type="file" id="importFile" accept=".json,.js,application/json,text/javascript" hidden>
 <script src="firebase-config.js?v=b443c275"></script>
-<script src="i18n.js?v=b0c15b27"></script>
+<script src="i18n.js?v=4b1a24aa"></script>
 <script src="ai-corpus.js?v=b443c275"></script>
-<script src="app.js?v=b0c15b27"></script>
+<script src="app.js?v=4b1a24aa"></script>
 </body>
 </html>
