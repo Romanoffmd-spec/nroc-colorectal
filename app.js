@@ -1277,9 +1277,10 @@ function renderFu() {
 
 
 /* ======================= Field rendering ======================= */
+function ddqHTML(x) { return ddDef(x.id) ? '<i class="ddq" data-ddq="' + x.id + '" role="button" tabindex="0" aria-label="' + esc(LL('Что означает поле', 'What this field means')) + '">?</i>' : ''; }
 function fieldHTML(x, val, path, d, attrs) {
   var out = fieldHTML0(x, val, path, d, attrs); if (!out) return out;
-  if (!has(val) && S.drawer && S.drawer.p.na && path === 'd.' + x.id && S.drawer.p.na[x.id] && !/^(files|multi|nodes)$/.test(x.type) && (!x.show || x.show(d))) return '<div class="fld' + (x.wide || x.type === 'long' ? ' wide' : '') + ' f-na"><span class="lbl">' + esc(L(x.label)) + '</span><div class="na-v">' + ico('info', 14) + '<span>' + LL('Нет информации', 'No information') + '</span><button type="button" class="linkbtn" data-act="naclear" data-path="' + path + '">' + LL('заполнить', 'fill in') + '</button></div></div>';
+  if (!has(val) && S.drawer && S.drawer.p.na && path === 'd.' + x.id && S.drawer.p.na[x.id] && !/^(files|multi|nodes)$/.test(x.type) && (!x.show || x.show(d))) return '<div class="fld' + (x.wide || x.type === 'long' ? ' wide' : '') + ' f-na"><span class="lbl">' + esc(L(x.label)) + ddqHTML(x) + '</span><div class="na-v">' + ico('info', 14) + '<span>' + LL('Нет информации', 'No information') + '</span><button type="button" class="linkbtn" data-act="naclear" data-path="' + path + '">' + LL('заполнить', 'fill in') + '</button></div></div>';
   var af = S.drawer && S.drawer.aiFilled && path === 'd.' + x.id ? S.drawer.aiFilled[x.id] : null;
   if (af) out = out.replace('class="fld', 'title="' + esc(LL('Заполнено из документа', 'Filled from document') + ' (' + Math.round(af.c * 100) + '%): ' + (af.q || '')) + '" class="fld aifill' + (af.c < 0.7 ? ' ailow' : ''));
   var fl = has(val);
@@ -1295,7 +1296,7 @@ function fieldHTML0(x, val, path, d, attrs) {
   if (x.show && !x.show(d)) return '';
   var wide = x.wide || x.type === 'long' || x.type === 'files' ? ' wide' : '';
   var lab = L(x.label), idA = 'f_' + path.replace(/\./g, '_');
-  if (isNA(val) && !/^(files|multi|nodes)$/.test(x.type)) return '<div class="fld' + wide + ' f-na"><span class="lbl">' + esc(lab) + '</span><div class="na-v">' + ico('info', 14) + '<span>' + LL('Нет информации', 'No information') + '</span><button type="button" class="linkbtn" data-act="naclear" data-path="' + path + '">' + LL('заполнить', 'fill in') + '</button></div></div>';
+  if (isNA(val) && !/^(files|multi|nodes)$/.test(x.type)) return '<div class="fld' + wide + ' f-na"><span class="lbl">' + esc(lab) + ddqHTML(x) + '</span><div class="na-v">' + ico('info', 14) + '<span>' + LL('Нет информации', 'No information') + '</span><button type="button" class="linkbtn" data-act="naclear" data-path="' + path + '">' + LL('заполнить', 'fill in') + '</button></div></div>';
   if (x.type === 'sel' && x.groups) {
     var sid = 'ss:' + path, sopen = S.menu === sid;
     var sh = '<div class="fld' + wide + '"><span class="lbl" id="' + idA + '">' + esc(lab) + '</span><div class="dd"><button type="button" class="mbtn sbtn" data-act="menu" data-id="' + sid + '" aria-haspopup="listbox" aria-expanded="' + sopen + '" aria-labelledby="' + idA + '">' + (has(val) ? '<span class="sval">' + esc(ov(val)) + '</span>' : '<span class="muted">' + t('f.notSet') + '</span>') + ico('down', 16) + '</button>';
