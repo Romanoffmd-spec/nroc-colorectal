@@ -1114,7 +1114,12 @@ function regDelete(id) {
   DB.registries.forEach(function (x) { if (x.parent === id) x.parent = r.parent || null; });
   DB.registries = DB.registries.filter(function (x) { return x.id !== id; });
   DB.patients.forEach(function (p) { if (p.custom) delete p.custom[id]; if (p.enroll && p.enroll[id]) { delete p.enroll[id]; p.log = (p.log || []).concat([{ ts: nowIso(), by: me(), act: 'edit', note: LL('исследование удалено: ', 'study deleted: ') + regName(r), ch: [] }]); } });
-  S.edit = null; save(); toast(isSt ? LL('Исследование удалено', 'Study deleted') : t('toast.regDeleted')); setView(isSt ? 'studies' : 'reg:all');
+  S.edit = null; save();
+  if (CLOUD.on && CLOUD.db) {
+    var dk = ('g_' + id).replace(/\//g, '_');
+    CLOUD.db.collection('data').doc(dk).delete().then(function () { delete CLOUD.cache[dk]; toast(isSt ? LL('Исследование удалено', 'Study deleted') : t('toast.regDeleted')); }).catch(function (e) { toast(LL('Не удалось удалить в облаке: ', 'Could not delete in the cloud: ') + (e.code || e.message)); });
+  } else toast(isSt ? LL('Исследование удалено', 'Study deleted') : t('toast.regDeleted'));
+  setView(isSt ? 'studies' : 'reg:all');
 }
 function apprAct(kind, id) {
   var r = (DB.pending || []).filter(function (x) { return x.id === id; })[0]; if (!r) return;
