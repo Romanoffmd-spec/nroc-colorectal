@@ -4884,6 +4884,7 @@ function render() {
   if (UI.aip) h += renderAIPanel();
   if (S.cmd) h += renderCmd();
   root.innerHTML = h;
+  document.body.classList.toggle('ovl', !!root.querySelector('.drawer.full'));
   Object.keys(keep).forEach(function (s) { var els = root.querySelectorAll(s); keep[s].forEach(function (v, i) { if (els[i]) els[i].scrollTop = v; }); });
   if (faId) { var ne = document.getElementById(faId); if (ne) { ne.focus(); try { ne.setSelectionRange(faPos, faPos); } catch (e) {} } }
   else { var fi = root.querySelector('[data-autofocus]'); if (fi) { fi.focus(); if (fi.setSelectionRange && fi.type !== 'number') { try { fi.setSelectionRange(fi.value.length, fi.value.length); } catch (e) {} } } }
@@ -5018,7 +5019,8 @@ document.addEventListener('click', function (ev) {
     case 'authhide': if (S.auth) { S.auth.show = false; if (S.auth.mode === 'wait') S.auth.mode = 'login'; } render(); break;
     case 'lang': LANG = g('v'); UI.lang = LANG; saveUI(); render(); break;
     case 'menu': S.menu = S.menu === g('id') ? null : g('id'); render(); break;
-    case 'view': { S.cmd = null; if (g('v') === 'users') S.users = null; var vv = g('v'), rg = vv.indexOf('reg:') === 0 ? regOf(vv.slice(4)) : null; if (rg) { UI.open = UI.open || {}; ancestors(rg).concat([rg]).forEach(function (a) { if (kids(a.id, a.kind === 'study').length) UI.open[a.id] = true; }); if (rg.kind === 'study') UI.open.studies = true; } setView(vv); break; }
+    case 'allcards': S.drawer = null; S.rec = null; S.edit = null; S.qb = null; S.menu = null; UI.fltBy = UI.fltBy || {}; UI.fltBy['reg:all'] = {}; setView('reg:all'); break;
+    case 'view': { S.cmd = null; if (g('v') && root.querySelector('.mnav [data-v="' + g('v') + '"], .t2-brand[data-v="' + g('v') + '"]')) { S.drawer = null; S.rec = null; S.edit = null; S.qb = null; } if (g('v') === 'users') S.users = null; var vv = g('v'), rg = vv.indexOf('reg:') === 0 ? regOf(vv.slice(4)) : null; if (rg) { UI.open = UI.open || {}; ancestors(rg).concat([rg]).forEach(function (a) { if (kids(a.id, a.kind === 'study').length) UI.open[a.id] = true; }); if (rg.kind === 'study') UI.open.studies = true; } setView(vv); break; }
     case 'openp': if (ev.target.closest('button') && ev.target.closest('button') !== tg) return; openPatient(g('id')); break;
     case 'newp': openPatient(null); break;
     case 'close': S.drawer = null; render(); break;
@@ -7927,7 +7929,7 @@ function renderMainNav() {
   return '<nav class="mnav" aria-label="' + t('a11y.sections') + '"><div class="mnav-in">' + navGroups().map(function (g) {
     if (g.v) return '<button type="button" class="mn-g' + (S.view === g.v ? ' on' : '') + '" data-act="view" data-v="' + g.v + '">' + esc(g.label) + '</button>';
     var act = g.items.some(function (x) { return x.v && x.v === S.view; }), open = S.menu === 'nav:' + g.id, badge = g.items.reduce(function (a, x) { return a + (+x.badge || 0); }, 0);
-    if (g.split) return '<div class="dd mn-split"><button type="button" class="mn-g' + (act ? ' on' : '') + '" data-act="view" data-v="' + g.split + '">' + esc(g.label) + (badge ? '<i class="badge">' + badge + '</i>' : '') + '</button><button type="button" class="mn-caret' + (open ? ' open' : '') + '" data-act="menu" data-id="nav:' + g.id + '" aria-expanded="' + open + '" aria-label="' + LL('Разделы', 'Sections') + '">' + ico('down', 14) + '</button>' + (open ? '<div class="pop mn-pop" role="menu">' + g.items.map(navItemHTML).join('') + '</div>' : '') + '</div>';
+    if (g.split) return '<div class="dd mn-split"><button type="button" class="mn-g' + (act ? ' on' : '') + '" data-act="allcards">' + esc(g.label) + (badge ? '<i class="badge">' + badge + '</i>' : '') + '</button><button type="button" class="mn-caret' + (open ? ' open' : '') + '" data-act="menu" data-id="nav:' + g.id + '" aria-expanded="' + open + '" aria-label="' + LL('Разделы', 'Sections') + '">' + ico('down', 14) + '</button>' + (open ? '<div class="pop mn-pop" role="menu">' + g.items.map(navItemHTML).join('') + '</div>' : '') + '</div>';
     return '<div class="dd"><button type="button" class="mn-g' + (act ? ' on' : '') + (open ? ' open' : '') + '" data-act="menu" data-id="nav:' + g.id + '" aria-expanded="' + open + '">' + esc(g.label) + (badge ? '<i class="badge">' + badge + '</i>' : '') + ico('down', 14) + '</button>' + (open ? '<div class="pop mn-pop' + (g.wide ? ' wide' : '') + '" role="menu">' + g.items.map(navItemHTML).join('') + '</div>' : '') + '</div>';
   }).join('') + '</div></nav>';
 }
