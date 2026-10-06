@@ -3031,7 +3031,7 @@ function qCard(p, isNew) {
     if (open && q) r += '<ol class="qans">' + qVisible(q, e.ans || {}).map(function (it) { var a = (e.ans || {})[it.id]; var txt = !has(a) ? '' : it.type === 'single' ? L(it.opts[+a].t) + (q.score ? ' (' + (it.opts[+a].s || 0) + ')' : '') : it.type === 'multi' ? a.map(function (i) { return L(it.opts[+i].t); }).join(', ') : String(a); return '<li><span>' + esc(L(it.text)) + '</span><b>' + esc(txt || LL('нет ответа', 'no answer')) + '</b></li>'; }).join('') + '</ol>';
     return r;
   }).join('') + '</div>';
-  h += asPatToggle(p);
+  h += qanPatHTML(p) + asPatToggle(p);
   h += '<div class="actions qbtns"><button type="button" class="btn" data-act="tntopen" data-pid="' + p.id + '">' + ico('flask', 16) + LL('Набор для исследования TNT', 'TNT study set') + '</button><button type="button" class="btn" data-act="qsched" data-pid="' + p.id + '">' + ico('cal', 16) + LL('Назначить анкеты', 'Schedule') + '</button><button type="button" class="btn" data-act="qnow" data-pid="' + p.id + '">' + ico('tablet', 16) + LL('Заполнить сейчас', 'Fill in now') + '</button></div>';
   return h + '</section>';
 }
@@ -3187,7 +3187,7 @@ function renderQPage() {
   if (tab === 'res') {
     var rows = []; DB.patients.forEach(function (p) { (p.q || []).forEach(function (e) { if (e.date) rows.push({ p: p, e: e }); }); });
     rows.sort(function (a, b) { return b.e.date.localeCompare(a.e.date); });
-    h += qStatsHTML();
+    h += '<div class="pad">' + qanHTML() + '</div>' + qStatsHTML();
     var rgrp = {}, rord = []; rows.forEach(function (x) { if (!rgrp[x.e.tid]) { rgrp[x.e.tid] = []; rord.push(x.e.tid); } rgrp[x.e.tid].push(x); });
     if (!rows.length) h += '<div class="empty">' + LL('Пока нет заполненных анкет в карточках', 'No completed questionnaires in records yet') + '</div>';
     rord.forEach(function (tid) { var qq = qTpl(tid), rows = rgrp[tid]; h += grpHead(esc(qq ? qName(qq) : '?'), rows.length, 'okg', '<button type="button" class="btn small" data-act="qxls" data-id="' + tid + '">' + ico('download', 14) + LL('Excel: шкалы и ответы', 'Excel: scales and answers') + '</button>');
@@ -3847,7 +3847,7 @@ function cloudDocs() {
   (DB.pending || []).forEach(function (r) { m['x_' + r.id] = r; });
   Object.keys(DB.ms || {}).forEach(function (sid) { var x = DB.ms[sid]; ['papers', 'secs', 'lib', 'cm', 'zcols'].forEach(function (g2) { Object.keys(x[g2] || {}).forEach(function (k) { m['m_' + sid + '__' + g2 + '__' + k] = x[g2][k]; }); }); });
   if (CLOUD.on) m.qsnap = qSnapAll();
-  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, qtext: DB.qtext, dictOv: DB.dictOv, autosend: DB.autosend, studySeq: DB.studySeq, importedAt: DB.importedAt };
+  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, qtext: DB.qtext, dictOv: DB.dictOv, autosend: DB.autosend, qconc: DB.qconc, studySeq: DB.studySeq, importedAt: DB.importedAt };
   var out = {}; Object.keys(m).forEach(function (k) { out[k.replace(/\//g, '_')] = JSON.stringify(m[k]); }); return out;
 }
 function cloudPush() {
@@ -5420,6 +5420,7 @@ document.addEventListener('click', function (ev) {
     case 'theme': UI.theme = themeCur() === 'dark' ? 'light' : 'dark'; saveUI(); themeApply(); render(); break;
     case 'qlnew': qlCreate(g('id'), g('pid'), g('eid')); break;
     case 'qwa': qWaSend(g('pid'), g('eid')); break;
+    case 'qanauto': case 'qansave': case 'qanapp': case 'qanunapp': case 'qanai': case 'qanxls': qanAct(a); break;
     case 'waopt': { var pw = g('pid'), cw = asCfg(), p0 = findPat(pw); if (!p0) break; var kw = cw.consent === 'optin' ? 'waOk' : 'waOff', vw = !p0[kw]; withPat(pw, function (x) { x[kw] = vw; }); save(); render(); break; }
     case 'asedit': S.asEdit = clone(asCfg()); render(); break;
     case 'asclose': S.asEdit = null; render(); break;
@@ -5833,6 +5834,259 @@ function renderQInbox() {
   });
   return h;
 }
+/* ======================= Анализ анкет: графики, статистика, предварительные выводы (одобряет врач) ======================= */
+var QTP = [['b', ['Исходно', 'Baseline']], ['m1', ['1 мес', '1 mo']], ['m3', ['3 мес', '3 mo']], ['m6', ['6 мес', '6 mo']], ['m12', ['12 мес', '12 mo']], ['m24', ['24 мес', '24 mo']], ['m36', ['36 мес', '36 mo']], ['m60', ['5 лет', '5 y']]];
+function qtpLabel(k) { var x = QTP.filter(function (z) { return z[0] === k; })[0]; return x ? L(x[1]) : k; }
+function qtpIdx(k) { for (var i = 0; i < QTP.length; i++) if (QTP[i][0] === k) return i; return 99; }
+function qAnchor(p, tid) { return tid === 'lars' && p.d.closure ? p.d.closure : p.d.date; }
+function qTpOf(p, e) {
+  var a = qAnchor(p, e.tid), d = e.date || e.due;
+  if (a && d) { var n = Math.round((new Date(d) - new Date(a)) / 864e5); return n <= 0 ? 'b' : n <= 60 ? 'm1' : n <= 135 ? 'm3' : n <= 270 ? 'm6' : n <= 545 ? 'm12' : n <= 910 ? 'm24' : n <= 1460 ? 'm36' : 'm60'; }
+  var m = /(\d+)\s*(мес|mo)/.exec(e.label || ''); if (m) { var k = +m[1]; return k <= 1 ? 'm1' : k <= 4 ? 'm3' : k <= 9 ? 'm6' : k <= 18 ? 'm12' : k <= 30 ? 'm24' : k <= 48 ? 'm36' : 'm60'; }
+  return '';
+}
+function qBandDir(b) { if (!b || b.length < 2) return 0; var ok = b.filter(function (x) { return x.c === 'ok'; })[0]; if (!ok) return 0; var oth = b.filter(function (x) { return x !== ok; }); return oth.every(function (x) { return x.min < ok.min; }) ? 1 : oth.every(function (x) { return x.min > ok.min; }) ? -1 : 0; }
+/* +1: чем больше, тем лучше; -1: чем больше, тем хуже; 0: направление не задано */
+function qDir(q, s) {
+  if (!s) return qBandDir(q.bands);
+  if (s.dir) return s.dir;
+  if (/^(eo-f|eo-g|c30sum|fsfitot)$/.test(s.type)) return 1;
+  if (/^(eo-s|max|maxall|cnt3)$/.test(s.type)) return -1;
+  if (q.id === 'eq5d5l') return s.id === 'VAS' ? 1 : s.id === 'LSS' ? -1 : 0;
+  if (q.id === 'iief') return 1;
+  if (q.id === 'hads') return -1;
+  return qBandDir(s.bands);
+}
+function qanScales(q) {
+  var o = [];
+  if (q.score) o.push({ key: '_', name: LL('Общий балл', 'Total score'), max: q.max, bands: q.bands, dir: qDir(q, null), main: true });
+  (q.scales || []).forEach(function (s) { if (s.type === 'eqprof' || s.type === 'text') return; var eo = /^(eo-f|eo-g|eo-s|c30sum)$/.test(s.type); o.push({ key: s.id, name: L(s.name), max: eo ? 100 : s.max, bands: s.bands, dir: qDir(q, s), eo: eo, main: !!s.main }); });
+  return o;
+}
+function qanVal(e, key) { var v = key === '_' ? e.score : (e.scales || {})[key]; if (typeof v === 'string') v = parseFloat(v); return typeof v === 'number' && isFinite(v) ? v : null; }
+function qanRows(tid, key) {
+  var rows = [];
+  DB.patients.forEach(function (p) {
+    var by = {};
+    (p.q || []).forEach(function (e) { if (e.tid !== tid || !e.date) return; var v = qanVal(e, key); if (v === null) return; var tp = qTpOf(p, e); if (!tp) return; var c = by[tp]; if (!c || (tp === 'b' ? e.date < c.date : e.date > c.date)) by[tp] = { pid: p.id, p: p, tp: tp, v: v, date: e.date }; });
+    Object.keys(by).forEach(function (k) { rows.push(by[k]); });
+  });
+  return rows;
+}
+/* ---------- статистика ---------- */
+function stMean(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : null; }
+function stSd(a) { if (a.length < 2) return null; var m = stMean(a); return Math.sqrt(a.reduce(function (s, x) { return s + (x - m) * (x - m); }, 0) / (a.length - 1)); }
+function stQ(a, pr) { var b = a.slice().sort(function (x, y) { return x - y; }); if (!b.length) return null; var i = (b.length - 1) * pr, lo = Math.floor(i), hi = Math.ceil(i); return b[lo] + (b[hi] - b[lo]) * (i - lo); }
+function tCrit(df) { var T = [[1, 12.71], [2, 4.30], [3, 3.18], [4, 2.78], [5, 2.57], [6, 2.45], [7, 2.36], [8, 2.31], [9, 2.26], [10, 2.23], [12, 2.18], [15, 2.13], [20, 2.09], [25, 2.06], [30, 2.04], [40, 2.02], [60, 2.00], [120, 1.98]], r = 1.96; for (var i = T.length - 1; i >= 0; i--) if (df >= T[i][0]) { r = T[i][1]; break; } return df < 1 ? null : r; }
+function normCdf(z) { var t = 1 / (1 + 0.3275911 * Math.abs(z) / Math.SQRT2), y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-z * z / 2); return z >= 0 ? (1 + y) / 2 : (1 - y) / 2; }
+function stRank(vals) { var idx = vals.map(function (v, i) { return [v, i]; }).sort(function (a, b) { return a[0] - b[0]; }), r = new Array(vals.length), ties = []; for (var i = 0; i < idx.length;) { var j = i; while (j + 1 < idx.length && idx[j + 1][0] === idx[i][0]) j++; var rk = (i + j) / 2 + 1; for (var k = i; k <= j; k++) r[idx[k][1]] = rk; if (j > i) ties.push(j - i + 1); i = j + 1; } return { r: r, ties: ties }; }
+/* критерий знаковых рангов Уилкоксона: точный (n до 30) или нормальная аппроксимация */
+function stWilcoxon(d) {
+  d = d.filter(function (x) { return x !== 0; }); var n = d.length; if (n < 1) return { n: 0, p: null };
+  var rk = stRank(d.map(Math.abs)), wp = 0; d.forEach(function (x, i) { if (x > 0) wp += rk.r[i]; });
+  if (n <= 30) {
+    var r2 = rk.r.map(function (x) { return Math.round(x * 2); }), tot = r2.reduce(function (a, b) { return a + b; }, 0), dp = new Float64Array(tot + 1); dp[0] = 1;
+    r2.forEach(function (r) { for (var s = tot - r; s >= 0; s--) if (dp[s]) dp[s + r] += dp[s]; });
+    var w2 = Math.round(wp * 2), all = Math.pow(2, n), le = 0, ge = 0; for (var s = 0; s <= tot; s++) { if (s <= w2) le += dp[s]; if (s >= w2) ge += dp[s]; }
+    return { n: n, w: wp, p: Math.min(1, 2 * Math.min(le, ge) / all), exact: true };
+  }
+  var mu = n * (n + 1) / 4, v = n * (n + 1) * (2 * n + 1) / 24 - rk.ties.reduce(function (a, t) { return a + (t * t * t - t) / 48; }, 0), z = (Math.abs(wp - mu) - 0.5) / Math.sqrt(v);
+  return { n: n, w: wp, p: Math.min(1, 2 * (1 - normCdf(z))) };
+}
+function stMannWhitney(a, b) {
+  var n1 = a.length, n2 = b.length; if (n1 < 2 || n2 < 2) return null;
+  var rk = stRank(a.concat(b)), r1 = 0; for (var i = 0; i < n1; i++) r1 += rk.r[i];
+  var u = r1 - n1 * (n1 + 1) / 2, N = n1 + n2, mu = n1 * n2 / 2, tc = rk.ties.reduce(function (s, t) { return s + t * t * t - t; }, 0), v = n1 * n2 / 12 * ((N + 1) - tc / (N * (N - 1)));
+  if (v <= 0) return { u: u, p: 1 }; var z = (Math.abs(u - mu) - 0.5) / Math.sqrt(v); return { u: u, p: Math.min(1, 2 * (1 - normCdf(Math.max(0, z)))) };
+}
+function lnGamma(x) { var c = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5], y = x, t = x + 5.5; t -= (x + 0.5) * Math.log(t); var s = 1.000000000190015; for (var j = 0; j < 6; j++) s += c[j] / ++y; return -t + Math.log(2.5066282746310005 * s / x); }
+function gammaP(a, x) {
+  if (x <= 0) return 0;
+  if (x < a + 1) { var ap = a, sum = 1 / a, del = sum; for (var n = 0; n < 200; n++) { ap++; del *= x / ap; sum += del; if (Math.abs(del) < Math.abs(sum) * 1e-12) break; } return sum * Math.exp(-x + a * Math.log(x) - lnGamma(a)); }
+  var b = x + 1 - a, c = 1e300, d = 1 / b, h = d; for (var i = 1; i < 200; i++) { var an = -i * (i - a); b += 2; d = an * d + b; if (Math.abs(d) < 1e-300) d = 1e-300; c = b + an / c; if (Math.abs(c) < 1e-300) c = 1e-300; d = 1 / d; var dl = d * c; h *= dl; if (Math.abs(dl - 1) < 1e-12) break; }
+  return 1 - Math.exp(-x + a * Math.log(x) - lnGamma(a)) * h;
+}
+function stKruskal(groups) {
+  groups = groups.filter(function (g) { return g.length; }); var k = groups.length; if (k < 2) return null;
+  var all = [], gi = []; groups.forEach(function (g, i) { g.forEach(function (v) { all.push(v); gi.push(i); }); });
+  var N = all.length, rk = stRank(all), rs = groups.map(function () { return 0; }); rk.r.forEach(function (r, i) { rs[gi[i]] += r; });
+  var H = 12 / (N * (N + 1)) * rs.reduce(function (s, r, i) { return s + r * r / groups[i].length; }, 0) - 3 * (N + 1), tc = 1 - rk.ties.reduce(function (s, t) { return s + t * t * t - t; }, 0) / (N * N * N - N); if (tc > 0) H /= tc;
+  return { h: H, df: k - 1, p: Math.max(0, 1 - gammaP((k - 1) / 2, H / 2)) };
+}
+function stHolm(ps) { var o = ps.map(function (p, i) { return [p, i]; }).filter(function (x) { return x[0] !== null; }).sort(function (a, b) { return a[0] - b[0]; }), m = o.length, adj = ps.map(function () { return null; }), prev = 0; o.forEach(function (x, j) { var v = Math.min(1, Math.max(prev, x[0] * (m - j))); prev = v; adj[x[1]] = v; }); return adj; }
+function fN(v, d) { if (v === null || v === undefined || !isFinite(v)) return '-'; var s = (+v).toFixed(d === undefined ? 1 : d); return LANG === 'en' ? s : s.replace('.', ','); }
+function fPv(p) { if (p === null || p === undefined) return '-'; return p < 0.001 ? '< ' + fN(0.001, 3) : fN(p, 3); }
+function fP(p) { if (p === null || p === undefined) return '-'; return p < 0.001 ? 'p < ' + fN(0.001, 3) : 'p = ' + fN(p, 3); }
+/* ---------- полный анализ одной шкалы ---------- */
+function qanRun(tid, key, grp, gtp) {
+  var q = qTpl(tid), sc = qanScales(q || {}).filter(function (s) { return s.key === key; })[0]; if (!q || !sc) return null;
+  var rows = qanRows(tid, key), by = {}; rows.forEach(function (r) { (by[r.tp] = by[r.tp] || []).push(r); });
+  var tps = Object.keys(by).sort(function (a, b) { return qtpIdx(a) - qtpIdx(b); }).map(function (k) {
+    var v = by[k].map(function (r) { return r.v; }), n = v.length, m = stMean(v), sd = stSd(v), tc = tCrit(n - 1), half = sd !== null && tc ? tc * sd / Math.sqrt(n) : null, bands = null;
+    if (sc.bands) { bands = sc.bands.map(function (b) { return { t: L(b.t), c: b.c, n: v.filter(function (x) { return x >= b.min && x <= b.max; }).length }; }); }
+    return { k: k, n: n, mean: m, sd: sd, lo: half !== null ? m - half : null, hi: half !== null ? m + half : null, med: stQ(v, 0.5), q1: stQ(v, 0.25), q3: stQ(v, 0.75), bands: bands };
+  });
+  var ref = by.b && by.b.length >= 3 ? 'b' : (tps[0] ? tps[0].k : null), refMap = {}; (by[ref] || []).forEach(function (r) { refMap[r.pid] = r.v; });
+  var bsd = stSd((by[ref] || []).map(function (r) { return r.v; })), mcid = sc.eo ? 10 : (bsd ? bsd / 2 : null), mcidSrc = sc.eo ? LL('10 баллов, порог EORTC (Osoba 1998)', '10 points, EORTC threshold (Osoba 1998)') : LL('0,5 SD исходных значений (Norman 2003)', '0.5 SD of reference values (Norman 2003)');
+  var cmp = tps.filter(function (t) { return t.k !== ref; }).map(function (t) {
+    var d = by[t.k].filter(function (r) { return refMap[r.pid] !== undefined; }).map(function (r) { return r.v - refMap[r.pid]; }), n = d.length, m = stMean(d), sd = stSd(d), tc = tCrit(n - 1), half = sd !== null && tc ? tc * sd / Math.sqrt(n) : null, w = n >= 5 ? stWilcoxon(d) : { p: null };
+    var imp = 0, wor = 0; if (mcid && sc.dir) d.forEach(function (x) { var g = x * sc.dir; if (g >= mcid) imp++; else if (g <= -mcid) wor++; });
+    return { k: t.k, n: n, md: m, lo: half !== null ? m - half : null, hi: half !== null ? m + half : null, p: w.p, exact: w.exact, imp: imp, wor: wor };
+  });
+  var adj = stHolm(cmp.map(function (c) { return c.p; })); cmp.forEach(function (c, i) { c.padj = adj[i]; });
+  /* выполнение графика заполнения (пропуски влияют на достоверность) */
+  var compl = {}, td = isoOf(new Date());
+  DB.patients.forEach(function (p) { (p.q || []).forEach(function (e) { if (e.tid !== tid || !e.due || (e.due > td && !e.date)) return; var k = qTpOf(p, e); if (!k) return; var c = compl[k] = compl[k] || [0, 0]; c[1]++; if (e.date) c[0]++; }); });
+  var G = null;
+  if (grp && FIELD[grp]) {
+    var at = gtp && by[gtp] ? gtp : (tps[tps.length - 1] || {}).k, gs = {}, ord = [];
+    (by[at] || []).forEach(function (r) { var gv = r.p.d[grp]; if (gv === undefined || gv === null || gv === '' || Array.isArray(gv)) return; gv = String(gv); if (!gs[gv]) { gs[gv] = []; ord.push(gv); } gs[gv].push(r.v); });
+    var arr = ord.map(function (g) { var v = gs[g]; return { name: ov(g), n: v.length, mean: stMean(v), med: stQ(v, 0.5), q1: stQ(v, 0.25), q3: stQ(v, 0.75), v: v }; }), ok = arr.filter(function (g) { return g.n >= 3; }), test = null;
+    if (ok.length === 2) { var mw = stMannWhitney(ok[0].v, ok[1].v); if (mw) test = { name: LL('критерий Манна-Уитни', 'Mann-Whitney U test'), p: mw.p }; }
+    else if (ok.length > 2) { var kw = stKruskal(ok.map(function (g) { return g.v; })); if (kw) test = { name: LL('критерий Краскела-Уоллиса', 'Kruskal-Wallis test'), p: kw.p }; }
+    G = { field: grp, label: L(FIELD[grp].label), tp: at, groups: arr, test: test };
+  }
+  var pts = {}; rows.forEach(function (r) { pts[r.pid] = 1; });
+  return { q: q, sc: sc, tid: tid, key: key, rows: rows, by: by, tps: tps, ref: ref, cmp: cmp, mcid: mcid, mcidSrc: mcidSrc, compl: compl, grp: G, npt: Object.keys(pts).length };
+}
+function qanSig(r) { return hashStr(JSON.stringify([r.npt, r.tps.map(function (t) { return [t.k, t.n, fN(t.mean, 1)]; }), r.cmp.map(function (c) { return [c.k, c.n, fN(c.p, 3)]; })])); }
+/* ---------- автоматический черновик выводов (правила, без ИИ) ---------- */
+function qanDraft(r) {
+  var sc = r.sc, nm = '«' + sc.name + '» (' + qShort(r.q) + ')', out = [];
+  out.push(LL('ПРЕДВАРИТЕЛЬНЫЕ ВЫВОДЫ. Сформированы автоматически и требуют проверки и одобрения врачом.', 'PRELIMINARY CONCLUSIONS. Generated automatically; require review and approval by a physician.'));
+  out.push(LL('Проанализировано: ', 'Analysed: ') + r.npt + LL(' пациентов, ', ' patients, ') + r.rows.length + LL(' заполненных анкет по шкале ', ' completed questionnaires, scale ') + nm + '.' + (sc.dir ? ' ' + (sc.dir > 0 ? LL('Чем выше балл, тем лучше.', 'Higher scores are better.') : LL('Чем выше балл, тем хуже (больше симптомов или нарушений).', 'Higher scores are worse (more symptoms or impairment).')) : ''));
+  if (!r.ref) return out.join('\n\n');
+  var rt = r.tps.filter(function (t) { return t.k === r.ref; })[0];
+  out.push(LL('Точка сравнения «', 'Reference point "') + qtpLabel(r.ref) + LL('»', '"') + (r.ref !== 'b' ? LL(' (исходных данных до лечения недостаточно)', ' (insufficient pre-treatment baseline data)') : '') + ': ' + LL('среднее ', 'mean ') + fN(rt.mean) + (rt.lo !== null ? LL(' (95% ДИ от ', ' (95% CI ') + fN(rt.lo) + LL(' до ', ' to ') + fN(rt.hi) + ')' : '') + ', n = ' + rt.n + '.');
+  r.cmp.forEach(function (c) {
+    var t = r.tps.filter(function (x) { return x.k === c.k; })[0], s = qtpLabel(c.k) + ': ' + LL('среднее ', 'mean ') + fN(t.mean) + ', n = ' + t.n + '. ';
+    if (c.n < 5) { s += LL('Парных наблюдений с точкой сравнения ', 'Paired observations with the reference: ') + c.n + LL(', для статистической оценки недостаточно.', ', too few for statistical testing.'); out.push(s); return; }
+    var dir = sc.dir ? (c.md * sc.dir > 0 ? LL('улучшение', 'improvement') : c.md * sc.dir < 0 ? LL('ухудшение', 'deterioration') : LL('без изменений', 'no change')) : (c.md > 0 ? LL('повышение', 'increase') : LL('снижение', 'decrease'));
+    var sig = c.padj !== null && c.padj < 0.05;
+    s += LL('Изменение у тех же пациентов (n = ', 'Within-patient change (n = ') + c.n + '): ' + (c.md > 0 ? '+' : '') + fN(c.md) + LL(' балла', ' points') + (c.lo !== null ? LL(' (95% ДИ от ', ' (95% CI ') + fN(c.lo) + LL(' до ', ' to ') + fN(c.hi) + ')' : '') + ', ' + dir + '; ' + (sig ? LL('различие статистически значимо', 'statistically significant') : LL('статистически значимого различия не выявлено', 'not statistically significant')) + ' (' + LL('критерий Уилкоксона', 'Wilcoxon signed-rank test') + ', ' + fP(c.p) + LL(', с поправкой Холма p ', ', Holm-adjusted p ') + (c.padj < 0.001 ? '< ' : '= ') + fPv(c.padj).replace('< ', '') + ').';
+    if (r.mcid && sc.dir) s += ' ' + LL('Клинически значимое улучшение у ', 'Clinically meaningful improvement in ') + c.imp + LL(' из ', ' of ') + c.n + ' (' + Math.round(c.imp / c.n * 100) + '%), ' + LL('ухудшение у ', 'deterioration in ') + c.wor + ' (' + Math.round(c.wor / c.n * 100) + '%); ' + LL('порог: ', 'threshold: ') + r.mcidSrc + '.';
+    out.push(s);
+  });
+  if (r.sc.bands && r.tps.length > 1) {
+    var worst = r.sc.bands.filter(function (b) { return b.c === 'due'; })[0] || r.sc.bands.filter(function (b) { return b.c !== 'ok'; }).slice(-1)[0];
+    if (worst) out.push(LL('Доля пациентов в категории «', 'Proportion in category "') + L(worst.t) + LL('» по срокам: ', '" by time point: ') + r.tps.map(function (t) { var b = t.bands.filter(function (x) { return x.t === L(worst.t); })[0]; return qtpLabel(t.k) + ' ' + Math.round((b ? b.n : 0) / t.n * 100) + '% (' + (b ? b.n : 0) + '/' + t.n + ')'; }).join('; ') + '.');
+  }
+  if (r.grp && r.grp.test) out.push(LL('Сравнение по признаку «', 'Comparison by "') + r.grp.label + '» (' + qtpLabel(r.grp.tp) + '): ' + r.grp.groups.filter(function (g) { return g.n; }).map(function (g) { return g.name + LL(': медиана ', ': median ') + fN(g.med) + ' (n = ' + g.n + ')'; }).join('; ') + '. ' + (r.grp.test.p < 0.05 ? LL('Различие между группами статистически значимо', 'Difference between groups is statistically significant') : LL('Статистически значимого различия между группами не выявлено', 'No statistically significant difference between groups')) + ' (' + r.grp.test.name + ', ' + fP(r.grp.test.p) + ').');
+  var lim = [];
+  if (r.npt < 20) lim.push(LL('малое число пациентов: результаты носят описательный характер', 'small sample: results are descriptive'));
+  var low = Object.keys(r.compl).filter(function (k) { var c = r.compl[k]; return c[1] >= 3 && c[0] / c[1] < 0.6; });
+  if (low.length) lim.push(LL('анкеты заполнили менее 60% пациентов на сроках ', 'completion below 60% at ') + low.map(qtpLabel).join(', ') + LL(': возможна систематическая ошибка из-за пропусков', ': possible bias from missing data'));
+  if (r.ref !== 'b') lim.push(LL('нет исходной оценки до лечения у достаточного числа пациентов', 'no adequate pre-treatment baseline'));
+  lim.push(LL('наблюдательные данные одного центра без поправки на возможные искажающие факторы', 'single-centre observational data without adjustment for confounders'));
+  out.push(LL('Ограничения: ', 'Limitations: ') + lim.join('; ') + '.');
+  return out.join('\n\n');
+}
+/* ---------- графики ---------- */
+function qanChart(r) {
+  var tps = r.tps; if (!tps.length) return '';
+  var W = 680, H = 280, pl = 70, pr = 40, pt = 16, pb = 34, xs = tps.length, max = r.sc.max || null, vals = r.rows.map(function (x) { return x.v; }), lo = 0, hi = max || Math.max.apply(null, vals.concat([1]));
+  if (!max) { hi = Math.ceil(hi * 1.1); }
+  var X = function (i) { return pl + (xs === 1 ? (W - pl - pr) / 2 : i * (W - pl - pr) / (xs - 1)); }, Y = function (v) { return pt + (H - pt - pb) * (1 - (v - lo) / (hi - lo || 1)); }, ix = {}; tps.forEach(function (t, i) { ix[t.k] = i; });
+  var h = '<svg class="qan-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(r.sc.name) + '">';
+  for (var g = 0; g <= 4; g++) { var gv = lo + (hi - lo) * g / 4, gy = Y(gv); h += '<line class="gl" x1="' + pl + '" x2="' + (W - pr) + '" y1="' + gy + '" y2="' + gy + '"/><text class="ax" x="' + (pl - 6) + '" y="' + (gy + 4) + '" text-anchor="end">' + fN(gv, gv % 1 ? 1 : 0) + '</text>'; }
+  if (r.sc.bands) r.sc.bands.forEach(function (b) { var y1 = Y(Math.min(hi, b.max)), y2 = Y(Math.max(lo, b.min)); if (y2 > y1) h += '<rect class="bz b-' + b.c + '" x="' + pl + '" width="' + (W - pl - pr) + '" y="' + y1 + '" height="' + (y2 - y1) + '"/>'; });
+  var per = {}; r.rows.forEach(function (x) { (per[x.pid] = per[x.pid] || []).push(x); });
+  Object.keys(per).forEach(function (pid) { var a = per[pid].filter(function (x) { return ix[x.tp] !== undefined; }).sort(function (x, y) { return ix[x.tp] - ix[y.tp]; }); if (a.length > 1) h += '<polyline class="sp" points="' + a.map(function (x) { return X(ix[x.tp]) + ',' + Y(x.v); }).join(' ') + '"/>'; });
+  var ci = tps.filter(function (t) { return t.lo !== null; });
+  if (ci.length > 1) h += '<polygon class="ci" points="' + ci.map(function (t) { return X(ix[t.k]) + ',' + Y(Math.min(hi, t.hi)); }).concat(ci.slice().reverse().map(function (t) { return X(ix[t.k]) + ',' + Y(Math.max(lo, t.lo)); })).join(' ') + '"/>';
+  h += '<polyline class="mn" points="' + tps.map(function (t) { return X(ix[t.k]) + ',' + Y(t.mean); }).join(' ') + '"/>';
+  tps.forEach(function (t) { var x = X(ix[t.k]); if (t.lo !== null) h += '<line class="eb" x1="' + x + '" x2="' + x + '" y1="' + Y(Math.min(hi, t.hi)) + '" y2="' + Y(Math.max(lo, t.lo)) + '"/>'; h += '<circle class="pt" cx="' + x + '" cy="' + Y(t.mean) + '" r="4.5"><title>' + esc(qtpLabel(t.k) + ': ' + fN(t.mean) + ', n = ' + t.n) + '</title></circle><text class="ax" x="' + x + '" y="' + (H - 14) + '" text-anchor="middle">' + esc(qtpLabel(t.k)) + '</text><text class="ax n" x="' + x + '" y="' + (H - 2) + '" text-anchor="middle">n = ' + t.n + '</text>'; });
+  return h + '</svg><p class="qan-leg"><span class="lg mn"></span>' + LL('среднее и 95% ДИ', 'mean and 95% CI') + '<span class="lg sp"></span>' + LL('отдельные пациенты', 'individual patients') + (r.sc.bands ? '<span class="lg bz"></span>' + LL('фон: категории шкалы', 'background: scale categories') : '') + '</p>';
+}
+function qanBandsChart(r) {
+  if (!r.sc.bands || !r.tps.length) return '';
+  return '<div class="qan-bars">' + r.tps.map(function (t) { return '<div class="qb-row"><span class="qb-l">' + esc(qtpLabel(t.k)) + '</span><div class="qb-bar">' + t.bands.map(function (b) { var pc = t.n ? b.n / t.n * 100 : 0; return pc ? '<i class="b-' + b.c + '" style="width:' + pc + '%" title="' + esc(b.t + ': ' + b.n + ' (' + Math.round(pc) + '%)') + '">' + (pc >= 12 ? Math.round(pc) + '%' : '') + '</i>' : ''; }).join('') + '</div><span class="qb-n">n = ' + t.n + '</span></div>'; }).join('') + '<p class="qan-leg">' + r.sc.bands.map(function (b) { return '<span class="lg b-' + b.c + '"></span>' + esc(L(b.t)); }).join('') + '</p></div>';
+}
+/* ---------- экран анализа ---------- */
+function qanCanApprove() { return !!(SESSION && (SESSION.admin || SESSION.role === 'doctor')); }
+function qanGroupFields() { var o = []; SECTIONS.forEach(function (s) { s.fields.forEach(function (x) { if ((x.type === 'sel' || x.type === 'seg') && fieldOpts(x).length >= 2 && fieldOpts(x).length <= 8) o.push(x); }); }); return o; }
+function qanHTML() {
+  var withData = qTpls().filter(function (q) { return DB.patients.some(function (p) { return (p.q || []).some(function (e) { return e.tid === q.id && e.date; }); }); });
+  if (!withData.length) return '';
+  var o = S.qan = S.qan || {}; if (!withData.some(function (q) { return q.id === o.tid; })) o.tid = withData[0].id;
+  var q = qTpl(o.tid), scs = qanScales(q); if (!scs.some(function (s) { return s.key === o.sc; })) o.sc = (scs.filter(function (s) { return s.main; })[0] || scs[0] || {}).key;
+  var h = '<section class="card qan pad0"><h3>' + ico('history', 18) + LL('Анализ анкет: динамика, статистика, выводы', 'Questionnaire analysis: trends, statistics, conclusions') + '</h3>';
+  h += '<div class="qan-ctl"><label><span>' + LL('Анкета', 'Questionnaire') + '</span><select data-sb="qan.tid">' + withData.map(function (x) { return '<option value="' + x.id + '"' + (x.id === o.tid ? ' selected' : '') + '>' + esc(qShort(x)) + '</option>'; }).join('') + '</select></label>';
+  h += '<label><span>' + LL('Шкала', 'Scale') + '</span><select data-sb="qan.sc">' + scs.map(function (s) { return '<option value="' + s.key + '"' + (s.key === o.sc ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></label>';
+  h += '<label><span>' + LL('Сравнить группы по признаку', 'Compare groups by') + '</span><select data-sb="qan.grp"><option value="">' + LL('не сравнивать', 'none') + '</option>' + qanGroupFields().map(function (x) { return '<option value="' + x.id + '"' + (x.id === o.grp ? ' selected' : '') + '>' + esc(L(x.label)) + '</option>'; }).join('') + '</select></label>';
+  var r = o.sc ? qanRun(o.tid, o.sc, o.grp, o.gtp) : null;
+  if (r && o.grp) h += '<label><span>' + LL('На сроке', 'At time point') + '</span><select data-sb="qan.gtp">' + r.tps.map(function (t) { return '<option value="' + t.k + '"' + (r.grp && r.grp.tp === t.k ? ' selected' : '') + '>' + esc(qtpLabel(t.k)) + '</option>'; }).join('') + '</select></label>';
+  h += '</div>';
+  if (!r || !r.rows.length) return h + '<p class="hint">' + LL('По этой шкале пока нет рассчитанных значений.', 'No computed values for this scale yet.') + '</p></section>';
+  h += '<p class="hint">' + LL('Сроки считаются от даты операции', 'Time points are counted from the surgery date') + (o.tid === 'lars' ? LL(' (для LARS от закрытия стомы, если она была)', ' (for LARS from stoma closure, if any)') : '') + LL('. «Исходно» = анкета до операции (берётся самая ранняя). ', '. "Baseline" = questionnaire before surgery (earliest one). ') + (r.sc.dir ? (r.sc.dir > 0 ? LL('Чем выше балл, тем лучше.', 'Higher is better.') : LL('Чем выше балл, тем хуже.', 'Higher is worse.')) : '') + '</p>';
+  h += '<div class="qan-grid"><div>' + qanChart(r) + '</div><div>' + qanBandsChart(r) + '</div></div>';
+  h += '<div class="tablewrap"><table class="grid qan-t"><thead><tr><th>' + LL('Срок', 'Time point') + '</th><th>n</th><th>' + LL('Заполнено / назначено', 'Completed / scheduled') + '</th><th>' + LL('Среднее (95% ДИ)', 'Mean (95% CI)') + '</th><th>' + LL('Медиана [IQR]', 'Median [IQR]') + '</th><th>' + LL('Изменение от точки сравнения (95% ДИ)', 'Change from reference (95% CI)') + '</th><th>' + LL('p (Уилкоксон / Холм)', 'p (Wilcoxon / Holm)') + '</th>' + (r.mcid && r.sc.dir ? '<th>' + LL('Клинически значимо: лучше / хуже', 'Meaningful: better / worse') + '</th>' : '') + '</tr></thead><tbody>';
+  r.tps.forEach(function (t) { var c = r.cmp.filter(function (x) { return x.k === t.k; })[0], cp = r.compl[t.k]; h += '<tr><td class="strong">' + esc(qtpLabel(t.k)) + (t.k === r.ref ? ' <span class="tag">' + LL('сравнение', 'reference') + '</span>' : '') + '</td><td>' + t.n + '</td><td>' + (cp ? cp[0] + ' / ' + cp[1] + ' (' + Math.round(cp[0] / cp[1] * 100) + '%)' : '-') + '</td><td>' + fN(t.mean) + (t.lo !== null ? ' (' + fN(t.lo) + '; ' + fN(t.hi) + ')' : '') + '</td><td>' + fN(t.med) + ' [' + fN(t.q1) + '; ' + fN(t.q3) + ']</td><td>' + (c && c.n ? (c.md > 0 ? '+' : '') + fN(c.md) + (c.lo !== null ? ' (' + fN(c.lo) + '; ' + fN(c.hi) + ')' : '') + ', n = ' + c.n : '') + '</td><td>' + (c ? (c.p !== null ? fPv(c.p) + ' / ' + fPv(c.padj) : (c.n ? LL('мало данных', 'too few') : '')) : '') + '</td>' + (r.mcid && r.sc.dir ? '<td>' + (c && c.n >= 5 ? c.imp + ' / ' + c.wor + LL(' из ', ' of ') + c.n : '') + '</td>' : '') + '</tr>'; });
+  h += '</tbody></table></div>';
+  if (r.mcid && r.sc.dir) h += '<p class="fhint">' + LL('Порог клинической значимости: ', 'Clinical significance threshold: ') + esc(r.mcidSrc) + (r.sc.eo ? '' : ' = ' + fN(r.mcid)) + LL('. Сравнение парное: учитываются только пациенты, у которых есть обе анкеты. p скорректировано на множественные сравнения методом Холма.', '. Paired comparison: only patients with both questionnaires. p adjusted for multiple comparisons (Holm).') + '</p>';
+  if (r.grp) {
+    var gg = r.grp;
+    h += '<h4 class="qan-h4">' + esc(gg.label) + ' · ' + esc(qtpLabel(gg.tp)) + '</h4><div class="tablewrap"><table class="grid qan-t"><thead><tr><th>' + LL('Группа', 'Group') + '</th><th>n</th><th>' + LL('Медиана [IQR]', 'Median [IQR]') + '</th><th>' + LL('Среднее', 'Mean') + '</th></tr></thead><tbody>' + gg.groups.map(function (g) { return '<tr><td class="strong">' + esc(g.name) + '</td><td>' + g.n + '</td><td>' + fN(g.med) + ' [' + fN(g.q1) + '; ' + fN(g.q3) + ']</td><td>' + fN(g.mean) + '</td></tr>'; }).join('') + '</tbody></table></div><p class="fhint">' + (gg.test ? esc(gg.test.name) + ': ' + fP(gg.test.p) : LL('Для статистического сравнения нужно не менее 3 пациентов в каждой из двух групп.', 'At least 3 patients in each of two groups are needed for testing.')) + '</p>';
+  }
+  h += qanConcHTML(r);
+  h += '<div class="actions"><button type="button" class="btn small" data-act="qanxls">' + ico('download', 14) + LL('Excel: таблицы анализа и выводы', 'Excel: analysis tables and conclusions') + '</button></div>';
+  return h + '</section>';
+}
+function qanKey(r) { return r.tid + ':' + r.key + (r.grp ? ':' + r.grp.field + ':' + r.grp.tp : ''); }
+function qanConcHTML(r) {
+  var k = qanKey(r), c = (DB.qconc || {})[k], sig = qanSig(r), stale = c && c.st === 'approved' && c.sig !== sig, txt = S.qanTxt && S.qanTxt.k === k ? S.qanTxt.v : (c ? c.text : qanDraft(r));
+  var tag = !c ? '<span class="tag">' + LL('автоматический черновик, не сохранён', 'automatic draft, not saved') + '</span>' : c.st === 'approved' ? (stale ? '<span class="tag due">' + LL('одобрено, но данные изменились: пересмотрите', 'approved, but data changed: review') + '</span>' : '<span class="tag ok">' + LL('одобрено врачом', 'approved by physician') + '</span>') : '<span class="tag">' + LL('черновик', 'draft') + '</span>';
+  var h = '<div class="qan-conc"><div class="qan-conc-h"><b>' + LL('Выводы и резюме', 'Conclusions and summary') + '</b>' + tag + '</div>';
+  h += '<p class="fhint">' + LL('Текст сформирован автоматически по результатам расчёта и является предварительным. Врач проверяет его, исправляет при необходимости и одобряет. В отчёты и публикации попадают только одобренные выводы.', 'The text is generated automatically from the calculations and is preliminary. A physician reviews, edits and approves it. Only approved conclusions go into reports and publications.') + '</p>';
+  h += '<textarea class="inp qan-txt" id="qanTxt" rows="10" data-k="' + esc(k) + '">' + esc(txt) + '</textarea>';
+  if (c && c.st === 'approved') h += '<p class="fhint">' + LL('Одобрил(а): ', 'Approved by: ') + esc(c.appBy || '') + ', ' + fmtDate(String(c.appAt || '').slice(0, 10)) + '</p>';
+  h += '<div class="actions"><button type="button" class="btn small ghost" data-act="qanauto">' + ico('refresh', 14) + LL('Пересчитать черновик', 'Regenerate draft') + '</button>' + (typeof aiReady === 'function' && aiReady() ? '<button type="button" class="btn small ghost" data-act="qanai">' + ico('sparkle', 14) + LL('Переформулировать с ИИ', 'Rephrase with AI') + '</button>' : '') + '<button type="button" class="btn small" data-act="qansave">' + LL('Сохранить черновик', 'Save draft') + '</button>' + (qanCanApprove() ? (c && c.st === 'approved' && !stale ? '<button type="button" class="btn small" data-act="qanunapp">' + LL('Снять одобрение', 'Withdraw approval') + '</button>' : '<button type="button" class="btn small primary" data-act="qanapp">' + ico('check', 14) + LL('Одобрить', 'Approve') + '</button>') : '') + '</div></div>';
+  return h;
+}
+function qanCur() { var o = S.qan || {}; return o.tid && o.sc ? qanRun(o.tid, o.sc, o.grp, o.gtp) : null; }
+function qanAct(a) {
+  var r = qanCur(); if (!r) return; var k = qanKey(r), ta = document.getElementById('qanTxt'), v = ta ? ta.value : '';
+  DB.qconc = DB.qconc || {};
+  if (a === 'qanauto') { S.qanTxt = { k: k, v: qanDraft(r) }; render(); return; }
+  if (a === 'qansave') { var c0 = DB.qconc[k] || {}; DB.qconc[k] = { text: v, st: 'draft', by: me(), at: nowIso(), sig: qanSig(r), hist: (c0.hist || []).concat(c0.text ? [{ text: c0.text, st: c0.st, by: c0.appBy || c0.by, at: c0.appAt || c0.at }] : []).slice(-10) }; S.qanTxt = null; save(); toast(LL('Черновик сохранён', 'Draft saved')); render(); return; }
+  if (a === 'qanapp') { if (!qanCanApprove()) return; var c1 = DB.qconc[k] || {}; DB.qconc[k] = { text: v, st: 'approved', by: c1.by || me(), at: c1.at || nowIso(), appBy: me(), appAt: nowIso(), sig: qanSig(r), hist: (c1.hist || []).concat(c1.text && c1.st === 'approved' ? [{ text: c1.text, st: c1.st, by: c1.appBy, at: c1.appAt }] : []).slice(-10) }; S.qanTxt = null; save(); toast(LL('Выводы одобрены', 'Conclusions approved')); render(); return; }
+  if (a === 'qanunapp') { var c2 = DB.qconc[k]; if (c2) { c2.st = 'draft'; c2.unBy = me(); c2.unAt = nowIso(); } save(); render(); return; }
+  if (a === 'qanai') {
+    if (!aiReady()) return; var data = qanDraft(r); S.qanTxt = { k: k, v: LL('ИИ формулирует…', 'AI is writing…') }; render();
+    aiStream({ temp: 0.2, search: false, system: LL('Ты помогаешь врачу-исследователю. Перепиши предварительные выводы по результатам анкетирования пациентов связным академическим языком для клинического отчёта. Используй ТОЛЬКО цифры из исходного текста, ничего не добавляй и не округляй иначе. Сохрани первую строку о том, что выводы предварительные и требуют одобрения врача, и раздел ограничений. Без длинных тире.', 'You assist a clinical researcher. Rewrite these preliminary questionnaire conclusions in clear academic language for a clinical report. Use ONLY numbers from the source text; add nothing. Keep the first line stating the conclusions are preliminary and need physician approval, and keep the limitations. No em dashes.'),
+      contents: [{ role: 'user', parts: [{ text: data }] }],
+      chunk: function (t) { var el = document.getElementById('qanTxt'); if (el) el.value = t; },
+      done: function (t) { S.qanTxt = { k: k, v: String(t || data).replace(/[—–]/g, '-') }; render(); },
+      fail: function (e) { S.qanTxt = { k: k, v: data }; toast(LL('ИИ недоступен: ', 'AI unavailable: ') + e); render(); } });
+    return;
+  }
+  if (a === 'qanxls') {
+    var c = DB.qconc[k], rows1 = [[LL('Срок', 'Time point'), 'n', LL('Заполнено', 'Completed'), LL('Назначено', 'Scheduled'), LL('Среднее', 'Mean'), LL('95% ДИ, нижн.', '95% CI low'), LL('95% ДИ, верхн.', '95% CI high'), LL('Медиана', 'Median'), 'Q1', 'Q3', LL('Изменение', 'Change'), LL('Парных n', 'Paired n'), 'p', LL('p (Холм)', 'p (Holm)'), LL('Лучше (МКЗ)', 'Better (MCID)'), LL('Хуже (МКЗ)', 'Worse (MCID)')]];
+    r.tps.forEach(function (t) { var x = r.cmp.filter(function (z) { return z.k === t.k; })[0] || {}, cp = r.compl[t.k] || ['', '']; rows1.push([qtpLabel(t.k), t.n, cp[0], cp[1], t.mean, t.lo, t.hi, t.med, t.q1, t.q3, x.md, x.n, x.p, x.padj, x.imp, x.wor].map(function (v) { return typeof v === 'number' ? Math.round(v * 1000) / 1000 : (v === undefined || v === null ? '' : v); })); });
+    var sheets = [{ name: LL('Динамика', 'Trend'), rows: rows1 }];
+    if (r.grp) sheets.push({ name: LL('Группы', 'Groups'), rows: [[LL('Группа', 'Group'), 'n', LL('Медиана', 'Median'), 'Q1', 'Q3', LL('Среднее', 'Mean')]].concat(r.grp.groups.map(function (g) { return [g.name, g.n, g.med, g.q1, g.q3, g.mean]; })).concat([[r.grp.test ? r.grp.test.name : '', '', r.grp.test ? r.grp.test.p : '']]) });
+    sheets.push({ name: LL('Выводы', 'Conclusions'), rows: [[LL('Статус', 'Status'), !c ? LL('черновик, не одобрен', 'draft, not approved') : c.st === 'approved' ? LL('одобрено: ', 'approved: ') + (c.appBy || '') + ' ' + String(c.appAt || '').slice(0, 10) : LL('черновик, не одобрен', 'draft, not approved')], [LL('Текст', 'Text'), c ? c.text : qanDraft(r)]] });
+    downloadBlob(safeName(qShort(r.q) + ' ' + r.sc.name + ' ' + isoOf(new Date())) + '.xlsx', buildXlsx(sheets)); return;
+  }
+}
+/* ---------- в карточке пациента: личная динамика ---------- */
+function qanPatHTML(p) {
+  var by = {}; (p.q || []).forEach(function (e) { if (e.date) (by[e.tid] = by[e.tid] || []).push(e); });
+  var h = '';
+  Object.keys(by).forEach(function (tid) {
+    var q = qTpl(tid); if (!q) return; var sc = (qanScales(q).filter(function (s) { return s.main; })[0] || qanScales(q)[0]); if (!sc) return;
+    var es = by[tid].map(function (e) { return { e: e, v: qanVal(e, sc.key) }; }).filter(function (x) { return x.v !== null; }).sort(function (a, b) { return a.e.date.localeCompare(b.e.date); });
+    if (es.length < 2) return;
+    var W = 300, H = 90, lo = 0, hi = sc.max || Math.max.apply(null, es.map(function (x) { return x.v; }).concat([1])) * 1.1, X = function (i) { return 14 + i * (W - 28) / (es.length - 1); }, Y = function (v) { return 8 + (H - 26) * (1 - (v - lo) / (hi - lo || 1)); };
+    var svg = '<svg class="qan-svg mini" viewBox="0 0 ' + W + ' ' + H + '">' + (sc.bands ? sc.bands.map(function (b) { var y1 = Y(Math.min(hi, b.max)), y2 = Y(Math.max(lo, b.min)); return y2 > y1 ? '<rect class="bz b-' + b.c + '" x="8" width="' + (W - 16) + '" y="' + y1 + '" height="' + (y2 - y1) + '"/>' : ''; }).join('') : '') + '<polyline class="mn" points="' + es.map(function (x, i) { return X(i) + ',' + Y(x.v); }).join(' ') + '"/>' + es.map(function (x, i) { return '<circle class="pt" cx="' + X(i) + '" cy="' + Y(x.v) + '" r="3.5"><title>' + esc(fmtDate(x.e.date) + ': ' + fN(x.v)) + '</title></circle><text class="ax" x="' + X(i) + '" y="' + (H - 3) + '" text-anchor="middle">' + esc(String(x.e.date).slice(5).split('-').reverse().join('.')) + '</text>'; }).join('') + '</svg>';
+    var a = es[0], z = es[es.length - 1], d = z.v - a.v, thr = sc.eo ? 10 : null, ba = sc.bands ? qScaleBand({ bands: sc.bands }, a.v) : null, bz = sc.bands ? qScaleBand({ bands: sc.bands }, z.v) : null;
+    var dirTxt = sc.dir ? (d * sc.dir > 0 ? LL('улучшение', 'improvement') : d * sc.dir < 0 ? LL('ухудшение', 'deterioration') : LL('без изменений', 'no change')) : '';
+    var t = LL('Предварительно, требует оценки врача. «', 'Preliminary, for physician review. "') + esc(sc.name) + LL('»: с ', '": from ') + fN(a.v) + ' (' + fmtDate(a.e.date) + LL(') до ', ') to ') + fN(z.v) + ' (' + fmtDate(z.e.date) + '), ' + (d > 0 ? '+' : '') + fN(d) + (dirTxt ? ', ' + dirTxt : '') + (thr ? (Math.abs(d) >= thr ? LL(', изменение клинически значимо (порог 10 баллов)', ', clinically meaningful (10-point threshold)') : LL(', в пределах порога клинической значимости', ', within the clinical significance threshold')) : '') + (ba && bz && ba !== bz ? LL('; категория: ', '; category: ') + esc(L(ba.t)) + ' → ' + esc(L(bz.t)) : '') + '.';
+    h += '<div class="qan-pat"><b>' + esc(qShort(q)) + '</b>' + svg + '<p class="fhint">' + t + '</p></div>';
+  });
+  return h ? '<div class="qan-pats">' + h + '</div>' : '';
+}
+
 function qAllEntries() {
   var out = [];
   DB.patients.forEach(function (p) { (p.q || []).forEach(function (e) { if (e.date) out.push({ tid: e.tid, ans: e.ans || {}, score: e.score, pid: p.id, date: e.date }); }); });
