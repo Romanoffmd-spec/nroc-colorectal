@@ -2008,6 +2008,12 @@ html[data-theme="dark"] .csec .fld select.empty{color:var(--faint);font-weight:4
 .csec .fld.filled>label,.csec .fld.filled>.lbl,.csec .fld.f-na>.lbl,.csec .fld.f-na>label{color:var(--muted);font-weight:500}
 html[data-theme="dark"] .csec .fld input,html[data-theme="dark"] .csec .fld select,html[data-theme="dark"] .csec .fld textarea,html[data-theme="dark"] .csec .fld .seg{background:#121318;border-color:#3A3D47}
 html[data-theme="dark"] .csec .fld.filled input,html[data-theme="dark"] .csec .fld.filled select,html[data-theme="dark"] .csec .fld.filled textarea,html[data-theme="dark"] .csec .fld.filled .mbtn,html[data-theme="dark"] .csec .fld.filled .seg{background:#08080A;border-color:#1F2127}
+/* поправка 2: все подписи жирные и заметные всегда, значения читаемые */
+.csec .fld>label,.csec .fld>.lbl,.csec .fld.filled>label,.csec .fld.filled>.lbl,.csec .fld.f-na>.lbl,.csec .fld.f-na>label{font-size:13.5px;font-weight:600;color:var(--ink)}
+.csec .fld input,.csec .fld select,.csec .fld textarea,.csec .fld.filled input,.csec .fld.filled select,.csec .fld.filled textarea{color:var(--ink);font-weight:500;background:#fff;border-color:var(--ctrl)}
+.csec .fld.filled .seg,.csec .fld .seg{background:#fff;border-color:var(--ctrl)}
+.csec .fld.filled .seg button:not(.on){color:var(--ink2)}
+html[data-theme="dark"] .csec .fld input,html[data-theme="dark"] .csec .fld select,html[data-theme="dark"] .csec .fld textarea,html[data-theme="dark"] .csec .fld .seg,html[data-theme="dark"] .csec .fld.filled input,html[data-theme="dark"] .csec .fld.filled select,html[data-theme="dark"] .csec .fld.filled textarea,html[data-theme="dark"] .csec .fld.filled .mbtn,html[data-theme="dark"] .csec .fld.filled .seg{background:#121318;border-color:#3A3D47;color:var(--ink)}
 </style>
 </head>
 <body>
