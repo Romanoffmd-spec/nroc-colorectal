@@ -1960,6 +1960,43 @@ html[data-theme="dark"] .rt-view mark,html[data-theme="dark"] .rt-hl{background:
 @media (max-width:640px){.dq-row{grid-template-columns:1fr 70px}.dq-bar{grid-column:1/-1;order:3}.dict-r{grid-template-columns:1fr;gap:4px}}
 [data-theme="dark"] .dqbox{background:#2A2210;border-color:#7A5A1A}[data-theme="dark"] .dqbox.err{background:#2B1513;border-color:#7A2E28}
 [data-theme="dark"] .dqbox li.e,[data-theme="dark"] .dq-it li.e{color:#F97066}[data-theme="dark"] .dqbox li.w,[data-theme="dark"] .dq-it li.w{color:#FDB022}
+
+/* карточка: чёткая иерархия (подпись тихая, значение тёмное, выбранное залито) */
+.csecs{gap:16px}
+.csec{border:1px solid var(--line);box-shadow:var(--sh1)}
+.csec-h{font-size:15.5px;padding:14px 20px}
+.csec.open .csec-h{background:var(--surface-2);border-bottom:1px solid var(--line);margin-bottom:18px}
+.csec-c{font-size:12.5px}
+.csec .fgrid{gap:18px 20px;padding:0 20px;align-items:start}
+.csec .fld{gap:6px}
+.csec .fld>label,.csec .fld>.lbl{font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.01em;display:flex;align-items:center;min-height:16px}
+.csec .fld input,.csec .fld select,.csec .fld textarea{height:38px;font-size:14.5px;font-weight:500;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);box-shadow:none}
+.csec .fld textarea{height:auto}
+.csec .fld.filled input,.csec .fld.filled select,.csec .fld.filled textarea,.csec .fld.filled .mbtn{background:#fff;border-color:var(--ctrl)}
+.csec .fld input:focus,.csec .fld select:focus,.csec .fld textarea:focus{background:#fff;border-color:var(--navy-l);box-shadow:0 0 0 3px rgba(31,47,132,.12)}
+.csec .fld input::placeholder{color:var(--faint);font-weight:400}
+.csec .fld select.empty{color:var(--faint);font-weight:400}
+.csec .fld .seg{min-height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);box-shadow:none;padding:3px;gap:3px}
+.csec .fld .seg button{border:0;border-radius:6px;color:var(--muted);font-weight:400;font-size:13.5px;background:transparent}
+.csec .fld .seg button:hover{background:var(--surface-3);color:var(--ink2)}
+.csec .fld .seg button.on{background:var(--navy);color:#fff;font-weight:600;box-shadow:0 1px 2px rgba(16,24,40,.18)}
+.csec .fld.filled .seg{border-color:var(--ctrl);background:#fff}
+.csec .f-na .na-v{border:0;background:transparent;padding:0;min-height:38px;color:var(--faint);font-size:13px}
+.csec .f-na .na-v svg{opacity:.7}
+.csec .fld .ddq{opacity:0;transition:opacity .12s}
+.csec .fld:hover .ddq,.csec .fld:focus-within .ddq{opacity:1}
+.csec .fld input[disabled],.csec .fld input[readonly]{color:var(--ink2)}
+html[data-theme="dark"] .csec{border-color:#22242B}
+html[data-theme="dark"] .csec.open .csec-h{background:#0E0F12;border-bottom-color:#22242B}
+html[data-theme="dark"] .csec .fld input,html[data-theme="dark"] .csec .fld select,html[data-theme="dark"] .csec .fld textarea{background:#08080A;border-color:#1F2127;color:var(--ink)}
+html[data-theme="dark"] .csec .fld.filled input,html[data-theme="dark"] .csec .fld.filled select,html[data-theme="dark"] .csec .fld.filled textarea,html[data-theme="dark"] .csec .fld.filled .mbtn{background:#121318;border-color:#33363F}
+html[data-theme="dark"] .csec .fld input:focus,html[data-theme="dark"] .csec .fld select:focus,html[data-theme="dark"] .csec .fld textarea:focus{background:#121318;border-color:#6E7CF0;box-shadow:0 0 0 3px rgba(110,124,240,.2)}
+html[data-theme="dark"] .csec .fld .seg{background:#08080A;border-color:#1F2127}
+html[data-theme="dark"] .csec .fld.filled .seg{background:#121318;border-color:#33363F}
+html[data-theme="dark"] .csec .fld .seg button:hover{background:#1A1C22}
+html[data-theme="dark"] .csec .fld .seg button.on{background:#4A5BE0;color:#fff}
+html[data-theme="dark"] .ctab.on{background:var(--surface);color:var(--ink)}
+html[data-theme="dark"] .csec .fld select.empty{color:var(--faint);font-weight:400}
 </style>
 </head>
 <body>
