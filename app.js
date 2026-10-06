@@ -1133,7 +1133,7 @@ function chronoKey(p) { return String(p.created || (p.log && p.log[0] && p.log[0
 function pName(p) { return p.d.fio || p.id; }
 
 /* ======================= UI state ======================= */
-var S = { view: UI.view || 'home', q: '', drawer: null, edit: null, rec: null, menu: null, inline: null, expand: null, sort: {} };
+var S = { view: 'home', q: '', drawer: null, edit: null, rec: null, menu: null, inline: null, expand: null, sort: {} };
 function setView(v) { S.menu = null; S.view = v; S.q = ''; S.expand = null; S.inline = null; UI.view = v; saveUI(); S.sideMob = false; render(); var m = root.querySelector('.content'); if (m) m.scrollTop = 0; }
 
 /* ======================= Render: shell ======================= */
