@@ -2965,8 +2965,34 @@ function qDueAll(days) {
 /* ---------- анкеты через WhatsApp (пилот): ссылка уходит в мессенджер, ответы идут сразу на сервер ---------- */
 function waPhone(ph) { var d = String(ph || '').replace(/\D/g, ''); if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1); if (d.length === 10) d = '7' + d; return d.length >= 11 ? d : ''; }
 function qWaText(p, q, url) { var parts = String(p.d.fio || '').trim().split(/\s+/), nm = parts.length > 1 ? parts.slice(1).join(' ') : (p.d.fio || ''); return LL('Здравствуйте', 'Hello') + (nm ? ', ' + nm : '') + '! ' + LL('Национальный научный онкологический центр просит вас заполнить анкету «', 'The National Research Oncology Centre kindly asks you to complete the questionnaire "') + qShort(q) + LL('». Это займёт около 10 минут. Ответы сразу попадут вашему лечащему врачу: ', '". It takes about 10 minutes. Your answers go directly to your doctor: ') + url; }
-function qSentDays(e) { return e && e.sent && !e.date ? Math.floor((Date.now() - new Date(e.sent).getTime()) / 864e5) : null; }
-function qWaTag(e) { var n = qSentDays(e); if (n === null) return ''; return n >= 7 ? '<span class="tag due" title="' + LL('Анкета не заполнена неделю после отправки', 'Not completed a week after sending') + '">' + LL('не заполнена 7+ дн.: позвоните пациенту', 'no reply 7+ days: call the patient') + '</span>' : '<span class="tag">' + LL('отправлена ', 'sent ') + fmtDate(String(e.sent).slice(0, 10)) + '</span>'; }
+/* ---------- авторассылка: настройки и статусы (статусы пишет рассыльщик в data/s_<eid>) ---------- */
+var AS_DEF = { on: false, hour: 10, remind: 3, escalate: 7, maxLate: 30, consent: 'optout', test: false, wl: '' };
+function asCfg() { return Object.assign({}, AS_DEF, DB.autosend || {}); }
+function asInfo(e) { return e ? ((DB.qsend || {})[e.id] || null) : null; }
+function asRun() { return (DB.qsend || {})._run || null; }
+function qSentAt(e) { if (!e) return ''; var s = asInfo(e), a = e.sent || '', b = s && s.sent && s.st !== 'failed' ? s.sent : ''; return a > b ? a : b; }
+function asWl() { return String(asCfg().wl || '').split(/[,;\n]+/).map(waPhone).filter(Boolean); }
+function asWho(p) { var c = asCfg(); if (!p || (p.d && p.d.vital === 'Умер')) return 'dead'; if (c.consent === 'optin' ? !p.waOk : p.waOff) return 'off'; var ph = waPhone(p.d && p.d.phone); if (c.test && (!ph || asWl().indexOf(ph) < 0)) return 'test'; if (!ph) return 'nophone'; return 'ok'; }
+function asState(p, e) {
+  var c = asCfg(), q = qTpl(e.tid), s = asInfo(e);
+  if (!CLOUD.on || !c.on || e.date || !q || q.clin) return null;
+  if (s && s.st === 'answered') return 'answered';
+  if (qSentAt(e)) return 'sent';
+  var w = asWho(p); if (w !== 'ok') return w;
+  if (s && (s.st === 'failed' || s.st === 'notext' || s.st === 'late')) return s.st;
+  return 'plan';
+}
+function qSentDays(e) { var t0 = qSentAt(e); return e && t0 && !e.date ? Math.floor((Date.now() - new Date(t0).getTime()) / 864e5) : null; }
+function qWaTag(e, p) {
+  var st = p ? asState(p, e) : null, s = asInfo(e), c = asCfg(), esc0 = c.escalate || 7;
+  if (st === 'answered') return '<span class="tag ok">' + LL('ответ получен: см. «Входящие»', 'answer received: see Inbox') + '</span>';
+  var n = qSentDays(e);
+  if (n !== null) return n >= esc0 ? '<span class="tag due" title="' + LL('Анкета не заполнена после отправки', 'Not completed after sending') + '">' + LL('не заполнена ', 'no reply ') + n + LL(' дн.: позвоните пациенту', ' d: call the patient') + '</span>' : '<span class="tag">' + (s && s.by === 'auto' ? LL('отправлена автоматически ', 'auto-sent ') : LL('отправлена ', 'sent ')) + fmtDate(String(qSentAt(e)).slice(0, 10)) + (s && s.rem ? LL(', напоминание ', ', reminder ') + fmtDate(String(s.rem).slice(0, 10)) : '') + '</span>';
+  if (!st) return '';
+  var m = { plan: ['', LL('уйдёт в WhatsApp автоматически ', 'auto WhatsApp on ') + fmtDate(e.due)], nophone: ['due', LL('авторассылка: нет телефона', 'auto-send: no phone')], off: ['', LL('авторассылка отключена для пациента', 'auto-send off for this patient')], test: ['', LL('тестовый режим: номер не в списке', 'test mode: number not listed')], failed: ['due', LL('не удалось отправить: ', 'sending failed: ') + ((s && s.err) || '')], notext: ['due', LL('авторассылка: нет текста анкеты', 'auto-send: questionnaire text missing')], late: ['', LL('давно просрочена: автоматически не отправляется', 'long overdue: not auto-sent')] }[st];
+  return m ? '<span class="tag' + (m[0] ? ' ' + m[0] : '') + '">' + esc(m[1]) + '</span>' : '';
+}
+function qWaTag0(e) { var n = qSentDays(e); if (n === null) return ''; return n >= 7 ? '<span class="tag due" title="' + LL('Анкета не заполнена неделю после отправки', 'Not completed a week after sending') + '">' + LL('не заполнена 7+ дн.: позвоните пациенту', 'no reply 7+ days: call the patient') + '</span>' : '<span class="tag">' + LL('отправлена ', 'sent ') + fmtDate(String(e.sent).slice(0, 10)) + '</span>'; }
 function qWaBtn(p, e) { var q = qTpl(e.tid); if (!CLOUD.on || e.date || !q || q.clin || !can('edit')) return ''; return '<button type="button" class="btn small wa" data-act="qwa" data-pid="' + p.id + '" data-eid="' + e.id + '" title="' + LL('Отправить ссылку на анкету в WhatsApp', 'Send the questionnaire link via WhatsApp') + '">' + ico('send', 14) + (e.sent ? LL('Отправить снова', 'Send again') : 'WhatsApp') + '</button>'; }
 function qWaSend(pid, eid) {
   var p = findPat(pid), e = p && (p.q || []).filter(function (x) { return x.id === eid; })[0]; if (!e) return;
@@ -2983,7 +3009,7 @@ function qWaSend(pid, eid) {
     if (!ph) toast(LL('В карточке нет телефона: выберите контакт в WhatsApp вручную', 'No phone in the record: pick the contact in WhatsApp'));
   }).catch(function (er) { if (w) w.close(); toast(LL('Не удалось создать ссылку: ', 'Could not create link: ') + (er.code || er.message)); });
 }
-function qStatusTag(e) { return qStatusTag0(e) + qWaTag(e); }
+function qStatusTag(e, p) { return qStatusTag0(e) + qWaTag(e, p); }
 function qStatusTag0(e) {
   var st = qStatus(e), q = qTpl(e.tid);
   if (st === 'done' && e.scales && q && q.scales) return '<span class="tag ok">' + LL('Заполнена ', 'Done ') + fmtDate(e.date) + '</span>' + qScalesHTML(q, e.scales, true);
@@ -2998,13 +3024,14 @@ function qCard(p, isNew) {
   if (!list.length) h += '<p class="hint">' + LL('Назначьте анкеты на контрольные сроки (например 3, 6 и 12 месяцев после закрытия стомы) или заполните прямо сейчас на планшете вместе с пациентом.', 'Schedule questionnaires at follow-up points (e.g. 3, 6 and 12 months after stoma closure) or fill one now on a tablet with the patient.') + '</p>';
   else h += '<div class="qlist">' + list.map(function (e) {
     var q = qTpl(e.tid), open = S.qview === e.id;
-    var r = '<div class="qrow"><div class="qn"><b>' + esc(qShort(q)) + '</b>' + (e.label ? '<span>' + esc(e.label) + '</span>' : '') + '</div><div class="qs">' + qStatusTag(e) + '</div><div class="qa">';
+    var r = '<div class="qrow"><div class="qn"><b>' + esc(qShort(q)) + '</b>' + (e.label ? '<span>' + esc(e.label) + '</span>' : '') + '</div><div class="qs">' + qStatusTag(e, p) + '</div><div class="qa">';
     r += e.date ? '<button type="button" class="btn small ghost" data-act="qview" data-id="' + e.id + '">' + (open ? LL('Скрыть ответы', 'Hide answers') : LL('Ответы', 'Answers')) + '</button>' : '<button type="button" class="btn small primary" data-act="qfill" data-pid="' + p.id + '" data-id="' + e.id + '">' + ico('tablet', 15) + LL('Заполнить', 'Fill in') + '</button>' + (CLOUD.on ? '<button type="button" class="btn small" data-act="qlnew" data-id="' + e.tid + '" data-pid="' + p.id + '" data-eid="' + e.id + '">' + ico('ext', 14) + LL('Ссылка пациенту', 'Link for patient') + '</button>' : '') + qWaBtn(p, e);
     r += '<button type="button" class="iconbtn sm" aria-label="' + LL('Удалить', 'Delete') + '" data-act="qdel" data-pid="' + p.id + '" data-id="' + e.id + '">' + ico('x', 15) + '</button></div></div>';
     if (open && q && e.scales) r += qScalesHTML(q, e.scales, false);
     if (open && q) r += '<ol class="qans">' + qVisible(q, e.ans || {}).map(function (it) { var a = (e.ans || {})[it.id]; var txt = !has(a) ? '' : it.type === 'single' ? L(it.opts[+a].t) + (q.score ? ' (' + (it.opts[+a].s || 0) + ')' : '') : it.type === 'multi' ? a.map(function (i) { return L(it.opts[+i].t); }).join(', ') : String(a); return '<li><span>' + esc(L(it.text)) + '</span><b>' + esc(txt || LL('нет ответа', 'no answer')) + '</b></li>'; }).join('') + '</ol>';
     return r;
   }).join('') + '</div>';
+  h += asPatToggle(p);
   h += '<div class="actions qbtns"><button type="button" class="btn" data-act="tntopen" data-pid="' + p.id + '">' + ico('flask', 16) + LL('Набор для исследования TNT', 'TNT study set') + '</button><button type="button" class="btn" data-act="qsched" data-pid="' + p.id + '">' + ico('cal', 16) + LL('Назначить анкеты', 'Schedule') + '</button><button type="button" class="btn" data-act="qnow" data-pid="' + p.id + '">' + ico('tablet', 16) + LL('Заполнить сейчас', 'Fill in now') + '</button></div>';
   return h + '</section>';
 }
@@ -3114,6 +3141,39 @@ function qbSave() {
   var q = qbCompile(b); DB.qtpl = (DB.qtpl || []).filter(function (x) { return x.id !== q.id; }).concat([q]);
   S.qb = null; save(); toast(LL('Анкета сохранена', 'Questionnaire saved')); render();
 }
+function asPatToggle(p) {
+  var c = asCfg(); if (!CLOUD.on || !c.on) return '';
+  var on = c.consent === 'optin' ? !!p.waOk : !p.waOff, ph = waPhone(p.d.phone);
+  return '<label class="chk wa-opt"><input type="checkbox" data-act="waopt" data-pid="' + p.id + '"' + (on ? ' checked' : '') + (can('edit') ? '' : ' disabled') + '><span><b>' + (c.consent === 'optin' ? LL('Пациент согласен получать анкеты в WhatsApp', 'Patient consents to questionnaires via WhatsApp') : LL('Отправлять анкеты в WhatsApp автоматически', 'Send questionnaires via WhatsApp automatically')) + '</b><em>' + (ph ? '+' + ph : LL('в карточке нет телефона', 'no phone in the record')) + '</em></span></label>';
+}
+function asStatusHTML() {
+  var c = asCfg(), r = asRun(), adm = SESSION && SESSION.admin;
+  if (!CLOUD.on) return '';
+  var h = '<section class="card asbox"><h3>' + ico('send', 18) + LL('Авторассылка анкет в WhatsApp', 'Automatic WhatsApp questionnaires') + '<span class="tag' + (c.on ? ' ok' : '') + '">' + (c.on ? (c.test ? LL('включена, тестовый режим', 'on, test mode') : LL('включена', 'on')) : LL('выключена', 'off')) + '</span></h3>';
+  h += '<p class="hint">' + LL('В день контрольного срока (с ', 'On the due date (from ') + c.hour + ':00) ' + LL('рассыльщик сам отправляет пациенту ссылку на анкету, без участия врача. ', 'the sender messages the patient a link, no clicks needed. ') + (c.remind ? LL('Если не заполнена, через ', 'If not completed, a reminder after ') + c.remind + LL(' дн. уходит напоминание. ', ' d. ') : '') + LL('Через ', 'After ') + c.escalate + LL(' дн. без ответа вы получите уведомление позвонить пациенту. Ответы идут сразу в базу, минуя мессенджер.', ' d without a reply you are notified to call. Answers go straight to the database, not through the messenger.') + '</p>';
+  var age = r && r.at ? (Date.now() - new Date(r.at).getTime()) / 36e5 : null;
+  h += '<p class="as-run' + (c.on && (age === null || age > 26) ? ' bad' : '') + '">' + (r && r.at ? LL('Рассыльщик: последняя проверка ', 'Sender: last check ') + fmtDate(String(r.at).slice(0, 10)) + ' ' + String(new Date(r.at).toTimeString()).slice(0, 5) + (r.day ? LL(', за день отправлено: ', ', sent that day: ') + (r.sent || 0) + LL(', напоминаний: ', ', reminders: ') + (r.rem || 0) : '') + (r.err ? LL('. Ошибка: ', '. Error: ') + esc(r.err) : '') : LL('Рассыльщик ещё не подключён: его нужно один раз запустить на постоянно включённом компьютере или сервере центра (папка autosend, инструкция внутри).', 'Sender not connected yet: run it once on an always-on computer or the centre server (autosend folder, instructions inside).')) + (c.on && age !== null && age > 26 ? LL(' Больше суток нет связи с рассыльщиком: проверьте компьютер, на котором он работает.', ' No contact for over a day: check the computer it runs on.') : '') + '</p>';
+  if (adm) h += '<div class="actions"><button type="button" class="btn" data-act="asedit">' + ico('wand', 15) + LL('Настроить', 'Settings') + '</button></div>';
+  return h + '</section>';
+}
+function renderAsEdit() {
+  var c = S.asEdit;
+  function opts(k, arr) { return '<div class="chips">' + arr.map(function (v) { return '<button type="button" class="chip' + (String(typeof c[k] === 'boolean' ? +c[k] : c[k]) === String(v[0]) ? ' on' : '') + '" data-act="asset" data-k="' + k + '" data-v="' + v[0] + '">' + v[1] + '</button>'; }).join('') + '</div>'; }
+  var h = '<div class="dim" data-act="asclose"></div><section class="modal xmodal" role="dialog" aria-modal="true"><div class="dhead"><div><div class="dh-kicker">WhatsApp</div><div class="dh-title">' + LL('Авторассылка анкет', 'Automatic questionnaires') + '</div></div><button type="button" class="iconbtn" data-act="asclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody">';
+  h += '<div class="xgrp"><div class="xlab">' + LL('Авторассылка', 'Automatic sending') + '</div>' + opts('on', [[1, LL('Включена: анкеты уходят сами в день срока', 'On: questionnaires go out on the due date')], [0, LL('Выключена', 'Off')]]) + '</div>';
+  h += '<div class="xgrp"><div class="xlab">' + LL('Время отправки', 'Sending time') + '</div>' + opts('hour', [9, 10, 11, 12, 15, 17].map(function (x) { return [x, x + ':00']; })) + '</div>';
+  h += '<div class="xgrp"><div class="xlab">' + LL('Напоминание пациенту', 'Reminder to patient') + '</div>' + opts('remind', [[0, LL('не отправлять', 'none')], [2, LL('через 2 дня', 'after 2 days')], [3, LL('через 3 дня', 'after 3 days')], [5, LL('через 5 дней', 'after 5 days')]]) + '</div>';
+  h += '<div class="xgrp"><div class="xlab">' + LL('Уведомить врача позвонить пациенту', 'Notify staff to call the patient') + '</div>' + opts('escalate', [[5, LL('через 5 дней', 'after 5 days')], [7, LL('через 7 дней', 'after 7 days')], [10, LL('через 10 дней', 'after 10 days')], [14, LL('через 14 дней', 'after 14 days')]]) + '</div>';
+  h += '<div class="xgrp"><div class="xlab">' + LL('Уже просроченные анкеты', 'Already overdue questionnaires') + '</div>' + opts('maxLate', [[7, LL('отправлять, если просрочка до 7 дней', 'send if up to 7 days late')], [30, LL('до 30 дней', 'up to 30 days')], [90, LL('до 90 дней', 'up to 90 days')]]) + '</div>';
+  h += '<div class="xgrp"><div class="xlab">' + LL('Согласие пациента', 'Patient consent') + '</div>' + opts('consent', [['optout', LL('согласие в информированном согласии; можно отключить в карточке', 'covered by admission consent; can be switched off per patient')], ['optin', LL('отправлять только при отметке согласия в карточке', 'send only when consent is ticked in the record')]]) + '</div>';
+  h += '<div class="xgrp"><div class="xlab">' + LL('Тестовый режим', 'Test mode') + '</div>' + opts('test', [[0, LL('Выключен', 'Off')], [1, LL('Только на номера из списка (тестовые карточки с телефонами врачей)', 'Only to listed numbers (test records with staff phones)')]]) + '</div>';
+  if (c.test) h += '<textarea class="inp" rows="2" data-sb="asEdit.wl" placeholder="+7 701 000 00 00, +7 702 000 00 00">' + esc(c.wl || '') + '</textarea>';
+  h += '<div class="xgrp"><div class="xlab">' + LL('Текст сообщения (шаблон, утверждается в WhatsApp Business)', 'Message text (template approved in WhatsApp Business)') + '</div><p class="hint">' + esc(AS_TXT[0]) + '</p><p class="hint">' + esc(AS_TXT[1]) + '</p></div>';
+  h += '</div><div class="dfoot"><div></div><div class="actions"><button type="button" class="btn" data-act="asclose">' + t('b.cancel') + '</button><button type="button" class="btn primary" data-act="assave">' + t('b.save') + '</button></div></div></section>';
+  return h;
+}
+var AS_TXT = ['Здравствуйте, {{имя}}! Национальный научный онкологический центр приглашает вас заполнить короткую анкету о самочувствии. Это займёт около 10 минут, ответы получит ваш лечащий врач. [Кнопка: Заполнить анкету]', 'Здравствуйте, {{имя}}! Напоминаем об анкете о самочувствии от Национального научного онкологического центра. Ваши ответы помогают врачу следить за результатами лечения. [Кнопка: Заполнить анкету]'];
+function qSnapAll() { var o = {}; qTpls().forEach(function (q0) { if (q0.clin) { o[q0.id] = { clin: true }; return; } if (!qTextReady(q0)) { o[q0.id] = { notext: true }; return; } var q = qTpl(q0.id); o[q0.id] = { tpl: qlSnapshot(q), short: qShort(q) }; }); return o; }
 function renderQPage() {
   var due = qDueAll(30), tab = UI.qtab || 'due';
   var h = '<div class="head"><div><div class="kicker">' + LL('Наука', 'Research') + '</div><h1>' + LL('Анкеты пациентов', 'Patient questionnaires') + '</h1></div><div class="actions"><button type="button" class="btn primary" data-act="qbnew">' + ico('plus', 16) + LL('Новая анкета', 'New questionnaire') + '</button></div></div>';
@@ -3135,7 +3195,8 @@ function renderQPage() {
     });
     return h;
   }
-  h += '<div class="tablewrap">' + (due.length ? '<table class="grid"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + LL('Анкета', 'Questionnaire') + '</th><th>' + LL('Срок', 'Time point') + '</th><th>' + LL('Заполнить до', 'Due') + '</th><th></th></tr></thead><tbody>' + due.map(function (x) { return '<tr data-act="openp" data-id="' + x.p.id + '" tabindex="0"><td class="mono">' + x.p.id + '</td><td class="strong">' + esc(pName(x.p)) + '</td><td>' + esc(qShort(qTpl(x.e.tid))) + '</td><td>' + esc(x.e.label || '') + '</td><td>' + (x.n < 0 ? '<span class="tag due">' + fmtDate(x.e.due) + ' · ' + daysLabel(x.n) + '</span>' : '<span class="tag">' + fmtDate(x.e.due) + ' · ' + daysLabel(x.n) + '</span>') + '</td><td><div class="qa"><button type="button" class="btn small primary" data-act="qfill" data-pid="' + x.p.id + '" data-id="' + x.e.id + '">' + ico('tablet', 15) + LL('Заполнить', 'Fill in') + '</button>' + qWaBtn(x.p, x.e) + '</div>' + qWaTag(x.e) + '</td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">' + LL('На ближайшие 30 дней анкет нет. Назначить анкету можно в карточке пациента, раздел «После операции».', 'Nothing due in the next 30 days. Schedule questionnaires in the patient card, After surgery section.') + '</div>') + '</div>';
+  h += '<div class="pad">' + asStatusHTML() + '</div>';
+  h += '<div class="tablewrap">' + (due.length ? '<table class="grid"><thead><tr><th>ID</th><th>' + t('col.fio') + '</th><th>' + LL('Анкета', 'Questionnaire') + '</th><th>' + LL('Срок', 'Time point') + '</th><th>' + LL('Заполнить до', 'Due') + '</th><th></th></tr></thead><tbody>' + due.map(function (x) { return '<tr data-act="openp" data-id="' + x.p.id + '" tabindex="0"><td class="mono">' + x.p.id + '</td><td class="strong">' + esc(pName(x.p)) + '</td><td>' + esc(qShort(qTpl(x.e.tid))) + '</td><td>' + esc(x.e.label || '') + '</td><td>' + (x.n < 0 ? '<span class="tag due">' + fmtDate(x.e.due) + ' · ' + daysLabel(x.n) + '</span>' : '<span class="tag">' + fmtDate(x.e.due) + ' · ' + daysLabel(x.n) + '</span>') + '</td><td><div class="qa"><button type="button" class="btn small primary" data-act="qfill" data-pid="' + x.p.id + '" data-id="' + x.e.id + '">' + ico('tablet', 15) + LL('Заполнить', 'Fill in') + '</button>' + qWaBtn(x.p, x.e) + '</div>' + qWaTag(x.e, x.p) + '</td></tr>'; }).join('') + '</tbody></table>' : '<div class="empty">' + LL('На ближайшие 30 дней анкет нет. Назначить анкету можно в карточке пациента, раздел «После операции».', 'Nothing due in the next 30 days. Schedule questionnaires in the patient card, After surgery section.') + '</div>') + '</div>';
   return h;
 }
 
@@ -3638,9 +3699,10 @@ function notifs() {
   var out = [], td = isoOf(new Date()), tm = isoOf(addDays(td, 1));
   apprMine().forEach(function (r) { out.push({ id: 'ap:' + r.id, ic: 'check', lvl: 'soon', t: (r.kind === 'study' ? LL('Одобрить исследование: ', 'Approve study: ') : LL('Одобрить регистр: ', 'Approve registry: ')) + regName(r), s: LL('создал(а) ', 'by ') + (r.appr.by || ''), go: ['v', 'appr'] }); });
   fuDueAll().forEach(function (x) { if (x.f.st === 'overdue') out.push({ id: 'fu:' + x.p.id + ':' + x.f.key, ic: 'clock', lvl: 'due', t: LL('Просрочен контроль: ', 'Follow-up overdue: ') + x.f.label, s: pName(x.p) + ' · ' + daysLabel(x.f.days), go: ['p', x.p.id] }); });
-  qDueAll(3).forEach(function (x) { out.push({ id: 'q:' + x.p.id + ':' + x.e.id, ic: 'clipboard', lvl: x.n < 0 ? 'due' : 'soon', t: LL('Анкета ', 'Questionnaire ') + qShort(qTpl(x.e.tid)) + (x.n < 0 ? LL(' просрочена', ' overdue') : LL(' к заполнению', ' due')), s: pName(x.p) + ' · ' + daysLabel(x.n), go: ['p', x.p.id] }); });
+  qDueAll(3).forEach(function (x) { if (asState(x.p, x.e) === 'plan' || asState(x.p, x.e) === 'sent') return; out.push({ id: 'q:' + x.p.id + ':' + x.e.id, ic: 'clipboard', lvl: x.n < 0 ? 'due' : 'soon', t: LL('Анкета ', 'Questionnaire ') + qShort(qTpl(x.e.tid)) + (x.n < 0 ? LL(' просрочена', ' overdue') : LL(' к заполнению', ' due')), s: pName(x.p) + ' · ' + daysLabel(x.n), go: ['p', x.p.id] }); });
   ([]).forEach(function (r) { if (r.done !== 'Заполнено' && r.contact && r.contact <= td) out.push({ id: 'rc:' + r.id, ic: 'flask', lvl: r.contact < td ? 'due' : 'soon', t: LL('RedCap: связаться с пациентом', 'RedCap: contact the patient'), s: (r.fio || '') + ' · ' + fmtDate(r.contact), go: ['r', 'redcap', r.id] }); });
-  DB.patients.forEach(function (p) { (p.q || []).forEach(function (e) { var n = qSentDays(e); if (n !== null && n >= 7) out.push({ id: 'qw:' + p.id + ':' + e.id + ':' + String(e.sent).slice(0, 10), ic: 'phone', lvl: 'due', t: LL('Анкета не заполнена ', 'Questionnaire not completed ') + n + LL(' дн.: свяжитесь с пациентом', ' d: contact the patient'), s: pName(p) + ' · ' + qShort(qTpl(e.tid)) + (p.d.phone ? ' · ' + p.d.phone : ''), go: ['p', p.id] }); }); });
+  var asc = asCfg(); DB.patients.forEach(function (p) { (p.q || []).forEach(function (e) { var ast = asState(p, e); if (ast === 'failed' || ast === 'notext' || (ast === 'nophone' && daysTo(e.due) !== null && daysTo(e.due) <= 0)) out.push({ id: 'qf:' + p.id + ':' + e.id + ':' + ast, ic: 'phone', lvl: 'due', t: ast === 'nophone' ? LL('Анкету не отправить: нет телефона', 'Cannot send questionnaire: no phone') : ast === 'notext' ? LL('Анкету не отправить: нет текста анкеты', 'Cannot send: questionnaire text missing') : LL('Анкета не отправлена в WhatsApp', 'WhatsApp sending failed'), s: pName(p) + ' · ' + qShort(qTpl(e.tid)), go: ['p', p.id] }); var n = qSentDays(e); if (n !== null && n >= (asc.escalate || 7) && ast !== 'answered') out.push({ id: 'qw:' + p.id + ':' + e.id + ':' + String(qSentAt(e)).slice(0, 10), ic: 'phone', lvl: 'due', t: LL('Анкета не заполнена ', 'Questionnaire not completed ') + n + LL(' дн.: свяжитесь с пациентом', ' d: contact the patient'), s: pName(p) + ' · ' + qShort(qTpl(e.tid)) + (p.d.phone ? ' · ' + p.d.phone : ''), go: ['p', p.id] }); }); });
+  if (CLOUD.on && asc.on && SESSION && SESSION.admin) { var rr = asRun(), ag = rr && rr.at ? (Date.now() - new Date(rr.at).getTime()) / 36e5 : null; if (ag === null || ag > 26) out.push({ id: 'qrun:' + td, ic: 'alert', lvl: 'due', t: LL('Авторассылка анкет не работает', 'Automatic questionnaires are not running'), s: ag === null ? LL('рассыльщик ещё ни разу не запускался', 'the sender has never run') : LL('больше суток нет связи с рассыльщиком', 'no contact with the sender for over a day'), go: ['v', 'q'] }); }
   (DB.cols.planner || []).forEach(function (r) { if ((r.surgeryDate === tm || r.surgeryDate === td) && r.status !== 'Отменено' && r.status !== 'Завершено') out.push({ id: 'op:' + r.id + ':' + r.surgeryDate, ic: 'knife', lvl: 'info', t: (r.surgeryDate === td ? LL('Операция сегодня: ', 'Surgery today: ') : LL('Операция завтра: ', 'Surgery tomorrow: ')) + (r.fio || ''), s: [r.dx, r.surgeon ? ov(r.surgeon) : ''].filter(Boolean).join(' · '), go: ['r', 'planner', r.id] }); });
   (DB.cols.mdt || []).forEach(function (r) { if (r.date === td && mdtWaiting(r)) out.push({ id: 'mdt:' + r.id, ic: 'mdt', lvl: 'info', t: LL('Сегодня на МДГ: ', 'At MDT today: ') + (r.fio || ''), s: r.dx || '', go: ['r', 'mdt', r.id] }); });
   studies().forEach(function (r) {
@@ -3784,7 +3846,8 @@ function cloudDocs() {
   DB.registries.forEach(function (r) { m['g_' + r.id] = r; });
   (DB.pending || []).forEach(function (r) { m['x_' + r.id] = r; });
   Object.keys(DB.ms || {}).forEach(function (sid) { var x = DB.ms[sid]; ['papers', 'secs', 'lib', 'cm', 'zcols'].forEach(function (g2) { Object.keys(x[g2] || {}).forEach(function (k) { m['m_' + sid + '__' + g2 + '__' + k] = x[g2][k]; }); }); });
-  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, qtext: DB.qtext, dictOv: DB.dictOv, studySeq: DB.studySeq, importedAt: DB.importedAt };
+  if (CLOUD.on) m.qsnap = qSnapAll();
+  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, qtext: DB.qtext, dictOv: DB.dictOv, autosend: DB.autosend, studySeq: DB.studySeq, importedAt: DB.importedAt };
   var out = {}; Object.keys(m).forEach(function (k) { out[k.replace(/\//g, '_')] = JSON.stringify(m[k]); }); return out;
 }
 function cloudPush() {
@@ -3793,7 +3856,7 @@ function cloudPush() {
   CLOUD.timer = setTimeout(function () {
     var cur = cloudDocs(), ops = [];
     Object.keys(cur).forEach(function (k) { if (CLOUD.cache[k] !== cur[k]) ops.push(['set', k, cur[k]]); });
-    Object.keys(CLOUD.cache).forEach(function (k) { if (!(k in cur)) ops.push(['del', k]); });
+    Object.keys(CLOUD.cache).forEach(function (k) { if (!(k in cur) && k.indexOf('s_') !== 0) ops.push(['del', k]); });
     if (!ops.length) return;
     for (var i = 0; i < ops.length; i += 400) {
       var b = CLOUD.db.batch();
@@ -3808,6 +3871,8 @@ function dbFromDocs(map) {
   Object.keys(map).forEach(function (k) {
     var v; try { v = JSON.parse(map[k]); } catch (e) { return; }
     if (k === 'meta') { Object.keys(v).forEach(function (x) { db[x] = v[x]; }); return; }
+    if (k === 'qsnap') return;
+    if (k.indexOf('s_') === 0) { db.qsend = db.qsend || {}; db.qsend[k.slice(2)] = v; return; }
     if (k.indexOf('p_') === 0) db.patients.push(v);
     else if (k.indexOf('g_') === 0) db.registries.push(v);
     else if (k.indexOf('x_') === 0) db.pending.push(v);
@@ -3831,6 +3896,7 @@ function cloudListen() {
     var busy = S.drawer || S.rec || S.edit || S.enr || S.fill || S.msEdit || S.msCite || S.cmNew || S.zot;
     DB = migrate(dbFromDocs(map));
     if (DB._dirty) { delete DB._dirty; if (can('edit')) save(); }
+    else if (can('edit') && !isStudent() && CLOUD.cache.qsnap !== JSON.stringify(qSnapAll())) cloudPush();
     try { localStorage.setItem(KEY_CLOUD, JSON.stringify(DB)); } catch (e) {}
     if (!busy) render(); else CLOUD.stale = true;
   }, function (e) { CLOUD.err = e.code || e.message; render(); });
@@ -4933,6 +4999,7 @@ function render() {
   if (!S.drawer && S.wipeAsk !== false && needWipe()) h += renderWipe();
   if (S.rec) h += renderRecord();
   if (S.qlink) h += renderQLink();
+  if (S.asEdit) h += renderAsEdit();
   if (S.edit) h += renderEditor();
   if (S.pick) h += renderPick();
   if (S.xport) h += renderExport();
@@ -5072,7 +5139,7 @@ document.addEventListener('click', function (ev) {
   if (S.menu && !ev.target.closest('.dd')) { S.menu = null; if (!tg) { render(); return; } }
   if (!tg) { if (S.inline && !ev.target.closest('.inline')) { S.inline = null; render(); } return; }
   var a = tg.getAttribute('data-act');
-  if (a === 'search' || (tg.tagName === 'INPUT' && a !== 'segset')) return;
+  if (a === 'search' || (tg.tagName === 'INPUT' && a !== 'segset' && a !== 'waopt')) return;
   var g = function (x) { return tg.getAttribute('data-' + x); };
   var NEED = { qlnew: 'edit', qllink: 'edit', qldel: 'edit', savep: 'edit', saverec: 'edit', delp: 'delete', delrec: 'delete', esave: 'edit', edelete: 'delete', enrgo: 'edit', enroll: 'edit', rand: 'rand', unlockf: 'unlock', impgo: 'edit', imp: 'edit', newp: 'edit', newrec: 'edit', newreg: 'edit', newstudy: 'edit', qbsave: 'edit', qbnew: 'edit', fillsave: 'edit', cmtadd: 'edit', labsdone: 'edit', reset: 'admin', restore: 'admin', tplsave: 'edit', qsched: 'edit', qnow: 'edit', toreg: 'edit', addlinked: 'edit' };
   if (msAct(a, g)) return;
@@ -5353,6 +5420,11 @@ document.addEventListener('click', function (ev) {
     case 'theme': UI.theme = themeCur() === 'dark' ? 'light' : 'dark'; saveUI(); themeApply(); render(); break;
     case 'qlnew': qlCreate(g('id'), g('pid'), g('eid')); break;
     case 'qwa': qWaSend(g('pid'), g('eid')); break;
+    case 'waopt': { var pw = g('pid'), cw = asCfg(), p0 = findPat(pw); if (!p0) break; var kw = cw.consent === 'optin' ? 'waOk' : 'waOff', vw = !p0[kw]; withPat(pw, function (x) { x[kw] = vw; }); save(); render(); break; }
+    case 'asedit': S.asEdit = clone(asCfg()); render(); break;
+    case 'asclose': S.asEdit = null; render(); break;
+    case 'asset': { var ak = g('k'), av = g('v'); S.asEdit[ak] = (ak === 'on' || ak === 'test') ? av === '1' : /^\d+$/.test(av) ? +av : av; render(); break; }
+    case 'assave': { var ae = S.asEdit; ae.by = me(); ae.at = nowIso(); DB.autosend = ae; S.asEdit = null; save(); toast(ae.on ? LL('Авторассылка включена', 'Automatic sending on') : LL('Авторассылка выключена', 'Automatic sending off')); render(); break; }
     case 'qlclose': S.qlink = null; render(); break;
     case 'qlcopy': { var qu = S.qlink.url; if (navigator.clipboard) navigator.clipboard.writeText(qu).then(function () { toast(LL('Ссылка скопирована', 'Link copied')); }); else { var qi = document.getElementById('qlurl'); qi.select(); document.execCommand('copy'); toast(LL('Ссылка скопирована', 'Link copied')); } break; }
     case 'qlshare': navigator.share({ title: S.qlink.name, url: S.qlink.url }).catch(function () {}); break;

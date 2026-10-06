@@ -68,6 +68,7 @@ input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(-
 <script>
 (function () {
   var app = document.getElementById('app'), tok = (location.hash || '').replace(/^#/, '').trim();
+  if (!tok) { var mq = /[?&]t=([A-Za-z0-9]+)/.exec(location.search); if (mq) { tok = mq[1]; try { history.replaceState(null, '', location.pathname + '#' + tok); } catch (e) {} } }
   var LANG = 'ru';
   var S = { link: null, ans: {}, fio: '', dob: '', phone: '', ok: false, sending: false, err: '' };
   function L(x) { return Array.isArray(x) ? (LANG === 'en' ? (x[1] || x[0]) : x[0]) : (x || ''); }
