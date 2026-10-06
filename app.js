@@ -4986,7 +4986,7 @@ function render() {
   document.documentElement.lang = LANG;
   document.title = (SESSION ? viewTitle() + ' · ' : '') + 'AddAll · ' + LL('Колоректальный регистр ННОЦ', 'NROC colorectal registry');
   var keep = {};
-  ['.dbody', '.content', '.tablewrap', '.side-in', '.fill-body', '.aip-body', '.cmd-l'].forEach(function (s) { keep[s] = [].map.call(root.querySelectorAll(s), function (el) { return el.scrollTop; }); });
+  ['.dbody', '.content', '.tablewrap', '.side-in', '.fill-body', '.aip-body', '.cmd-l', '.ns-b'].forEach(function (s) { keep[s] = [].map.call(root.querySelectorAll(s), function (el) { return el.scrollTop; }); });
   var fa = document.activeElement, faId = fa && fa.id && (fa.id === 'ai-in' || fa.id === 'cmd-in') ? fa.id : null, faPos = faId ? fa.selectionStart : 0, rtc = fa && fa.id === 'msed' && fa.isContentEditable ? rtCaretGet(fa) : null;
   if (typeof selPopHide === 'function') selPopHide();
   document.body.classList.toggle('ai-open', !!(SESSION && UI.aip));
@@ -5150,7 +5150,13 @@ document.addEventListener('click', function (ev) {
   if (msAct(a, g)) return;
   if (NEED[a] && !can(NEED[a])) { toast(LL('Недостаточно прав для роли «', 'Not allowed for role "') + (SESSION ? roleName(SESSION.role) : '') + LL('»', '"')); return; }
   switch (a) {
-    case 'nstog': S.nsOpen = S.nsOpen || {}; S.nsOpen[g('k')] = g('o') !== '1'; render(); break;
+    case 'nstog': {
+      var nk = g('k'), now = g('o') !== '1'; S.nsOpen = S.nsOpen || {}; S.nsOpen[nk] = now;
+      tg.setAttribute('data-o', now ? '1' : '0'); tg.setAttribute('aria-expanded', now); tg.classList.toggle('open', now);
+      if (tg.classList.contains('ns-gh')) tg.parentNode.classList.toggle('open', now);
+      [].forEach.call(root.querySelectorAll('.ns-col'), function (c) { if (c.getAttribute('data-col') === nk) c.classList.toggle('open', now); });
+      break;
+    }
     case 'side': S.sideMob = !S.sideMob; S.menu = null; render(); break;
     case 'authshow': S.lpop = null; S.auth = S.auth || { mode: 'login', role: 'resident' }; S.auth.show = true; render(); break;
     case 'lpop': S.lpop = g('id'); render(); var lb = root.querySelector('.lpop .lp-b'); if (lb) lb.scrollTop = 0; break;
@@ -8347,7 +8353,7 @@ function renderNavSheet() {
       if (!kidsL.length) { h += navItemHTML(x); i++; continue; }
       var k = 'i:' + (x.v || x.label), open = isOpen(k, kidsL.some(function (z) { return z.v && z.v === S.view; }));
       h += '<div class="ns-row">' + navItemHTML(x) + car(k, open) + '</div>';
-      if (open) h += '<div class="ns-kids">' + items(kidsL) + '</div>';
+      h += '<div class="ns-col' + (open ? ' open' : '') + '" data-col="' + esc(k) + '"><div>' + items(kidsL) + '</div></div>';
       i = j;
     }
     return h;
@@ -8355,7 +8361,7 @@ function renderNavSheet() {
   return '<div class="dim" data-act="side"></div><aside class="nsheet" aria-label="' + t('a11y.sections') + '"><div class="ns-h">' + aaMark(34) + aaWord() + '<b>' + LL('Колоректальный сектор', 'Colorectal unit') + '</b><button type="button" class="iconbtn" data-act="side" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="ns-b">' + navGroups().map(function (g) {
     if (g.v) return navItemHTML({ v: g.v, icon: g.icon, label: g.label });
     var k = 'g:' + g.id, open = isOpen(k, g.items.some(function (x) { return x.v && x.v === S.view; })), badge = g.items.reduce(function (a, x) { return a + (+x.badge || 0); }, 0);
-    return '<div class="ns-g' + (open ? ' open' : '') + '"><button type="button" class="ns-gh" data-act="nstog" data-k="' + k + '" data-o="' + (open ? 1 : 0) + '" aria-expanded="' + open + '">' + ico(g.icon, 16) + '<span>' + esc(g.label) + '</span>' + (badge ? '<i class="badge">' + badge + '</i>' : '') + ico('down', 16) + '</button>' + (open ? '<div class="ns-gb">' + items(g.items) + '</div>' : '') + '</div>';
+    return '<div class="ns-g' + (open ? ' open' : '') + '"><button type="button" class="ns-gh" data-act="nstog" data-k="' + k + '" data-o="' + (open ? 1 : 0) + '" aria-expanded="' + open + '">' + ico(g.icon, 16) + '<span>' + esc(g.label) + '</span>' + (badge ? '<i class="badge">' + badge + '</i>' : '') + ico('down', 16) + '</button>' + '<div class="ns-col' + (open ? ' open' : '') + '" data-col="' + k + '"><div class="ns-gb">' + items(g.items) + '</div></div></div>';
   }).join('') + '</div></aside>';
 }
 function renderTop2() {
