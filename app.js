@@ -1033,14 +1033,19 @@ function dfltStay(r) { var d = dfltOf(); return inRange(r.date, d.aF, d.aT) && i
 function patStays(p) { var sn = nameTokens(p.d.fio)[0]; return (DB.cols.planner || []).filter(function (r) { return r.status !== 'Отменено' && (r.pid ? r.pid === p.id : !!sn && nameTokens(r.fio)[0] === sn); }); }
 function dfltPat(p) { return !dfltOn() || patStays(p).some(dfltStay) || ((p.d.admDate || p.d.disDate) && dfltStay({ date: p.d.admDate, discharge: p.d.disDate })); }
 function dfltRec(k, r) { if (!dfltOn()) return true; if (k === 'planner') return dfltStay(r); var p = r.pid ? DB.patients.filter(function (x) { return x.id === r.pid; })[0] : null; if (!p && r.fio) { var sn = nameTokens(r.fio)[0]; p = DB.patients.filter(function (x) { return nameTokens(x.d.fio)[0] === sn; })[0]; } return p ? dfltPat(p) : false; }
+function inWardNow(p) { var td = isoOf(new Date()); if (patStays(p).some(function (r) { return inWard(r, td); })) return true; var a = p.d.admDate, dd = p.d.disDate; return !!a && a <= td && (dd ? dd >= td : ddays(a, td) <= 60); }
+function patPhase(p) { var td = isoOf(new Date()); if (inWardNow(p)) return 'ward'; return p.d.date && p.d.date <= td ? 'post' : 'pre'; }
 function stagesDone(p) { var f = fuList(p); return f.length > 0 && f.every(function (x) { return x.st === 'done'; }) && !(p.q || []).some(function (e) { return !e.date; }); }
 function renderDateFilters(withStage) {
-  var d = dfltOf(), fl = fltOf(), any = dfltOn() || (withStage && fl.stg);
+  var d = dfltOf(), fl = fltOf(), any = dfltOn() || (withStage && (fl.stg || fl.ph));
   function di(id, ph) { return '<input type="date" class="fdate-i' + (d[id] ? ' on' : '') + '" data-act="dflt" data-id="' + id + '" value="' + esc(d[id] || '') + '" aria-label="' + ph + '" title="' + ph + '">'; }
   var h = '<div class="filters fdates" role="group" aria-label="' + LL('Фильтры по датам', 'Date filters') + '"><span class="flabel">' + ico('cal', 15) + LL('Даты', 'Dates') + '</span>';
   h += '<span class="fdate"><b>' + LL('Поступление', 'Admission') + '</b>' + di('aF', LL('с', 'from')) + '<i>–</i>' + di('aT', LL('по', 'to')) + '</span>';
   h += '<span class="fdate"><b>' + LL('Выписка', 'Discharge') + '</b>' + di('dF', LL('с', 'from')) + '<i>–</i>' + di('dT', LL('по', 'to')) + '</span>';
-  if (withStage) h += '<label class="fsel' + (fl.stg ? ' on' : '') + '"><span class="sr">' + LL('Этапы', 'Stages') + '</span><select data-act="flt" data-id="stg"><option value="">' + LL('Этапы: любые', 'Stages: any') + '</option><option value="done"' + (fl.stg === 'done' ? ' selected' : '') + '>' + LL('Этапы: все завершены', 'Stages: all completed') + '</option><option value="open"' + (fl.stg === 'open' ? ' selected' : '') + '>' + LL('Этапы: не завершены', 'Stages: not completed') + '</option></select></label>';
+  if (withStage) {
+    h += '<label class="fsel' + (fl.ph ? ' on' : '') + '"><span class="sr">' + LL('Этап лечения', 'Treatment stage') + '</span><select data-act="flt" data-id="ph"><option value="">' + LL('Этап: любой', 'Stage: any') + '</option>' + [['pre', LL('Этап: до операции', 'Stage: before surgery')], ['ward', LL('Этап: сейчас в стационаре', 'Stage: in hospital now')], ['post', LL('Этап: после операции', 'Stage: after surgery')]].map(function (o) { return '<option value="' + o[0] + '"' + (fl.ph === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>';
+    h += '<label class="fsel' + (fl.stg ? ' on' : '') + '"><span class="sr">' + LL('Контроли наблюдения', 'Follow-up checks') + '</span><select data-act="flt" data-id="stg"><option value="">' + LL('Контроли: любые', 'Follow-up: any') + '</option><option value="done"' + (fl.stg === 'done' ? ' selected' : '') + '>' + LL('Контроли: все выполнены', 'Follow-up: all done') + '</option><option value="open"' + (fl.stg === 'open' ? ' selected' : '') + '>' + LL('Контроли: есть невыполненные', 'Follow-up: some pending') + '</option></select></label>';
+  }
   if (any) h += '<button type="button" class="btn small ghost" data-act="dfltreset">' + LL('Сбросить даты', 'Clear dates') + '</button>';
   return h + '</div>';
 }
@@ -1150,6 +1155,7 @@ function listForReg() {
   FILTERS.forEach(function (g) { var v = fl[g.id]; if (!v) return; var o = g.opts.filter(function (x) { return x[0] === v; })[0]; if (o) list = list.filter(function (p) { return o[2](p.d); }); });
   if (dfltOn()) list = list.filter(dfltPat);
   if (fl.stg) list = list.filter(function (p) { return stagesDone(p) === (fl.stg === 'done'); });
+  if (fl.ph) list = list.filter(function (p) { return patPhase(p) === fl.ph; });
   var q = S.q.trim().toLowerCase();
   if (q) list = list.filter(function (p) { return (p.id + ' ' + (p.d.fio || '') + ' ' + (p.d.ib || '') + ' ' + (p.d.iin || '') + ' ' + (p.d.loc || '') + ' ' + (p.d.proc || '')).toLowerCase().indexOf(q) >= 0; });
   return { reg: reg, list: list };
@@ -5182,8 +5188,8 @@ document.addEventListener('click', function (ev) {
     case 'newreg': openEditor(null); break;
     case 'newstudy': openEditor(null, 'study'); break;
     case 'tog': UI.open = UI.open || {}; UI.open[g('id')] = !(g('id') === 'studies' ? UI.open.studies !== false : isOpen(g('id'))); saveUI(); render(); break;
-    case 'fltreset': var stg0 = fltOf().stg; UI.fltBy[S.view] = {}; if (stg0) fltOf().stg = stg0; saveUI(); render(); break;
-    case 'dfltreset': UI.dfltBy = UI.dfltBy || {}; UI.dfltBy[S.view] = {}; delete fltOf().stg; saveUI(); render(); break;
+    case 'fltreset': var stg0 = fltOf().stg, ph0 = fltOf().ph; UI.fltBy[S.view] = {}; if (stg0) fltOf().stg = stg0; if (ph0) fltOf().ph = ph0; saveUI(); render(); break;
+    case 'dfltreset': UI.dfltBy = UI.dfltBy || {}; UI.dfltBy[S.view] = {}; delete fltOf().stg; delete fltOf().ph; saveUI(); render(); break;
     case 'editreg': openEditor(g('id')); break;
     case 'eclose': S.edit = null; render(); break;
     case 'esave': saveEditor(); break;
