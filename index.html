@@ -2144,14 +2144,41 @@ html[data-theme="dark"]{--aa-a:#95A3FF;--aa-b:#C9D0FF}
 .ns-col.open>div{visibility:visible}
 .ns-b{flex:1 1 auto;min-height:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .ns-gh,.ns-car{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+
+/* личный кабинет */
+.me .me-head{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:16px 24px 0}
+.me .av.xl{width:64px;height:64px;font-size:22px;flex:none}
+.me-id{flex:1;min-width:220px}.me-id h1{margin:0;font-size:22px}.me-id p{margin:2px 0 8px;color:var(--muted)}
+.me-tags{display:flex;flex-wrap:wrap;gap:6px}
+.me-2col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.me-2col{grid-template-columns:1fr}.me .me-head{margin:12px 12px 0}}
+.me-feed{display:flex;flex-direction:column}
+.me-ev{display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line2);background:none;padding:12px 16px;cursor:pointer;font:inherit;color:var(--ink)}
+.me-ev:hover{background:var(--hover)}
+.me-ev:last-child{border-bottom:0}
+.me-ic{flex:none;width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:var(--accent-soft);color:var(--navy)}
+.me-ev.lv-ok .me-ic{background:var(--ok-soft);color:var(--ok)}.me-ev.lv-due .me-ic{background:var(--due-soft);color:var(--due)}.me-ev.lv-soon .me-ic{background:var(--warn-soft);color:var(--warn)}
+.me-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.me-tx b{font-weight:600;font-size:14px}.me-tx em{font-style:normal;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis}
+.me-ts{flex:none;color:var(--muted);font-size:12px;white-space:nowrap}
+.me-ev.un{background:var(--accent-soft)}.me-ev.un .me-tx b::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--navy);margin-right:8px;vertical-align:1px}
+.me-ev .st{flex:none}
+.me-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.me-set{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}
+.pop-user{width:100%;border:0;background:none;text-align:left;font:inherit;color:inherit;cursor:pointer;border-radius:10px}
+.pop-user:hover{background:var(--hover)}
+.pop-sep{height:1px;background:var(--line);margin:6px 0}
+.pop .opt .badge{margin-left:auto}
+.user .av{position:relative}
+.av-dot{position:absolute;top:-2px;right:-2px;width:10px;height:10px;border-radius:50%;background:var(--due);border:2px solid var(--surface)}
+@media (max-width:760px){.me-ts{display:none}}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <input type="file" id="importFile" accept=".json,.js,application/json,text/javascript" hidden>
 <script src="firebase-config.js?v=b443c275"></script>
-<script src="i18n.js?v=44b562ec"></script>
+<script src="i18n.js?v=c8586074"></script>
 <script src="ai-corpus.js?v=b443c275"></script>
-<script src="app.js?v=44b562ec"></script>
+<script src="app.js?v=c8586074"></script>
 </body>
 </html>

@@ -3699,6 +3699,171 @@ function importOrcid() {
   }).catch(function () { toast(LL('ORCID недоступен: проверьте номер и интернет', 'ORCID unavailable: check the number and internet')); });
 }
 
+/* ======================= Личный кабинет ======================= */
+function meIs(by) { return !!by && String(by).trim().toLowerCase() === String(me()).trim().toLowerCase(); }
+function myProfile() { var id = SESSION ? SESSION.id : ''; return ((DB.profiles || {})[id]) || {}; }
+function goTo(go) {
+  if (!go) return; S.menu = null;
+  if (go[0] === 'v') setView(go[1]);
+  else if (go[0] === 'p') openPatient(go[1]);
+  else if (go[0] === 'r') openRec(go[1], go[2]);
+  else if (go[0] === 'w') wrOpen(go[1], go[2]);
+  else if (go[0] === 's') { UI.stab = go[2]; UI.stabFor = go[1]; setView('reg:' + go[1]); }
+}
+/* мои проекты: регистры и исследования, где я автор или в команде */
+function myProjects() {
+  var pend = DB.pending || [], out = [];
+  DB.registries.concat(pend).forEach(function (r) {
+    var a = r.appr || {}, own = (SESSION && a.uid && a.uid === SESSION.id) || meIs(a.by), tm = null;
+    if (r.kind === 'study') tm = ((r.proto || {}).team || []).filter(function (m) { return meIs(m.name); })[0];
+    if (!own && !tm) return;
+    out.push({ r: r, own: own, role: own ? LL('Автор', 'Owner') : (tm.role || LL('Участник', 'Member')), pending: pend.indexOf(r) >= 0 });
+  });
+  return out;
+}
+function myPatientIds() {
+  var ids = {}, live = myProjects().filter(function (x) { return !x.pending; });
+  DB.patients.forEach(function (p) {
+    if ((p.log || []).some(function (e) { return e.act === 'create' && meIs(e.by); })) ids[p.id] = 'own';
+    else if (live.some(function (x) { return inReg(p, x.r); })) ids[p.id] = 'proj';
+  });
+  return ids;
+}
+function projOfPatient(p, projs) { var x = projs.filter(function (y) { return !y.pending && inReg(p, y.r); })[0]; return x ? x.r : null; }
+var ME_ACT = { create: ['добавил(а) карточку', 'added a record'], edit: ['изменил(а) карточку', 'edited a record'], 'import': ['обновил(а) из файла', 'updated from a file'], enroll: ['включил(а) в исследование', 'enrolled in a study'], rand: ['рандомизировал(а)', 'randomised'], q: ['анкета заполнена', 'questionnaire completed'] };
+/* входящие: события по моим проектам и карточкам от других пользователей */
+function inboxEvents() {
+  if (!SESSION) return [];
+  var ev = [], projs = myProjects(), mine = myPatientIds(), since = new Date(Date.now() - 120 * 864e5).toISOString().slice(0, 10);
+  projs.forEach(function (x) {
+    var r = x.r, a = r.appr || {}, nm = '«' + regName(r) + '»', kind = r.kind === 'study' ? LL('исследование', 'study') : LL('регистр', 'registry'), go = x.pending ? ['v', 'appr'] : ['v', 'reg:' + r.id];
+    if (!x.own) return;
+    if (a.at) ev.push({ id: 'ap0:' + r.id, ts: a.at, type: 'appr', ic: 'clock', t: LL('Отправлено на одобрение: ', 'Sent for approval: ') + kind + ' ' + nm, s: LL('ждёт решения коллеги или администратора', 'waiting for a colleague or admin'), go: go, mine: true });
+    if (a.okAt) ev.push({ id: 'ap1:' + r.id, ts: a.okAt, type: 'appr', ic: 'check', lvl: 'ok', t: LL('Одобрено: ', 'Approved: ') + kind + ' ' + nm, s: LL('одобрил(а) ', 'approved by ') + (a.okBy || ''), go: go });
+    if (a.noAt && a.st === 'rejected') ev.push({ id: 'ap2:' + r.id + ':' + a.noAt, ts: a.noAt, type: 'appr', ic: 'alert', lvl: 'due', t: LL('Отклонено: ', 'Rejected: ') + kind + ' ' + nm, s: (a.noBy || '') + ': ' + (a.reason || LL('без комментария', 'no comment')), go: ['v', 'appr'] });
+  });
+  apprMine().filter(function (r) { var a = r.appr || {}; return !((SESSION && a.uid === SESSION.id) || meIs(a.by)); }).forEach(function (r) { ev.push({ id: 'apw:' + r.id, ts: (r.appr || {}).at || '', type: 'task', ic: 'check', lvl: 'soon', t: LL('Ждёт вашего одобрения: ', 'Awaiting your approval: ') + '«' + regName(r) + '»', s: LL('создал(а) ', 'by ') + ((r.appr || {}).by || ''), go: ['v', 'appr'] }); });
+  var grp = {};
+  DB.patients.forEach(function (p) {
+    if (!mine[p.id]) return;
+    var pr = projOfPatient(p, projs), where = pr ? LL(' в «', ' in "') + regName(pr) + LL('»', '"') : '';
+    (p.log || []).forEach(function (e) {
+      if (!e.ts || e.ts.slice(0, 10) < since || meIs(e.by)) return;
+      if (e.act === 'q') { ev.push({ id: 'q:' + p.id + ':' + e.ts, ts: e.ts, type: 'pt', ic: 'clipboard', t: LL('Пациент заполнил анкету', 'Patient completed a questionnaire') + where, s: pName(p) + (e.note ? ' · ' + e.note : ''), go: ['p', p.id] }); return; }
+      var k = (pr ? pr.id : 'mine') + '|' + e.by + '|' + e.ts.slice(0, 10) + '|' + e.act, g = grp[k] || (grp[k] = { ts: e.ts, by: e.by, act: e.act, pr: pr, pts: [], day: e.ts.slice(0, 10) });
+      if (e.ts > g.ts) g.ts = e.ts; if (g.pts.indexOf(p) < 0) g.pts.push(p);
+    });
+    (p.comments || []).forEach(function (c) {
+      if (!c.ts || meIs(c.by) || c.ts.slice(0, 10) < since) return;
+      ev.push({ id: 'pc:' + (c.id || p.id + c.ts), ts: c.ts, type: 'cmt', ic: 'chat', t: c.by + LL(' прокомментировал(а) карточку', ' commented on a record') + where, s: pName(p) + ': ' + String(c.text || '').slice(0, 140), go: ['p', p.id] });
+    });
+  });
+  Object.keys(grp).forEach(function (k) {
+    var g = grp[k], n = g.pts.length, verb = L(ME_ACT[g.act] || ME_ACT.edit); if (n > 1) verb = verb.replace('карточку', 'карточки').replace('a record', 'records');
+    ev.push({ id: 'ch:' + k, ts: g.ts, type: 'chg', ic: g.act === 'create' ? 'plus' : g.act === 'enroll' || g.act === 'rand' ? 'flask' : 'history', t: g.by + ' ' + verb + (n > 1 ? ' (' + n + ')' : '') + (g.pr ? LL(' в «', ' in "') + regName(g.pr) + LL('»', '"') : LL(' в ваших карточках', ' in your records')), s: g.pts.slice(0, 3).map(pName).join(', ') + (n > 3 ? LL(' и ещё ', ' and ') + (n - 3) : ''), go: n === 1 ? ['p', g.pts[0].id] : g.pr ? ['v', 'reg:' + g.pr.id] : ['v', 'reg:all'] });
+  });
+  Object.keys(DB.cols || {}).forEach(function (ck) {
+    (DB.cols[ck] || []).forEach(function (r) {
+      if (!(r.log || []).some(function (e) { return e.act === 'create' && meIs(e.by); })) return;
+      (r.comments || []).forEach(function (c) { if (!c.ts || meIs(c.by) || c.ts.slice(0, 10) < since) return; ev.push({ id: 'rc:' + (c.id || r.id + c.ts), ts: c.ts, type: 'cmt', ic: 'chat', t: c.by + LL(' прокомментировал(а) вашу запись в «', ' commented on your entry in "') + L(COLS[ck].title) + LL('»', '"'), s: String(c.text || '').slice(0, 140), go: ['r', ck, r.id] }); });
+      (r.log || []).forEach(function (e) { if (!e.ts || meIs(e.by) || e.act === 'create' || e.ts.slice(0, 10) < since) return; ev.push({ id: 'rl:' + r.id + e.ts, ts: e.ts, type: 'chg', ic: 'history', t: e.by + LL(' изменил(а) вашу запись в «', ' edited your entry in "') + L(COLS[ck].title) + LL('»', '"'), s: (r.fio || r.title || r.name || ''), go: ['r', ck, r.id] }); });
+    });
+  });
+  return ev.sort(function (a, b) { return String(b.ts).localeCompare(String(a.ts)); });
+}
+function inboxSeen() { return ((UI.inboxSeen || {})[SESSION ? SESSION.id : '']) || ''; }
+function inboxUnread() { if (!SESSION) return 0; var s0 = inboxSeen(), off = UI.inboxOff || {}; return inboxEvents().filter(function (e) { return !e.mine && !off[e.type] && e.ts > s0; }).length; }
+/* мои задачи: из общего списка уведомлений оставляем то, что относится к моим пациентам и проектам */
+function myTasks() {
+  var mine = myPatientIds(), projIds = {}; myProjects().forEach(function (x) { projIds[x.r.id] = 1; });
+  return notifs().filter(function (n) { var g = n.go || []; if (/^ap:/.test(n.id) || /^qrun:/.test(n.id)) return true; if (g[0] === 'p') return !!mine[g[1]]; if (g[0] === 's') return !!projIds[g[1]]; return false; });
+}
+function myActivity() {
+  var out = [];
+  DB.patients.forEach(function (p) {
+    (p.log || []).forEach(function (e) { if (meIs(e.by)) out.push({ ts: e.ts, ic: e.act === 'create' ? 'plus' : 'history', t: L(ME_ACT[e.act] || ME_ACT.edit).replace('(а)', LL('(а)', '')) + (e.ch && e.ch.length ? LL(': полей ', ': fields ') + e.ch.length : ''), s: pName(p) + (e.note ? ' · ' + e.note : ''), go: ['p', p.id] }); });
+    (p.comments || []).forEach(function (c) { if (meIs(c.by)) out.push({ ts: c.ts, ic: 'chat', t: LL('комментарий к карточке', 'comment on a record'), s: pName(p) + ': ' + String(c.text || '').slice(0, 120), go: ['p', p.id] }); });
+  });
+  Object.keys(DB.cols || {}).forEach(function (ck) { (DB.cols[ck] || []).forEach(function (r) { (r.log || []).forEach(function (e) { if (meIs(e.by)) out.push({ ts: e.ts, ic: 'history', t: L(ME_ACT[e.act] || ME_ACT.edit) + ' · ' + L(COLS[ck].title), s: r.fio || r.title || r.name || '', go: ['r', ck, r.id] }); }); }); });
+  return out.filter(function (x) { return x.ts; }).sort(function (a, b) { return String(b.ts).localeCompare(String(a.ts)); }).slice(0, 150);
+}
+function meRows(list, seen, kind) {
+  if (!list.length) return '<div class="empty">' + (kind === 'act' ? LL('Пока нет ваших действий', 'No activity yet') : kind === 'task' ? LL('Задач нет, всё под контролем', 'No tasks, all clear') : LL('Новых событий нет', 'Nothing new')) + '</div>';
+  S.meGo = list.map(function (e) { return e.go; });
+  return '<div class="me-feed">' + list.map(function (e, i) { var un = seen !== undefined && !e.mine && e.ts > seen; return '<button type="button" class="me-ev' + (un ? ' un' : '') + (e.lvl ? ' lv-' + e.lvl : '') + '" data-act="mego" data-i="' + i + '"><span class="me-ic">' + ico(e.ic || 'bell', 16) + '</span><span class="me-tx"><b>' + esc(e.t) + '</b>' + (e.s ? '<em>' + esc(e.s) + '</em>' : '') + '</span><span class="me-ts">' + (e.ts ? fmtDT(e.ts) : '') + '</span></button>'; }).join('') + '</div>';
+}
+function renderMe() {
+  if (!SESSION) return '<div class="empty">' + LL('Войдите в систему', 'Please sign in') + '</div>';
+  var tab = UI.metab || 'over', pf = myProfile(), projs = myProjects(), ev = inboxEvents(), off = UI.inboxOff || {}, seen = inboxSeen(), unread = ev.filter(function (e) { return !e.mine && !off[e.type] && e.ts > seen; }).length, tasks = myTasks();
+  var h = '<div class="me">';
+  h += '<section class="card me-head"><span class="av xl">' + esc(initials(me())) + '</span><div class="me-id"><h1>' + esc(me()) + '</h1><p>' + esc([pf.pos, pf.dept].filter(Boolean).join(' · ') || LL('Добавьте должность и отделение в профиле', 'Add your position and unit in the profile')) + '</p><div class="me-tags"><span class="tag">' + esc(SESSION.email || '') + '</span><span class="tag">' + (SESSION.admin ? LL('Администратор', 'Admin') + ' · ' : '') + esc(roleName(SESSION.role)) + '</span>' + (pf.orcid ? '<span class="tag">ORCID ' + esc(pf.orcid) + '</span>' : '') + '</div></div><button type="button" class="btn" data-act="metab" data-v="prof">' + ico('user', 15) + LL('Редактировать профиль', 'Edit profile') + '</button></section>';
+  var tabs = [['over', LL('Обзор', 'Overview'), null], ['inbox', LL('Входящие', 'Inbox'), unread || null], ['proj', LL('Мои проекты', 'My projects'), projs.length || null], ['task', LL('Мои задачи', 'My tasks'), tasks.length || null], ['act', LL('Моя активность', 'My activity'), null], ['prof', LL('Профиль и настройки', 'Profile and settings'), null]];
+  h += '<div class="tabs pad">' + tabs.map(function (x) { return '<button type="button" class="tab' + (tab === x[0] ? ' on' : '') + '" data-act="metab" data-v="' + x[0] + '">' + x[1] + (x[2] ? '<span class="cnt">' + x[2] + '</span>' : '') + '</button>'; }).join('') + '</div><div class="pad">';
+  if (tab === 'over') {
+    var waitMine = projs.filter(function (x) { return x.pending && x.own; }).length;
+    h += '<div class="kpis home">' + [[projs.length, LL('моих регистров и исследований', 'my registries and studies'), 'folder', 'proj'], [waitMine, LL('ждут одобрения', 'awaiting approval'), 'clock', 'proj'], [unread, LL('новых событий', 'new events'), 'bell', 'inbox'], [tasks.length, LL('задач по моим пациентам', 'tasks for my patients'), 'flag', 'task']].map(function (k) { return '<button type="button" class="kpi" data-act="metab" data-v="' + k[3] + '"><span class="kpi-ic">' + ico(k[2], 18) + '</span><b>' + k[0] + '</b><span>' + k[1] + '</span></button>'; }).join('') + '</div>';
+    h += '<div class="me-2col"><section class="card"><h3>' + ico('bell', 18) + LL('Последние события', 'Latest events') + '</h3>' + meRows(ev.filter(function (e) { return !off[e.type]; }).slice(0, 6), seen) + '</section>';
+    h += '<section class="card"><h3>' + ico('folder', 18) + LL('Мои проекты', 'My projects') + '</h3>' + meProjList(projs.slice(0, 6)) + '</section></div>';
+  } else if (tab === 'inbox') {
+    var ft = UI.meflt || 'all', types = [['all', LL('Все', 'All')], ['appr', LL('Одобрения', 'Approvals')], ['cmt', LL('Комментарии', 'Comments')], ['chg', LL('Изменения', 'Changes')], ['pt', LL('Анкеты пациентов', 'Patient questionnaires')], ['task', LL('Нужно ваше решение', 'Needs your decision')]];
+    var list = ev.filter(function (e) { return !off[e.type] && (ft === 'all' || e.type === ft); });
+    h += '<div class="me-bar"><div class="chips">' + types.map(function (x) { return '<button type="button" class="chip' + (ft === x[0] ? ' on' : '') + '" data-act="meflt" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' + (unread ? '<button type="button" class="btn small" data-act="meread">' + ico('check', 14) + LL('Отметить всё прочитанным', 'Mark all as read') + '</button>' : '') + '</div>';
+    h += '<p class="hint">' + LL('Здесь собраны действия других пользователей в ваших регистрах, исследованиях и карточках за последние 4 месяца: одобрения, комментарии, изменения, заполненные пациентами анкеты.', 'Actions of other users in your registries, studies and records over the last 4 months: approvals, comments, changes, completed patient questionnaires.') + '</p>';
+    h += '<section class="card pad0">' + meRows(list, seen) + '</section>';
+  } else if (tab === 'proj') {
+    h += '<div class="me-bar"><p class="hint">' + LL('Регистры и исследования, которые вы создали или где вы в команде.', 'Registries and studies you created or where you are on the team.') + '</p>' + (can('edit') ? '<div class="actions"><button type="button" class="btn" data-act="newreg">' + ico('plus', 15) + t('nav.newRegistry') + '</button><button type="button" class="btn" data-act="newstudy">' + ico('plus', 15) + t('nav.newStudy') + '</button></div>' : '') + '</div>';
+    h += '<section class="card pad0">' + meProjTable(projs) + '</section>';
+  } else if (tab === 'task') {
+    h += '<p class="hint">' + LL('Просроченные контроли и анкеты ваших пациентов, контрольные точки ваших исследований и заявки, которые ждут вашего одобрения.', 'Overdue follow-ups and questionnaires of your patients, checkpoints of your studies and requests awaiting your approval.') + '</p>';
+    h += '<section class="card pad0">' + meRows(tasks.map(function (n) { return { ts: '', ic: n.ic, lvl: n.lvl, t: n.t, s: n.s, go: n.go }; }), undefined, 'task') + '</section>';
+  } else if (tab === 'act') {
+    h += '<p class="hint">' + LL('Ваши последние действия: созданные и изменённые карточки, комментарии, записи.', 'Your recent actions: created and edited records, comments, entries.') + '</p><section class="card pad0">' + meRows(myActivity(), undefined, 'act') + '</section>';
+  } else if (tab === 'prof') {
+    var f = S.meProf || (S.meProf = { name: me(), pos: pf.pos || '', dept: pf.dept || '', phone: pf.phone || '', orcid: pf.orcid || '', about: pf.about || '' });
+    function fld(k, lab, ph, type) { return '<label class="af"><span>' + lab + '</span><input type="' + (type || 'text') + '" data-sb="meProf.' + k + '" value="' + esc(f[k] || '') + '" placeholder="' + esc(ph || '') + '"></label>'; }
+    h += '<div class="me-2col"><section class="card"><h3>' + ico('user', 18) + LL('Профиль', 'Profile') + '</h3>' + fld('name', LL('Фамилия и имя', 'Full name'), 'Иванов Иван') + fld('pos', LL('Должность', 'Position'), LL('Врач-онколог, резидент, заведующий…', 'Oncologist, resident, head of unit…')) + fld('dept', LL('Отделение', 'Unit'), LL('Колоректальный сектор', 'Colorectal unit')) + fld('phone', LL('Рабочий телефон', 'Work phone'), '+7 …', 'tel') + fld('orcid', 'ORCID', '0000-0000-0000-0000') + '<label class="af"><span>' + LL('О себе: научные интересы', 'About: research interests') + '</span><textarea class="inp" rows="3" data-sb="meProf.about">' + esc(f.about || '') + '</textarea></label><p class="fhint">' + LL('Почта для входа: ', 'Sign-in email: ') + esc(SESSION.email || '') + LL('. Роль и права меняет администратор.', '. Role and permissions are changed by an administrator.') + '</p><div class="actions"><button type="button" class="btn primary" data-act="meprofsave">' + LL('Сохранить профиль', 'Save profile') + '</button></div></section>';
+    h += '<div><section class="card"><h3>' + ico('bell', 18) + LL('Что показывать во входящих', 'What to show in the inbox') + '</h3>' + [['appr', LL('Одобрения и отклонения моих регистров и исследований', 'Approvals and rejections of my registries and studies')], ['task', LL('Заявки, которые ждут моего одобрения', 'Requests awaiting my approval')], ['cmt', LL('Комментарии к моим карточкам и записям', 'Comments on my records')], ['chg', LL('Изменения в моих регистрах, исследованиях и карточках', 'Changes in my registries, studies and records')], ['pt', LL('Анкеты, заполненные моими пациентами', 'Questionnaires completed by my patients')]].map(function (x) { return '<label class="chk big"><input type="checkbox" data-act="meoff" data-v="' + x[0] + '"' + (off[x[0]] ? '' : ' checked') + '><span><b>' + x[1] + '</b></span></label>'; }).join('') + '</section>';
+    h += '<section class="card"><h3>' + ico('sun', 18) + LL('Интерфейс', 'Interface') + '</h3><div class="me-set"><span>' + LL('Язык', 'Language') + '</span>' + langSeg() + '</div><div class="me-set"><span>' + LL('Тема', 'Theme') + '</span>' + themeBtn() + '</div></section>';
+    h += '<section class="card"><h3>' + ico('lock', 18) + LL('Безопасность', 'Security') + '</h3>';
+    if (CLOUD.on) h += '<p class="hint">' + LL('Ссылка для смены пароля придёт на вашу почту.', 'A password change link will be sent to your email.') + '</p><div class="actions"><button type="button" class="btn" data-act="mepassmail">' + ico('send', 15) + LL('Сменить пароль', 'Change password') + '</button></div>';
+    else { var pw = S.mePw || (S.mePw = {}); h += '<label class="af"><span>' + LL('Текущий пароль', 'Current password') + '</span><input type="password" data-sb="mePw.cur" autocomplete="current-password"></label><label class="af"><span>' + LL('Новый пароль', 'New password') + '</span><input type="password" data-sb="mePw.n1" autocomplete="new-password"></label><label class="af"><span>' + LL('Повторите новый пароль', 'Repeat new password') + '</span><input type="password" data-sb="mePw.n2" autocomplete="new-password"></label>' + (pw.err ? '<div class="aerr">' + ico('alert', 14) + esc(pw.err) + '</div>' : '') + '<div class="actions"><button type="button" class="btn" data-act="mepass">' + LL('Сменить пароль', 'Change password') + '</button></div>'; }
+    h += '<div class="actions"><button type="button" class="btn ghost" data-act="logout">' + ico('logout', 15) + LL('Выйти из аккаунта', 'Sign out') + '</button></div></section></div></div>';
+  }
+  return h + '</div></div>';
+}
+function meProjStatus(x) { var a = x.r.appr || {}; if (x.pending) return a.st === 'rejected' ? '<span class="st st-cancel">' + LL('Отклонено', 'Rejected') + '</span>' : '<span class="st st-prog">' + LL('На одобрении', 'Pending') + '</span>'; if (x.r.kind === 'study') return '<span class="st st-done">' + esc(ov((x.r.proto || {}).status || 'Черновик')) + '</span>'; return '<span class="st st-done">' + LL('Активен', 'Active') + '</span>'; }
+function meLastAct(r) { var last = ''; DB.patients.forEach(function (p) { if (!inReg(p, r)) return; (p.log || []).forEach(function (e) { if (e.ts > last) last = e.ts; }); }); return last; }
+function meProjList(list) {
+  if (!list.length) return '<div class="empty">' + LL('Вы пока не создали регистр или исследование', 'You have not created a registry or study yet') + '</div>';
+  return '<div class="me-feed">' + list.map(function (x) { return '<button type="button" class="me-ev" data-act="view" data-v="' + (x.pending ? 'appr' : 'reg:' + x.r.id) + '"><span class="me-ic">' + ico(x.r.kind === 'study' ? 'flask' : 'folder', 16) + '</span><span class="me-tx"><b>' + esc(regName(x.r)) + '</b><em>' + esc(x.role) + (x.pending ? '' : ' · ' + plural(regCount(x.r), 'pl.patient')) + '</em></span>' + meProjStatus(x) + '</button>'; }).join('') + '</div>';
+}
+function meProjTable(list) {
+  if (!list.length) return '<div class="empty">' + LL('Вы пока не создали регистр или исследование', 'You have not created a registry or study yet') + '</div>';
+  return '<div class="tablewrap"><table class="grid"><thead><tr><th>' + LL('Название', 'Name') + '</th><th>' + LL('Тип', 'Type') + '</th><th>' + LL('Моя роль', 'My role') + '</th><th>' + LL('Статус', 'Status') + '</th><th>' + LL('Пациентов', 'Patients') + '</th><th>' + LL('Последнее изменение', 'Last change') + '</th><th>' + LL('Одобрил(а)', 'Approved by') + '</th></tr></thead><tbody>' + list.map(function (x) { var a = x.r.appr || {}, la = x.pending ? '' : meLastAct(x.r); return '<tr data-act="view" data-v="' + (x.pending ? 'appr' : 'reg:' + x.r.id) + '" tabindex="0"><td class="strong">' + esc(regName(x.r)) + '</td><td>' + (x.r.kind === 'study' ? LL('Исследование', 'Study') : LL('Регистр', 'Registry')) + '</td><td>' + esc(x.role) + '</td><td>' + meProjStatus(x) + '</td><td>' + (x.pending ? '' : regCount(x.r)) + '</td><td>' + (la ? fmtDT(la) : '') + '</td><td>' + esc(a.okBy || '') + (a.okAt ? ', ' + fmtDate(String(a.okAt).slice(0, 10)) : '') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+}
+function meAct(a, g) {
+  if (a === 'metab') { UI.metab = g('v'); saveUI(); if (S.view !== 'me') setView('me'); else render(); return true; }
+  if (a === 'meflt') { UI.meflt = g('v'); saveUI(); render(); return true; }
+  if (a === 'meread') { UI.inboxSeen = UI.inboxSeen || {}; UI.inboxSeen[SESSION.id] = nowIso(); saveUI(); render(); return true; }
+  if (a === 'mego') { var go = (S.meGo || [])[+g('i')]; goTo(go); return true; }
+  if (a === 'meoff') { UI.inboxOff = UI.inboxOff || {}; UI.inboxOff[g('v')] = !UI.inboxOff[g('v')]; saveUI(); render(); return true; }
+  if (a === 'meprofsave') {
+    var f = S.meProf || {}, nm = String(f.name || '').trim(); if (!nm) { toast(LL('Укажите имя', 'Enter your name')); return true; }
+    DB.profiles = DB.profiles || {}; DB.profiles[SESSION.id] = { name: nm, pos: String(f.pos || '').trim(), dept: String(f.dept || '').trim(), phone: String(f.phone || '').trim(), orcid: String(f.orcid || '').trim(), about: String(f.about || '').trim(), at: nowIso() };
+    if (nm !== SESSION.name) { SESSION.name = nm; UI.me = nm; if (!CLOUD.on) { var us = localUsers(); us.forEach(function (u) { if (u.id === SESSION.id) u.name = nm; }); saveLocalUsers(us); } setSession(SESSION); }
+    save(); S.meProf = null; toast(LL('Профиль сохранён', 'Profile saved')); render(); return true;
+  }
+  if (a === 'mepassmail') { if (CLOUD.fb) CLOUD.fb.auth().sendPasswordResetEmail(SESSION.email).then(function () { toast(LL('Ссылка для смены пароля отправлена на ', 'Password link sent to ') + SESSION.email); }).catch(function (e) { toast(e.code || e.message); }); return true; }
+  if (a === 'mepass') {
+    var pw = S.mePw || {}, us2 = localUsers(), u = us2.filter(function (x) { return x.id === SESSION.id; })[0];
+    if (!u) return true; if (!pw.n1 || String(pw.n1).length < 6) { pw.err = LL('Новый пароль: не меньше 6 символов', 'New password: at least 6 characters'); render(); return true; }
+    if (pw.n1 !== pw.n2) { pw.err = LL('Новые пароли не совпадают', 'New passwords do not match'); render(); return true; }
+    sha256(u.salt + (pw.cur || '')).then(function (h0) { if (h0 !== u.hash) { pw.err = LL('Текущий пароль неверный', 'Current password is wrong'); render(); return; } return sha256(u.salt + pw.n1).then(function (h1) { u.hash = h1; saveLocalUsers(us2); S.mePw = {}; toast(LL('Пароль изменён', 'Password changed')); render(); }); });
+    return true;
+  }
+  return false;
+}
+
 /* ======================= Notifications ======================= */
 function notifs() {
   var out = [], td = isoOf(new Date()), tm = isoOf(addDays(td, 1));
@@ -3770,7 +3935,7 @@ function isStudent() { return false; }
 function sha256(s) { return crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)).then(function (b) { return [].map.call(new Uint8Array(b), function (x) { return x.toString(16).padStart(2, '0'); }).join(''); }); }
 function localUsers() { try { return JSON.parse(localStorage.getItem('crr.users') || '[]'); } catch (e) { return []; } }
 function saveLocalUsers(u) { try { localStorage.setItem('crr.users', JSON.stringify(u)); } catch (e) {} }
-function setSession(s) { SESSION = s; if (s) { UI.me = s.name; saveUI(); if (s.role === 'student' && !s.admin) maskForStudent(); } try { var sk = CLOUD.on ? 'crr.cloud.sess' : 'crr.session'; if (s) { localStorage.setItem(sk, JSON.stringify(s)); if (s.email) localStorage.setItem('crr.lastEmail', s.email); } else localStorage.removeItem(sk); } catch (e) {} }
+function setSession(s) { SESSION = s; if (s) { UI.me = (((typeof DB !== 'undefined' && DB && DB.profiles) || {})[s.id] || {}).name || s.name; saveUI(); if (s.role === 'student' && !s.admin) maskForStudent(); } try { var sk = CLOUD.on ? 'crr.cloud.sess' : 'crr.session'; if (s) { localStorage.setItem(sk, JSON.stringify(s)); if (s.email) localStorage.setItem('crr.lastEmail', s.email); } else localStorage.removeItem(sk); } catch (e) {} }
 function lastEmail() { try { return localStorage.getItem('crr.lastEmail') || ''; } catch (e) { return ''; } }
 function authPrefill() { var em = lastEmail(); if (em && !SESSION) S.auth = { mode: 'login', role: 'doctor', email: em, show: true }; }
 /* облако: сразу показываем рабочий экран по сохранённой сессии, вход проверяется в фоне */
@@ -3858,7 +4023,7 @@ function cloudDocs() {
   (DB.pending || []).forEach(function (r) { m['x_' + r.id] = r; });
   Object.keys(DB.ms || {}).forEach(function (sid) { var x = DB.ms[sid]; ['papers', 'secs', 'lib', 'cm', 'zcols'].forEach(function (g2) { Object.keys(x[g2] || {}).forEach(function (k) { m['m_' + sid + '__' + g2 + '__' + k] = x[g2][k]; }); }); });
   if (CLOUD.on) m.qsnap = qSnapAll();
-  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, qtext: DB.qtext, dictOv: DB.dictOv, autosend: DB.autosend, qconc: DB.qconc, studySeq: DB.studySeq, importedAt: DB.importedAt };
+  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, qtext: DB.qtext, dictOv: DB.dictOv, autosend: DB.autosend, qconc: DB.qconc, profiles: DB.profiles, studySeq: DB.studySeq, importedAt: DB.importedAt };
   var out = {}; Object.keys(m).forEach(function (k) { out[k.replace(/\//g, '_')] = JSON.stringify(m[k]); }); return out;
 }
 function cloudPush() {
@@ -4967,6 +5132,7 @@ function renderHome() {
 function viewTitle() {
   var v = S.view;
   if (v === 'home') return LL('Главная', 'Home');
+  if (v === 'me') return LL('Личный кабинет', 'My account');
   if (v === 'users') return LL('Пользователи', 'Users');
   if (v === 'fu') return t('nav.followup');
   if (v === 'retro') return LL('Ретро-загрузка документов', 'Retrospective import');
@@ -5046,9 +5212,11 @@ function renderTop() {
   h += '<button type="button" class="aibtn' + (UI.aip ? ' on' : '') + '" data-act="aitoggle" title="' + LL('ИИ-ассистент по открытому экрану', 'AI assistant for this screen') + '">' + ico('sparkle', 16) + '<span>' + LL('Ассистент', 'Assistant') + '</span></button>';
   h += renderBell();
   h += themeBtn() + langSeg();
-  h += '<div class="dd"><button type="button" class="user" data-act="menu" data-id="top" aria-expanded="' + (S.menu === 'top') + '"><span class="av">' + esc(initials(me())) + '</span><span class="un"><b>' + esc(me()) + '</b><em>' + (SESSION.admin ? LL('Администратор', 'Admin') : LL('Пользователь', 'User')) + '</em></span>' + ico('down', 14) + '</button>';
+  h += '<div class="dd"><button type="button" class="user" data-act="menu" data-id="top" aria-expanded="' + (S.menu === 'top') + '"><span class="av">' + esc(initials(me())) + (inboxUnread() ? '<i class="av-dot"></i>' : '') + '</span><span class="un"><b>' + esc(me()) + '</b><em>' + (SESSION.admin ? LL('Администратор', 'Admin') : LL('Пользователь', 'User')) + '</em></span>' + ico('down', 14) + '</button>';
   if (S.menu === 'top') {
-    h += '<div class="pop right" role="menu"><div class="pop-user"><span class="av">' + esc(initials(me())) + '</span><div><b>' + esc(me()) + '</b><em>' + esc(SESSION.email) + '</em><span class="tag">' + (SESSION.admin ? LL('Администратор', 'Admin') + ' · ' : '') + roleName(SESSION.role) + '</span></div></div>';
+    var unr = inboxUnread();
+    h += '<div class="pop right" role="menu"><button type="button" class="pop-user" data-act="metab" data-v="over" title="' + LL('Открыть личный кабинет', 'Open my account') + '"><span class="av">' + esc(initials(me())) + '</span><div><b>' + esc(me()) + '</b><em>' + esc(SESSION.email) + '</em><span class="tag">' + (SESSION.admin ? LL('Администратор', 'Admin') + ' · ' : '') + roleName(SESSION.role) + '</span></div></button>';
+    h += '<button type="button" class="opt" data-act="metab" data-v="over">' + ico('user', 16) + LL('Личный кабинет', 'My account') + '</button><button type="button" class="opt" data-act="metab" data-v="inbox">' + ico('bell', 16) + LL('Входящие', 'Inbox') + (unr ? '<i class="badge">' + unr + '</i>' : '') + '</button><button type="button" class="opt" data-act="metab" data-v="proj">' + ico('folder', 16) + LL('Мои проекты', 'My projects') + '</button><button type="button" class="opt" data-act="metab" data-v="prof">' + ico('lock', 16) + LL('Профиль и настройки', 'Profile and settings') + '</button><div class="pop-sep"></div>';
     if (isAdmin()) h += '<button type="button" class="opt" data-act="view" data-v="users">' + ico('users', 16) + LL('Пользователи', 'Users') + '</button><button type="button" class="opt" data-act="cloudsetup">' + ico('cloud', 16) + LL('Облако (Firebase)', 'Cloud (Firebase)') + '</button>';
     h += '<button type="button" class="opt" data-act="backup">' + ico('download', 16) + t('menu.backup') + '</button>';
     if (isAdmin()) h += '<button type="button" class="opt" data-act="restore">' + ico('upload', 16) + t('menu.restore') + '</button><button type="button" class="opt danger" data-act="reset">' + ico('alert', 16) + t('menu.reset') + '</button>';
@@ -5096,6 +5264,7 @@ function renderMain() {
   if (v === 'retro') return renderRetro();
   if (v === 'studies') return renderStudies();
   if (v === 'q') return renderQPage();
+  if (v === 'me') return renderMe();
   if (v === 'dq') return renderDQ();
   if (v === 'dict') return renderDict();
   if (v === 'col:redcap') { S.view = 'home'; return renderHome(); }
@@ -5151,10 +5320,11 @@ document.addEventListener('click', function (ev) {
   if (S.menu && !ev.target.closest('.dd')) { S.menu = null; if (!tg) { render(); return; } }
   if (!tg) { if (S.inline && !ev.target.closest('.inline')) { S.inline = null; render(); } return; }
   var a = tg.getAttribute('data-act');
-  if (a === 'search' || (tg.tagName === 'INPUT' && a !== 'segset' && a !== 'waopt')) return;
+  if (a === 'search' || (tg.tagName === 'INPUT' && a !== 'segset' && a !== 'waopt' && a !== 'meoff')) return;
   var g = function (x) { return tg.getAttribute('data-' + x); };
   var NEED = { qlnew: 'edit', qllink: 'edit', qldel: 'edit', savep: 'edit', saverec: 'edit', delp: 'delete', delrec: 'delete', esave: 'edit', edelete: 'delete', enrgo: 'edit', enroll: 'edit', rand: 'rand', unlockf: 'unlock', impgo: 'edit', imp: 'edit', newp: 'edit', newrec: 'edit', newreg: 'edit', newstudy: 'edit', qbsave: 'edit', qbnew: 'edit', fillsave: 'edit', cmtadd: 'edit', labsdone: 'edit', reset: 'admin', restore: 'admin', tplsave: 'edit', qsched: 'edit', qnow: 'edit', toreg: 'edit', addlinked: 'edit' };
   if (msAct(a, g)) return;
+  if (meAct(a, g)) return;
   if (NEED[a] && !can(NEED[a])) { toast(LL('Недостаточно прав для роли «', 'Not allowed for role "') + (SESSION ? roleName(SESSION.role) : '') + LL('»', '"')); return; }
   switch (a) {
     case 'nstog': {
