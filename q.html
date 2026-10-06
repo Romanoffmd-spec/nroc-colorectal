@@ -58,6 +58,7 @@ input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(-
 .center{text-align:center;color:var(--muted);padding:60px 16px}
 .spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s 1s linear infinite;margin:0 auto 12px}@keyframes s{to{transform:rotate(360deg)}}
 .priv{font-size:12px;color:var(--muted);margin-top:18px;text-align:center}
+.aa-by{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:#8A8F98;margin:6px 0 24px}
 </style>
 </head>
 <body>
@@ -118,7 +119,7 @@ input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(-
     h += '<div class="card"><label class="consent"><input type="checkbox" id="ok"' + (S.ok ? ' checked' : '') + '><span>' + T('Я согласен(на), чтобы мои ответы использовались лечащими врачами Национального научного онкологического центра для наблюдения и научных исследований в обезличенном виде.', 'I agree that my answers may be used by my doctors at the National Research Oncology Center for follow-up and, de-identified, for research.') + '</span></label></div>';
     if (S.err) h += '<div class="err">' + esc(S.err) + '</div>';
     h += '<div class="bar"><div class="prog"><span style="width:' + progress() + '%"></span></div><button type="button" class="send" id="send"' + (valid() && !S.sending ? '' : ' disabled') + '>' + (S.sending ? T('Отправляю…', 'Sending…') : T('Отправить ответы', 'Send answers')) + '</button>' + (valid() ? '' : '<div class="hint">' + T('Заполните все поля и ответьте на все вопросы', 'Fill in all fields and answer every question') + '</div>') + '</div>';
-    h += '<p class="priv">' + T('Ответы видят только ваши лечащие врачи.', 'Only your doctors can see your answers.') + '</p>';
+    h += '<p class="priv">' + T('Ответы видят только ваши лечащие врачи.', 'Only your doctors can see your answers.') + '</p><p class="aa-by"><img src="media/addall-icon.svg" alt="" width="16" height="16"> ' + T('Работает на платформе AddAll', 'Powered by AddAll') + '</p>';
     var y = window.scrollY; app.innerHTML = h; window.scrollTo(0, y);
   }
   function top() { return '<div class="top"><div class="brand"><img class="logo" src="media/nroc-logo.png" alt="NROC"><span>' + T('Национальный научный онкологический центр', 'National Research Oncology Center') + '<br>' + T('Колоректальный сектор', 'Colorectal unit') + '</span></div><div class="lang"><button type="button" data-lang="ru" class="' + (LANG === 'ru' ? 'on' : '') + '">RU</button><button type="button" data-lang="en" class="' + (LANG === 'en' ? 'on' : '') + '">EN</button></div></div>'; }
