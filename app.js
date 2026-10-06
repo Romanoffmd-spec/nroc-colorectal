@@ -418,6 +418,31 @@ var STD = {
 };
 /* определение поля: [рус, англ, стандарт, ядро] ; ядро = ключевое поле для полноты регистра */
 var DDEF = {
+  phone: ['Контактный телефон пациента или родственника для связи и рассылки анкет.', 'Patient or relative phone for contact and questionnaires.', ''],
+  address: ['Адрес постоянного проживания по документам.', 'Home address.', ''],
+  nation: ['Национальность со слов пациента или по документам.', 'Ethnicity as stated.', ''],
+  comorb: ['Да, если есть хотя бы одно хроническое сопутствующее заболевание (СД, АГ, ССЗ, болезни лёгких, ЦВБ, печени и др.).', 'Yes if at least one chronic comorbidity is present.', ''],
+  diab: ['Сахарный диабет 1 или 2 типа в анамнезе, на лечении или диете.', 'Diabetes mellitus type 1 or 2.', ''],
+  htn: ['Артериальная гипертензия, диагностированная ранее или на гипотензивной терапии.', 'Arterial hypertension.', ''],
+  cvd: ['ИБС, перенесённый инфаркт, сердечная недостаточность, аритмии, пороки сердца.', 'Coronary disease, MI, heart failure, arrhythmia, valve disease.', ''],
+  lung: ['ХОБЛ, бронхиальная астма, интерстициальные болезни лёгких и др. хронические заболевания лёгких.', 'COPD, asthma and other chronic lung disease.', ''],
+  cvb: ['Перенесённый инсульт, ТИА, хроническая ишемия мозга.', 'Stroke, TIA or chronic cerebrovascular disease.', ''],
+  liverDz: ['Хронический гепатит, цирроз, жировая болезнь печени и др.', 'Chronic hepatitis, cirrhosis, fatty liver disease etc.', ''],
+  comorbOther: ['Другие хронические заболевания, не перечисленные выше.', 'Other chronic conditions not listed above.', ''],
+  oncoHx: ['Онкологические заболевания в анамнезе (кроме текущей опухоли): локализация, год, лечение.', 'Previous cancers (other than the index tumour): site, year, treatment.', ''],
+  ecig: ['Регулярное использование электронных сигарет или систем нагревания табака.', 'Regular e-cigarette or heated tobacco use.', ''],
+  smokeYrs: ['Сколько лет пациент курит или курил, лет.', 'Years of smoking.', ''],
+  alcohol: ['Регулярное употребление алкоголя со слов пациента.', 'Regular alcohol use as reported.', ''],
+  famCa: ['Злокачественная опухоль любой локализации у родственника первой линии.', 'Cancer of any site in a first-degree relative.', ''],
+  prevOps: ['Операции на органах брюшной полости и таза в анамнезе.', 'Previous abdominal or pelvic surgery.', ''],
+  multiPrim: ['Есть ли у пациента другая самостоятельная злокачественная опухоль (синхронная или метахронная).', 'Another independent primary cancer.', ''],
+  otherTumor: ['Локализация другой первичной опухоли, если она есть.', 'Site of the other primary tumour.', ''],
+  hist: ['Гистологическое заключение биопсии до операции: тип опухоли и степень дифференцировки.', 'Pre-operative biopsy histology.', ''],
+  symptoms: ['Жалобы и симптомы, с которыми пациент обратился, и их длительность.', 'Presenting symptoms and duration.', ''],
+  mets: ['Описание отдалённых метастазов при стадировании: органы, число, размеры.', 'Description of distant metastases at staging.', ''],
+  cea0: ['Уровень РЭА в крови до начала лечения, нг/мл.', 'CEA before treatment, ng/ml.', ''],
+  ca199_0: ['Уровень СА 19-9 в крови до начала лечения, Ед/мл.', 'CA 19-9 before treatment, U/ml.', ''],
+  hb0: ['Гемоглобин перед операцией, г/л.', 'Haemoglobin before surgery, g/l.', ''],
   iin: ['12-значный индивидуальный идентификационный номер. Проверяется контрольная сумма; из ИИН выводятся дата рождения и пол.', '12-digit national ID; checksum verified; date of birth and sex derived from it.', 'iin', 1],
   ib: ['Номер медицинской карты стационарного больного ННОЦ для госпитализации, во время которой выполнено основное лечение.', 'NROC inpatient record number of the index admission.', '', 1],
   dob: ['Дата рождения по документу, удостоверяющему личность (или по ИИН).', 'Date of birth from ID document (or IIN).', '', 1],
@@ -492,7 +517,7 @@ var DDEF = {
   vital: ['Статус жизни на дату последнего контакта.', 'Vital status at last contact.', 'ichom', 1],
   deathCause: ['Основная причина смерти.', 'Main cause of death.', 'ichom']
 };
-function ddDef(id) { var o = (DB.dictOv || {})[id]; if (o && (o.ru || o.en)) return LANG === 'en' ? (o.en || o.ru) : (o.ru || o.en); var x = DDEF[id]; if (x) return LANG === 'en' ? x[1] : x[0]; var f = FIELD[id]; if (!f) return ''; return L(f.label) + (f.unit ? ', ' + t(f.unit) : '') + '.'; }
+function ddDef(id) { var o = (DB.dictOv || {})[id]; if (o && (o.ru || o.en)) return LANG === 'en' ? (o.en || o.ru) : (o.ru || o.en); var x = DDEF[id]; if (x) return LANG === 'en' ? x[1] : x[0]; var f = FIELD[id]; if (!f) return ''; var op = f.type === 'nodes' ? [] : fieldOpts(f), tp = { num: LL('Число', 'Number'), date: LL('Дата', 'Date'), text: LL('Свободный текст', 'Free text'), long: LL('Свободный текст', 'Free text'), sel: LL('Выберите один вариант', 'Choose one option'), seg: LL('Выберите один вариант', 'Choose one option'), multi: LL('Можно выбрать несколько вариантов', 'Several options allowed') }[f.type] || ''; return L(f.label) + '. ' + tp + (f.unit ? LL(', в единицах: ', ', units: ') + t(f.unit) : '') + (op.length && op.length <= 12 ? ': ' + op.map(ov).join(', ') : '') + '. ' + LL('Если сведений нет в документах, отметьте «нет информации».', 'If the documents do not say, mark "no information".'); }
 function ddStd(id) { var x = DDEF[id]; return x && x[2] ? STD[x[2]] : ''; }
 function ddCore(id) { var x = DDEF[id]; return !!(x && x[3]); }
 /* коды МКБ-10 / МКБ-О-3 (топография) по локализации */
@@ -1258,7 +1283,7 @@ function fieldHTML(x, val, path, d, attrs) {
   var af = S.drawer && S.drawer.aiFilled && path === 'd.' + x.id ? S.drawer.aiFilled[x.id] : null;
   if (af) out = out.replace('class="fld', 'title="' + esc(LL('Заполнено из документа', 'Filled from document') + ' (' + Math.round(af.c * 100) + '%): ' + (af.q || '')) + '" class="fld aifill' + (af.c < 0.7 ? ' ailow' : ''));
   var fl = has(val);
-  if (path === 'd.' + x.id) { var dfn = ddDef(x.id); if (dfn) { var lb = esc(L(x.label)); var ip = out.indexOf(lb + '</'); if (ip >= 0) out = out.slice(0, ip + lb.length) + '<i class="ddq" data-ddq="' + x.id + '" title="' + esc(dfn + (ddStd(x.id) ? ' [' + ddStd(x.id) + ']' : '')) + '">?</i>' + out.slice(ip + lb.length); }
+  if (path === 'd.' + x.id) { var dfn = ddDef(x.id); if (dfn) { var lb = esc(L(x.label)); var ip = out.indexOf(lb + '</'); if (ip >= 0) out = out.slice(0, ip + lb.length) + '<i class="ddq" data-ddq="' + x.id + '" role="button" tabindex="0" aria-label="' + esc(LL('Что означает поле', 'What this field means')) + '">?</i>' + out.slice(ip + lb.length); }
     if (x.id === 'loc' && icd10Of(d)) out = out.replace(/<\/div>$/, '<p class="fcode">' + LL('МКБ-10 ', 'ICD-10 ') + icd10Of(d) + ' · ' + LL('МКБ-О-3 ', 'ICD-O-3 ') + icdoTopoOf(d) + '</p></div>'); }
   out = out.replace('class="fld', 'class="fld f-' + x.type + (fl ? ' filled' : ''));
   if (x.type === 'sel' && !fl) out = out.replace('<select ', '<select class="empty" ');
@@ -7947,6 +7972,26 @@ function renderTop2() {
   return h;
 }
 
+
+/* подсказка «?» у поля: открывается по нажатию */
+function ddPopClose() { var o = document.getElementById('ddpop'); if (o) o.remove(); }
+function ddPopOpen(el) {
+  var id = el.getAttribute('data-ddq'); ddPopClose(); if (!FIELD[id]) return; window.__ddAt = Date.now();
+  var d = document.createElement('div'); d.id = 'ddpop'; d.className = 'ddpop'; d.setAttribute('role', 'dialog');
+  d.innerHTML = '<div class="ddp-h"><b>' + esc(L(FIELD[id].label)) + '</b><button type="button" class="ddp-x" aria-label="' + esc(t('a11y.close')) + '">×</button></div><p>' + esc(ddDef(id)) + '</p>' + (ddStd(id) ? '<div class="ddp-s">' + esc(LL('Стандарт: ', 'Standard: ') + ddStd(id)) + '</div>' : '') + '<button type="button" class="ddp-l">' + esc(LL('Открыть словарь данных', 'Open data dictionary')) + '</button>';
+  document.body.appendChild(d);
+  var r = el.getBoundingClientRect(), w = d.offsetWidth, hh = d.offsetHeight, x = Math.min(Math.max(8, r.left - 12), window.innerWidth - w - 8), y = r.bottom + 8; if (y + hh > window.innerHeight - 8) y = Math.max(8, r.top - hh - 8);
+  d.style.left = x + 'px'; d.style.top = y + 'px';
+  d.querySelector('.ddp-x').onclick = ddPopClose;
+  d.querySelector('.ddp-l').onclick = function () { ddPopClose(); S.drawer = null; S.dictQ = L(FIELD[id].label); setView('dict'); };
+}
+document.addEventListener('click', function (ev) {
+  var q = ev.target.closest && ev.target.closest('[data-ddq]');
+  if (q) { ev.preventDefault(); ev.stopPropagation(); var o = document.getElementById('ddpop'); if (o && o.getAttribute('data-for') === q.getAttribute('data-ddq')) { ddPopClose(); return; } ddPopOpen(q); var n = document.getElementById('ddpop'); if (n) n.setAttribute('data-for', q.getAttribute('data-ddq')); return; }
+  if (!(ev.target.closest && ev.target.closest('#ddpop'))) ddPopClose();
+}, true);
+document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') ddPopClose(); else if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.getAttribute && ev.target.getAttribute('data-ddq')) { ev.preventDefault(); ddPopOpen(ev.target); } });
+window.addEventListener('scroll', function () { if (Date.now() - (window.__ddAt || 0) > 400) ddPopClose(); }, true);
 window.__CRR = { SECTIONS: SECTIONS, MODULES: MODULES, MEDIA: MEDIA, COLS: COLS, DICT: DICT, OPT: OPT };
 if (SESSION && isStudent()) maskForStudent();
 themeApply();
