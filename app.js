@@ -1064,7 +1064,7 @@ function tagsOf(match) {
   return match.filter(function (r) { return !match.some(function (o) { return o.parent === r.id; }); });
 }
 function regOf(id) { return DB.registries.filter(function (r) { return r.id === id; })[0]; }
-function canApprove(r) { if (!SESSION || !r.appr) return false; if (isAdmin()) return r.appr.st === 'pending' || r.appr.st === 'rejected'; return r.appr.st === 'pending' && (!CLOUD.on || r.appr.uid !== SESSION.id); }
+function canApprove(r) { if (!SESSION || !r.appr) return false; if (!isAdmin() && !can('approve')) return false; if (isAdmin()) return r.appr.st === 'pending' || r.appr.st === 'rejected'; return r.appr.st === 'pending' && (!CLOUD.on || r.appr.uid !== SESSION.id); }
 function apprMine() { return (DB.pending || []).filter(canApprove); }
 function renderAppr() {
   var list = (DB.pending || []).slice().sort(function (a, b) { return String(b.appr.at).localeCompare(String(a.appr.at)); });
@@ -1207,9 +1207,9 @@ function renderRegistry() {
     h = '<div class="head"><div>' + (crumbs ? '<div class="crumbs">' + crumbs + '</div>' : '<div class="kicker">' + (reg && reg.sci ? LL('Научный регистр', 'Research registry') : LL('Регистр', 'Registry')) + '</div>') + '<h1>' + esc(reg ? regName(reg) : t('nav.allPatients')) + '</h1><p class="sub">' + esc(reg ? ruleText(reg) : t('reg.allSub')) + '</p></div>';
     h += '<div class="actions"><input class="search" type="search" data-act="search" placeholder="' + t('reg.search') + '" aria-label="' + t('reg.search') + '" value="' + esc(S.q) + '">';
     if (reg && reg.kind !== 'track') h += '<button type="button" class="btn" data-act="wropen" data-id="' + reg.id + '" title="' + LL('Статьи, тезисы и литература по этому регистру', 'Papers and library for this registry') + '">' + ico('doc', 16) + LL('Рукописи', 'Manuscripts') + '</button>';
-    if (reg) h += '<button type="button" class="btn" data-act="editreg" data-id="' + reg.id + '">' + t('reg.configure') + '</button>';
+    if (reg && can('edit')) h += '<button type="button" class="btn" data-act="editreg" data-id="' + reg.id + '">' + t('reg.configure') + '</button>';
     h += '<div class="dd"><button type="button" class="btn" data-act="menu" data-id="xl">' + ico('sheet', 16) + 'Excel' + ico('down', 14) + '</button>' + (S.menu === 'xl' ? '<div class="pop right" role="menu"><button type="button" class="opt" data-act="csv">' + ico('download', 16) + LL('Экспорт в Excel', 'Export to Excel') + '</button><button type="button" class="opt" data-act="imp">' + ico('upload', 16) + LL('Импорт из Excel или CSV', 'Import from Excel or CSV') + '</button><div class="pop-note">' + LL('Экспорт с кодами и кодбуком, обезличенный вариант. Импорт обновляет карточки по ID или № ИБ.', 'Export with codes and codebook, anonymised option. Import updates records by ID or case no.') + '</div></div>' : '') + '</div>';
-    h += '<button type="button" class="btn primary" data-act="newp">' + ico('plus', 16) + t('reg.addPatient') + '</button></div></div>';
+    h += (can('edit') ? '<button type="button" class="btn primary" data-act="newp">' + ico('plus', 16) + t('reg.addPatient') + '</button>' : '') + '</div></div>';
   }
   var ages = list.map(function (p) { return num(p.d.age); }).filter(function (x) { return x !== null; });
   var avg = ages.length ? Math.round(ages.reduce(function (a, b) { return a + b; }, 0) / ages.length) : null;
@@ -3927,11 +3927,11 @@ var CLOUD = { cfg: null, on: false, ready: false, err: '', fb: null, db: null, c
   if (!c) { try { c = JSON.parse(localStorage.getItem('crr.fbconfig') || 'null'); } catch (e) { c = null; } }
   if (c && c.apiKey && c.projectId) { CLOUD.cfg = c; CLOUD.on = true; }
 })();
-function roleName(r) { return LL('Пользователь', 'User'); }
+function roleName(r) { return L(ROLES[r] || ['Пользователь', 'User']); }
 function isAdmin() { return !!(SESSION && SESSION.admin); }
-var PERM = { edit: ['doctor', 'resident'], comment: ['doctor', 'resident', 'student'], delete: ['doctor'], rand: ['doctor'], unlock: ['doctor'], admin: [] };
-function can(what) { if (!SESSION) return false; if (SESSION.admin) return true; return what !== 'admin'; }
-function isStudent() { return false; }
+var PERM = { edit: ['doctor', 'resident'], comment: ['doctor', 'resident', 'student'], delete: ['doctor'], rand: ['doctor'], unlock: ['doctor'], approve: ['doctor'], admin: [] };
+function can(what) { if (!SESSION) return false; if (SESSION.admin) return true; return (PERM[what] || []).indexOf(SESSION.role) >= 0; }
+function isStudent() { return !!(SESSION && SESSION.role === 'student' && !SESSION.admin); }
 function sha256(s) { return crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)).then(function (b) { return [].map.call(new Uint8Array(b), function (x) { return x.toString(16).padStart(2, '0'); }).join(''); }); }
 function localUsers() { try { return JSON.parse(localStorage.getItem('crr.users') || '[]'); } catch (e) { return []; } }
 function saveLocalUsers(u) { try { localStorage.setItem('crr.users', JSON.stringify(u)); } catch (e) {} }
@@ -4087,13 +4087,14 @@ function setUser(id, patch) {
 }
 function renderUsers() {
   if (!isAdmin()) return '<div class="page"><div class="empty">' + LL('Раздел доступен только администратору', 'Administrators only') + '</div></div>';
+  if (!S.users && !CLOUD.on) S.users = localUsers();
   if (!S.users) { cloudUsers(function (a) { S.users = a; render(); }); return '<div class="page"><div class="empty">' + LL('Загрузка…', 'Loading…') + '</div></div>'; }
-  var h = pageHead(LL('Администрирование', 'Administration'), LL('Пользователи', 'Users'), LL('Новые регистрации ждут подтверждения администратором. У всех подтверждённых пользователей одинаковые права, отдельные права только у администратора.', 'New sign-ups wait for admin approval. All approved users have the same rights; only the admin has extra rights.'), '');
+  var h = pageHead(LL('Администрирование', 'Administration'), LL('Пользователи', 'Users'), LL('Новые регистрации ждут подтверждения администратором. Врач: полный доступ (ввод, правка, удаление, рандомизация, одобрение регистров). Резидент: ввод и правка, комментарии, заявки на регистры. Студент: только обезличенные данные и комментарии.', 'New sign-ups wait for admin approval. Doctor: full access (entry, edit, delete, randomisation, approvals). Resident: entry and edit, comments, registry requests. Student: anonymised data and comments only.'), '');
   var list = S.users.slice().sort(function (a, b) { return (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1); });
   h += '<div class="tablewrap"><table class="grid"><thead><tr><th>' + LL('Пользователь', 'User') + '</th><th>' + LL('Почта', 'Email') + '</th><th>' + LL('Права', 'Rights') + '</th><th>' + LL('Статус', 'Status') + '</th><th></th></tr></thead><tbody>';
   list.forEach(function (u) {
     var st = u.status === 'active' ? '<span class="st st-done">' + LL('Активен', 'Active') + '</span>' : u.status === 'pending' ? '<span class="st st-prog">' + LL('Ждёт подтверждения', 'Pending') + '</span>' : '<span class="st st-cancel">' + LL('Отклонён', 'Rejected') + '</span>';
-    h += '<tr><td class="strong"><span class="av sm">' + esc(initials(u.name)) + '</span> ' + esc(u.name) + (u.admin ? ' <span class="tag">admin</span>' : '') + '</td><td>' + esc(u.email) + '</td><td>' + (u.admin ? LL('Администратор', 'Admin') : LL('Пользователь', 'User')) + '</td><td>' + st + '</td><td class="ra">' + (u.admin ? (u.status !== 'active' ? '<button type="button" class="btn small primary" data-act="uok" data-id="' + u.id + '">' + LL('Подтвердить', 'Approve') + '</button>' : '') : (u.status !== 'active' ? '<button type="button" class="btn small primary" data-act="uok" data-id="' + u.id + '">' + LL('Подтвердить', 'Approve') + '</button>' : '') + (u.status !== 'rejected' ? '<button type="button" class="btn small ghost" data-act="uno" data-id="' + u.id + '">' + LL('Отключить', 'Disable') + '</button>' : '')) + '</td></tr>';
+    h += '<tr><td class="strong"><span class="av sm">' + esc(initials(u.name)) + '</span> ' + esc(u.name) + (u.admin ? ' <span class="tag">admin</span>' : '') + '</td><td>' + esc(u.email) + '</td><td>' + (u.admin ? LL('Администратор', 'Admin') + ' · ' : '') + '<select class="inp sm" data-act="urole" data-id="' + u.id + '">' + ['doctor', 'resident', 'student'].map(function (r) { return '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + esc(roleName(r)) + '</option>'; }).join('') + '</select></td><td>' + st + '</td><td class="ra">' + (u.admin ? (u.status !== 'active' ? '<button type="button" class="btn small primary" data-act="uok" data-id="' + u.id + '">' + LL('Подтвердить', 'Approve') + '</button>' : '') : (u.status !== 'active' ? '<button type="button" class="btn small primary" data-act="uok" data-id="' + u.id + '">' + LL('Подтвердить', 'Approve') + '</button>' : '') + (u.status !== 'rejected' ? '<button type="button" class="btn small ghost" data-act="uno" data-id="' + u.id + '">' + LL('Отключить', 'Disable') + '</button>' : '')) + '</td></tr>';
   });
   h += '</tbody></table></div>';
   h += '<div class="page-sec"><div class="panel wipe-p"><div class="ph"><h2>' + LL('Очистка данных', 'Data wipe') + '</h2></div>' + (DB.mig && DB.mig.w1 && !wipeStats().p && !wipeStats().c && !wipeStats().r ? '<p class="muted">' + LL('Данные очищены. В базе нет карточек и записей журналов.', 'Data has been wiped.') + '</p>' : wipeBlock(false)) + '</div></div>';
@@ -4167,6 +4168,7 @@ function renderAuthCard() {
     h += '<label class="af"><span>' + LL('Пароль', 'Password') + '</span><input type="password" name="password" id="auth-pass" data-sb="auth.pass" data-enter="' + (reg ? 'reg' : 'login') + '"' + (!reg && a.email && !a.pass ? ' autofocus' : '') + ' autocomplete="' + (reg ? 'new-password' : 'current-password') + '"></label>';
     if (reg) {
       h += '<label class="af"><span>' + LL('Повторите пароль', 'Repeat password') + '</span><input type="password" data-sb="auth.pass2" data-enter="reg" autocomplete="new-password"></label>';
+      h += '<div class="af"><span>' + LL('Роль', 'Role') + '</span><div class="roles">' + [['doctor', 'stethoscope', LL('Врач', 'Doctor'), LL('полный доступ: ввод, правка, удаление, рандомизация, одобрение регистров и исследований', 'full access: entry, edit, delete, randomisation, approval of registries and studies')], ['resident', 'users', LL('Резидент', 'Resident'), LL('ввод и правка данных, комментарии, заявки на новые регистры и исследования', 'data entry and edit, comments, requests for new registries and studies')], ['student', 'cap', LL('Студент', 'Student'), LL('просмотр обезличенных данных и комментарии', 'view anonymised data and comment')]].map(function (r) { return '<button type="button" class="role' + (a.role === r[0] ? ' on' : '') + '" data-act="arole" data-v="' + r[0] + '">' + ico(r[1], 18) + '<b>' + r[2] + '</b><em>' + r[3] + '</em></button>'; }).join('') + '</div><p class="fhint">' + LL('Роль подтверждает администратор.', 'The administrator confirms the role.') + '</p></div>';
     }
     if (a.err) h += '<div class="aerr">' + ico('alert', 15) + esc(a.err) + '</div>';
     h += '<button type="button" class="btn primary wide" data-act="' + (reg ? 'aregister' : 'alogin') + '"' + (a.busy ? ' disabled' : '') + '>' + (a.busy ? LL('Подождите…', 'Please wait…') : reg ? LL('Отправить заявку', 'Request access') : LL('Войти', 'Sign in')) + '</button></form>';
@@ -5668,6 +5670,7 @@ document.addEventListener('click', function (ev) {
     case 'csoff': if (confirm(LL('Выключить облачный режим и вернуться к локальным данным?', 'Disable cloud mode and return to local data?'))) { try { localStorage.removeItem('crr.fbconfig'); } catch (e) {} if (CLOUD.fb) CLOUD.fb.auth().signOut(); location.reload(); } break;
     case 'copyrules': { var fr = root.querySelector('#fbrules'); if (fr && navigator.clipboard) navigator.clipboard.writeText(fr.value).then(function () { toast(LL('Правила скопированы', 'Rules copied')); }); break; }
     case 'uok': setUser(g('id'), { status: 'active' }); break;
+    case 'urole': break;
     case 'uno': if (confirm(LL('Отключить доступ пользователю?', 'Disable this user?'))) setUser(g('id'), { status: 'rejected' }); break;
     case 'demoload': if (confirm(LL('Заменить облачные данные тестовым набором?', 'Replace cloud data with the test set?'))) { DB = migrate(demoDB()); save(); render(); } break;
     case 'backup': S.menu = null; download(t('file.backup') + ' ' + isoOf(new Date()) + '.json', JSON.stringify(DB), 'application/json'); render(); break;
@@ -5702,6 +5705,7 @@ document.addEventListener('input', function (ev) {
 document.addEventListener('change', function (ev) {
   var tg = ev.target, b = tg.getAttribute('data-bind');
   if (tg.id === 'retrofiles') { retroAdd(tg.files); tg.value = ''; return; }
+  if (tg.getAttribute('data-act') === 'urole' && isAdmin()) { setUser(tg.getAttribute('data-id'), { role: tg.value }); toast(LL('Роль изменена: ', 'Role changed: ') + roleName(tg.value)); return; }
   if (tg.getAttribute('data-tnt') && S.tnt) { S.tnt[tg.getAttribute('data-tnt')] = tg.checked; render(); return; }
   if (tg.getAttribute('data-tntd') && S.tnt) { S.tnt[tg.getAttribute('data-tntd')] = tg.value; render(); return; }
   if (tg.getAttribute('data-retrogp')) { var rg0 = RETRO.groups.filter(function (x) { return x.id === tg.getAttribute('data-retrogp'); })[0]; if (rg0) { rg0.pid = tg.value || null; rg0.pidManual = true; } render(); return; }
