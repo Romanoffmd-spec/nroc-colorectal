@@ -2173,7 +2173,7 @@ function exportCsv() {
 
 /* ======================= v9: shared helpers ======================= */
 function LL(ru, en) { return LANG === 'en' ? en : ru; }
-function me() { return UI.me || LL('Пользователь', 'User'); }
+function me() { var pf = typeof SESSION !== 'undefined' && SESSION && DB && DB.profiles ? DB.profiles[SESSION.id] : null; return (pf && pf.name) || UI.me || LL('Пользователь', 'User'); }
 function initials(s) { var p = String(s || '').trim().split(/\s+/).filter(Boolean); return ((p[0] || '?').charAt(0) + (p[1] ? p[1].charAt(0) : '')).toUpperCase(); }
 function nowIso() { return new Date().toISOString(); }
 function fmtDT(ts) { if (!ts) return ''; var d = new Date(ts); return fmtDate(isoOf(d)) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
@@ -3841,6 +3841,13 @@ function meProjTable(list) {
   if (!list.length) return '<div class="empty">' + LL('Вы пока не создали регистр или исследование', 'You have not created a registry or study yet') + '</div>';
   return '<div class="tablewrap"><table class="grid"><thead><tr><th>' + LL('Название', 'Name') + '</th><th>' + LL('Тип', 'Type') + '</th><th>' + LL('Моя роль', 'My role') + '</th><th>' + LL('Статус', 'Status') + '</th><th>' + LL('Пациентов', 'Patients') + '</th><th>' + LL('Последнее изменение', 'Last change') + '</th><th>' + LL('Одобрил(а)', 'Approved by') + '</th></tr></thead><tbody>' + list.map(function (x) { var a = x.r.appr || {}, la = x.pending ? '' : meLastAct(x.r); return '<tr data-act="view" data-v="' + (x.pending ? 'appr' : 'reg:' + x.r.id) + '" tabindex="0"><td class="strong">' + esc(regName(x.r)) + '</td><td>' + (x.r.kind === 'study' ? LL('Исследование', 'Study') : LL('Регистр', 'Registry')) + '</td><td>' + esc(x.role) + '</td><td>' + meProjStatus(x) + '</td><td>' + (x.pending ? '' : regCount(x.r)) + '</td><td>' + (la ? fmtDT(la) : '') + '</td><td>' + esc(a.okBy || '') + (a.okAt ? ', ' + fmtDate(String(a.okAt).slice(0, 10)) : '') + '</td></tr>'; }).join('') + '</tbody></table></div>';
 }
+function profPush() {
+  if (!CLOUD.on || !SESSION) return;
+  var id = SESSION.id, v = JSON.stringify((DB.profiles || {})[id] || {});
+  if (!CLOUD.db || !CLOUD.authed) { CLOUD.pfPending = true; return; }
+  CLOUD.pfPending = false; CLOUD.cache['pf_' + id] = v;
+  CLOUD.db.collection('data').doc('pf_' + id).set({ v: v, by: me(), at: nowIso() }).catch(function (e) { toast(LL('Профиль не сохранился в облаке: ', 'Profile not saved to cloud: ') + (e.code || e.message)); });
+}
 function meAct(a, g) {
   if (a === 'metab') { UI.metab = g('v'); saveUI(); if (S.view !== 'me') setView('me'); else render(); return true; }
   if (a === 'meflt') { UI.meflt = g('v'); saveUI(); render(); return true; }
@@ -3851,7 +3858,7 @@ function meAct(a, g) {
     var f = S.meProf || {}, nm = String(f.name || '').trim(); if (!nm) { toast(LL('Укажите имя', 'Enter your name')); return true; }
     DB.profiles = DB.profiles || {}; DB.profiles[SESSION.id] = { name: nm, pos: String(f.pos || '').trim(), dept: String(f.dept || '').trim(), phone: String(f.phone || '').trim(), orcid: String(f.orcid || '').trim(), about: String(f.about || '').trim(), at: nowIso() };
     if (nm !== SESSION.name) { SESSION.name = nm; UI.me = nm; if (!CLOUD.on) { var us = localUsers(); us.forEach(function (u) { if (u.id === SESSION.id) u.name = nm; }); saveLocalUsers(us); } setSession(SESSION); }
-    save(); S.meProf = null; toast(LL('Профиль сохранён', 'Profile saved')); render(); return true;
+    save(); profPush(); S.meProf = null; toast(LL('Профиль сохранён', 'Profile saved')); render(); return true;
   }
   if (a === 'mepassmail') { if (CLOUD.fb) CLOUD.fb.auth().sendPasswordResetEmail(SESSION.email).then(function () { toast(LL('Ссылка для смены пароля отправлена на ', 'Password link sent to ') + SESSION.email); }).catch(function (e) { toast(e.code || e.message); }); return true; }
   if (a === 'mepass') {
@@ -3996,7 +4003,7 @@ function cloudInit() {
         var p = d.exists ? d.data() : null;
         if (!p) { CLOUD.fb.auth().signOut(); return; }
         if (p.status !== 'active') { S.auth = S.auth || { mode: 'login' }; S.auth.mode = 'wait'; S.auth.busy = false; CLOUD.fb.auth().signOut(); render(); return; }
-        CLOUD.authed = true; setSession({ id: u.uid, email: u.email, name: p.name, role: p.role, admin: !!p.admin }); S.auth = null; if (S.view === 'portal') S.view = 'home';
+        CLOUD.authed = true; if (CLOUD.pfPending) profPush(); setSession({ id: u.uid, email: u.email, name: p.name, role: p.role, admin: !!p.admin }); S.auth = null; if (S.view === 'portal') S.view = 'home';
         cloudListen(); aiLoadShared(); qlListen(); render();
       });
     });
@@ -4023,7 +4030,8 @@ function cloudDocs() {
   (DB.pending || []).forEach(function (r) { m['x_' + r.id] = r; });
   Object.keys(DB.ms || {}).forEach(function (sid) { var x = DB.ms[sid]; ['papers', 'secs', 'lib', 'cm', 'zcols'].forEach(function (g2) { Object.keys(x[g2] || {}).forEach(function (k) { m['m_' + sid + '__' + g2 + '__' + k] = x[g2][k]; }); }); });
   if (CLOUD.on) m.qsnap = qSnapAll();
-  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, qtext: DB.qtext, dictOv: DB.dictOv, autosend: DB.autosend, qconc: DB.qconc, profiles: DB.profiles, studySeq: DB.studySeq, importedAt: DB.importedAt };
+  Object.keys(DB.profiles || {}).forEach(function (u) { m['pf_' + u] = DB.profiles[u]; });
+  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, qtext: DB.qtext, dictOv: DB.dictOv, autosend: DB.autosend, qconc: DB.qconc, studySeq: DB.studySeq, importedAt: DB.importedAt };
   var out = {}; Object.keys(m).forEach(function (k) { out[k.replace(/\//g, '_')] = JSON.stringify(m[k]); }); return out;
 }
 function cloudPush() {
@@ -4046,8 +4054,9 @@ function dbFromDocs(map) {
   var db = { v: 3, seq: 1, registries: [], pending: [], patients: [], cols: { planner: [], mdt: [], mm: [], redcap: [], goals: [], pubs: [] }, mig: {} };
   Object.keys(map).forEach(function (k) {
     var v; try { v = JSON.parse(map[k]); } catch (e) { return; }
-    if (k === 'meta') { Object.keys(v).forEach(function (x) { db[x] = v[x]; }); return; }
+    if (k === 'meta') { Object.keys(v).forEach(function (x) { if (x === 'profiles') { db.profiles = Object.assign({}, v.profiles || {}, db.profiles || {}); return; } db[x] = v[x]; }); return; }
     if (k === 'qsnap') return;
+    if (k.indexOf('pf_') === 0) { db.profiles = db.profiles || {}; db.profiles[k.slice(3)] = v; return; }
     if (k.indexOf('s_') === 0) { db.qsend = db.qsend || {}; db.qsend[k.slice(2)] = v; return; }
     if (k.indexOf('p_') === 0) db.patients.push(v);
     else if (k.indexOf('g_') === 0) db.registries.push(v);
