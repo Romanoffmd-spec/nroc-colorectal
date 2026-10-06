@@ -1997,6 +1997,17 @@ html[data-theme="dark"] .csec .fld .seg button:hover{background:#1A1C22}
 html[data-theme="dark"] .csec .fld .seg button.on{background:#4A5BE0;color:#fff}
 html[data-theme="dark"] .ctab.on{background:var(--surface);color:var(--ink)}
 html[data-theme="dark"] .csec .fld select.empty{color:var(--faint);font-weight:400}
+/* поправка: в фокусе то, что нужно заполнить */
+.csec .fld>label,.csec .fld>.lbl{font-size:13.5px;font-weight:600;color:var(--ink);letter-spacing:0}
+.csec .fld input,.csec .fld select,.csec .fld textarea{font-weight:400;color:var(--ink2);background:#fff;border-color:var(--ctrl)}
+.csec .fld.filled input,.csec .fld.filled select,.csec .fld.filled textarea,.csec .fld.filled .mbtn{background:var(--surface-2);border-color:var(--line)}
+.csec .fld .seg{background:#fff;border-color:var(--ctrl)}
+.csec .fld.filled .seg{background:var(--surface-2);border-color:var(--line)}
+.csec .fld .seg button{color:var(--ink2)}
+.csec .fld.filled .seg button:not(.on){color:var(--faint)}
+.csec .fld.filled>label,.csec .fld.filled>.lbl,.csec .fld.f-na>.lbl,.csec .fld.f-na>label{color:var(--muted);font-weight:500}
+html[data-theme="dark"] .csec .fld input,html[data-theme="dark"] .csec .fld select,html[data-theme="dark"] .csec .fld textarea,html[data-theme="dark"] .csec .fld .seg{background:#121318;border-color:#3A3D47}
+html[data-theme="dark"] .csec .fld.filled input,html[data-theme="dark"] .csec .fld.filled select,html[data-theme="dark"] .csec .fld.filled textarea,html[data-theme="dark"] .csec .fld.filled .mbtn,html[data-theme="dark"] .csec .fld.filled .seg{background:#08080A;border-color:#1F2127}
 </style>
 </head>
 <body>
