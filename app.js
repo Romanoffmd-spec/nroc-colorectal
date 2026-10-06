@@ -1069,7 +1069,9 @@ function apprMine() { return (DB.pending || []).filter(canApprove); }
 function renderAppr() {
   var list = (DB.pending || []).slice().sort(function (a, b) { return String(b.appr.at).localeCompare(String(a.appr.at)); });
   var h = pageHead(LL('Наука', 'Research'), LL('На одобрении', 'Awaiting approval'), LL('Новые исследования и регистры появляются для всех только после одобрения врачом, который их не создавал, или администратором (он может одобрить любую заявку, в том числе свою и ранее отклонённую).', 'New studies and registries go live after approval by a doctor other than the author, or by the admin (who can approve any request, including their own or a rejected one).'));
-  if (!list.length) return h + '<div class="empty">' + LL('Нет заявок на одобрение', 'Nothing awaiting approval') + '</div>';
+  var dq = (DB.delReq || []).filter(function (q) { return q.st === 'pending' && (isAdmin() || (SESSION && q.uid === SESSION.id)); });
+  if (dq.length) h += '<section class="card"><h3>' + ico('alert', 18) + LL('Запросы на удаление', 'Deletion requests') + '<span class="h3-note">' + dq.length + '</span></h3>' + dq.map(function (q) { return '<div class="dr-row"><div><b>' + esc(q.name) + '</b><span class="muted">' + (q.kind === 'study' ? LL('исследование', 'study') : LL('регистр', 'registry')) + ' · ' + esc(q.by) + ' · ' + fmtDT(q.at) + '</span>' + (q.reason ? '<p>' + esc(q.reason) + '</p>' : '') + '</div><div class="actions">' + (isAdmin() ? '<button type="button" class="btn small danger-t" data-act="drok" data-id="' + q.id + '">' + LL('Удалить', 'Delete') + '</button><button type="button" class="btn small" data-act="drno" data-id="' + q.id + '">' + LL('Отклонить', 'Decline') + '</button>' : '<span class="tag">' + LL('ждёт администратора', 'waiting for admin') + '</span>') + '</div></div>'; }).join('') + '</section>';
+  if (!list.length) return h + (dq.length ? '' : '<div class="empty">' + LL('Нет заявок на одобрение', 'Nothing awaiting approval') + '</div>');
   h += '<div class="apl">' + list.map(function (r) {
     var pr = r.kind === 'study' ? stProto(r) : null, a = r.appr, mine = SESSION && a.uid === SESSION.id;
     var st = a.st === 'rejected' ? '<span class="st st-cancel">' + LL('Отклонено', 'Rejected') + '</span>' : '<span class="st st-prog">' + LL('Ждёт одобрения', 'Pending') + '</span>';
@@ -1085,9 +1087,28 @@ function renderAppr() {
   }).join('') + '</div>';
   return h;
 }
-function canDelReg(r) { if (!r || !SESSION) return false; if (r.kind === 'track' || /^(g_surg|g_endo|rg_)/.test(r.id)) return isAdmin(); if (isAdmin()) return true; var a = r.appr || {}; return can('delete') || (a.uid && a.uid === SESSION.id) || meIs(a.by); }
+function canDelReg(r) { return !!(r && SESSION && isAdmin()); }
+function canReqDel(r) { if (!r || !SESSION || isAdmin() || r.kind === 'track' || /^(g_surg|g_endo|rg_)/.test(r.id)) return false; var a = r.appr || {}; return can('delete') || (a.uid && a.uid === SESSION.id) || meIs(a.by); }
+function delReqOpen(rid) { return (DB.delReq || []).filter(function (x) { return x.rid === rid && x.st === 'pending'; })[0]; }
+function regDelBtn(r) {
+  if (canDelReg(r)) return '<button type="button" class="btn ghost danger-t" data-act="regdel" data-id="' + r.id + '">' + ico('x', 16) + LL('Удалить', 'Delete') + '</button>';
+  if (!canReqDel(r)) return '';
+  if (delReqOpen(r.id)) return '<span class="tag">' + LL('Запрос на удаление у администратора', 'Deletion requested') + '</span>';
+  return '<button type="button" class="btn ghost danger-t" data-act="regdelreq" data-id="' + r.id + '">' + ico('x', 16) + LL('Запросить удаление', 'Request deletion') + '</button>';
+}
+function regDelRequest(rid) {
+  var r = regOf(rid); if (!r || !canReqDel(r) || delReqOpen(rid)) return;
+  var why = prompt(LL('Почему нужно удалить «', 'Why should "') + regName(r) + LL('»? Заявку рассмотрит администратор.', '" be deleted? An administrator will review the request.'), ''); if (why === null) return;
+  DB.delReq = (DB.delReq || []).concat([{ id: uid('dr'), rid: rid, name: regName(r), kind: r.kind === 'study' ? 'study' : 'registry', by: me(), uid: SESSION.id, at: nowIso(), reason: why.trim(), st: 'pending' }]);
+  save(); toast(LL('Заявка на удаление отправлена администратору', 'Deletion request sent to the administrator')); render();
+}
+function delReqAct(kind, id) {
+  var q = (DB.delReq || []).filter(function (x) { return x.id === id; })[0]; if (!q || !isAdmin() || q.st !== 'pending') return;
+  if (kind === 'ok') { var before = DB.registries.length; regDelete(q.rid); if (DB.registries.length < before || !regOf(q.rid)) { q.st = 'done'; q.okBy = me(); q.okAt = nowIso(); save(); render(); } }
+  else { var why = prompt(LL('Причина отказа (увидит автор заявки):', 'Reason (the requester will see it):'), ''); if (why === null) return; q.st = 'rejected'; q.noBy = me(); q.noAt = nowIso(); q.reason2 = why.trim(); save(); render(); }
+}
 function regDelete(id) {
-  var r = regOf(id); if (!r || !canDelReg(r)) return;
+  var r = regOf(id); if (!r || !isAdmin()) return;
   var isSt = r.kind === 'study', n = isSt ? DB.patients.filter(function (p) { return p.enroll && p.enroll[id]; }).length : regCount(r);
   if (!confirm((isSt ? LL('Удалить исследование «', 'Delete study "') : LL('Удалить регистр «', 'Delete registry "')) + regName(r) + LL('»?', '"?') + '\n\n' + (isSt ? LL('Включённых пациентов: ', 'Enrolled patients: ') + n + LL('. Карточки пациентов останутся в общем регистре, удалятся только протокол, включение и рандомизация по этому исследованию.', '. Patient records stay in the master registry; only the protocol, enrolment and randomisation of this study are removed.') : LL('Карточки пациентов останутся в общем регистре.', 'Patient records stay in the master registry.')))) return;
   DB.registries.forEach(function (x) { if (x.parent === id) x.parent = r.parent || null; });
@@ -1219,7 +1240,7 @@ function renderRegistry() {
     if (reg && reg.kind !== 'track') h += '<button type="button" class="btn" data-act="wropen" data-id="' + reg.id + '" title="' + LL('Статьи, тезисы и литература по этому регистру', 'Papers and library for this registry') + '">' + ico('doc', 16) + LL('Рукописи', 'Manuscripts') + '</button>';
     if (reg && can('edit')) h += '<button type="button" class="btn" data-act="editreg" data-id="' + reg.id + '">' + t('reg.configure') + '</button>';
     h += '<div class="dd"><button type="button" class="btn" data-act="menu" data-id="xl">' + ico('sheet', 16) + 'Excel' + ico('down', 14) + '</button>' + (S.menu === 'xl' ? '<div class="pop right" role="menu"><button type="button" class="opt" data-act="csv">' + ico('download', 16) + LL('Экспорт в Excel', 'Export to Excel') + '</button><button type="button" class="opt" data-act="imp">' + ico('upload', 16) + LL('Импорт из Excel или CSV', 'Import from Excel or CSV') + '</button><div class="pop-note">' + LL('Экспорт с кодами и кодбуком, обезличенный вариант. Импорт обновляет карточки по ID или № ИБ.', 'Export with codes and codebook, anonymised option. Import updates records by ID or case no.') + '</div></div>' : '') + '</div>';
-    h += (can('edit') ? '<button type="button" class="btn primary" data-act="newp">' + ico('plus', 16) + t('reg.addPatient') + '</button>' : '') + (reg && reg.kind !== 'track' && canDelReg(reg) ? '<button type="button" class="btn ghost danger-t" data-act="regdel" data-id="' + reg.id + '" title="' + LL('Удалить регистр', 'Delete registry') + '">' + ico('x', 16) + LL('Удалить', 'Delete') + '</button>' : '') + '</div></div>';
+    h += (can('edit') ? '<button type="button" class="btn primary" data-act="newp">' + ico('plus', 16) + t('reg.addPatient') + '</button>' : '') + (reg && reg.kind !== 'track' ? regDelBtn(reg) : '') + '</div></div>';
   }
   var ages = list.map(function (p) { return num(p.d.age); }).filter(function (x) { return x !== null; });
   var avg = ages.length ? Math.round(ages.reduce(function (a, b) { return a + b; }, 0) / ages.length) : null;
@@ -3432,7 +3453,7 @@ function renderEditor() {
   (function walk(pid, dep) { kids(pid, false).forEach(function (r) { if (r.id === e.id) return; opts.push([r.id, new Array(dep + 1).join('   ') + regName(r)]); walk(r.id, dep + 1); }); })(null, 0);
   h += '<div class="fld wide"><label for="regpar">' + t('ed.parent') + '</label><select id="regpar" data-ebind="parent">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + ((e.parent || '') === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select><p class="hint">' + t('ed.parentHint') + '</p></div></section>';
   h += (e.kind === 'track' ? '<section class="card"><p class="hint">' + LL('Раздел маршрута лечения: сюда попадают пациенты, которым МДГ рекомендовал «', 'Pathway section: patients whose MDT recommended «') + esc(regName(e)) + LL('». Ниже можно настроить, какие поля показывать в карточке, открытой из этого раздела.', '». Choose the fields shown here.') + '</p></section>' : edWho(e)) + edFields(e) + edCustom(e) + (e.kind === 'track' ? '' : warnBox(edWarnings(e)));
-  h += '</div><div class="dfoot"><div class="actions">' + (e.isNew ? '' : '<button type="button" class="btn danger" data-act="edelete">' + t('ed.delete') + '</button>') + '<button type="button" class="btn ghost" data-act="tplsave">' + ico('copy', 15) + LL('Сохранить как шаблон', 'Save as template') + '</button></div><div class="actions"><button type="button" class="btn" data-act="eclose">' + t('b.cancel') + '</button><button type="button" class="btn primary" data-act="esave">' + (e.isNew ? t('b.create') : t('b.save')) + '</button></div></div></section>';
+  h += '</div><div class="dfoot"><div class="actions">' + (e.isNew || !isAdmin() ? '' : '<button type="button" class="btn danger" data-act="edelete">' + t('ed.delete') + '</button>') + '<button type="button" class="btn ghost" data-act="tplsave">' + ico('copy', 15) + LL('Сохранить как шаблон', 'Save as template') + '</button></div><div class="actions"><button type="button" class="btn" data-act="eclose">' + t('b.cancel') + '</button><button type="button" class="btn primary" data-act="esave">' + (e.isNew ? t('b.create') : t('b.save')) + '</button></div></div></section>';
   return h;
 }
 function renderStudyEditor() {
@@ -3505,7 +3526,7 @@ function renderStudyEditor() {
   }
   if (step === 5) h += edFields(e) + edCustom(e);
   h += warnBox(step === 5 ? edWarnings(e) : []);
-  h += '</div><div class="dfoot"><div class="actions">' + (e.isNew ? '' : '<button type="button" class="btn danger" data-act="edelete">' + t('ed.delete') + '</button>') + '<button type="button" class="btn ghost" data-act="tplsave">' + ico('copy', 15) + LL('Сохранить как шаблон', 'Save as template') + '</button></div><div class="actions">' + (step ? '<button type="button" class="btn" data-act="estep" data-v="' + (step - 1) + '">' + ico('left', 16) + LL('Назад', 'Back') + '</button>' : '') + (step < 5 ? '<button type="button" class="btn" data-act="estep" data-v="' + (step + 1) + '">' + LL('Далее', 'Next') + ico('right', 16) + '</button>' : '') + '<button type="button" class="btn primary" data-act="esave">' + (e.isNew ? LL('Создать исследование', 'Create study') : t('b.save')) + '</button></div></div></section>';
+  h += '</div><div class="dfoot"><div class="actions">' + (e.isNew || !isAdmin() ? '' : '<button type="button" class="btn danger" data-act="edelete">' + t('ed.delete') + '</button>') + '<button type="button" class="btn ghost" data-act="tplsave">' + ico('copy', 15) + LL('Сохранить как шаблон', 'Save as template') + '</button></div><div class="actions">' + (step ? '<button type="button" class="btn" data-act="estep" data-v="' + (step - 1) + '">' + ico('left', 16) + LL('Назад', 'Back') + '</button>' : '') + (step < 5 ? '<button type="button" class="btn" data-act="estep" data-v="' + (step + 1) + '">' + LL('Далее', 'Next') + ico('right', 16) + '</button>' : '') + '<button type="button" class="btn primary" data-act="esave">' + (e.isNew ? LL('Создать исследование', 'Create study') : t('b.save')) + '</button></div></div></section>';
   return h;
 }
 function applyTemplate(id) {
@@ -3594,7 +3615,7 @@ function renderRandShow() {
 function studyHead(r) {
   var pr = stProto(r), n = stCount(r), tg = stTarget(pr), dl = daysTo(pr.deadline), cp = stNextCp(pr), lead = stLead(pr);
   var h = '<div class="shead"><div class="sh-l"><div class="crumbs"><button type="button" class="crumb" data-act="view" data-v="studies">' + t('nav.studies') + '</button><span class="csep">/</span><span class="mono">' + esc(pr.no || '') + '</span></div><h1>' + esc(regName(r)) + '</h1><div class="sh-tags">' + stStatusPill(pr) + '<span class="pill">' + esc(ov(pr.type || '')) + '</span>' + (pr.syn && pr.syn.design ? '<span class="pill">' + esc(ov(pr.syn.design)) + '</span>' : '') + (pr.rand.on === 'Да' ? '<span class="pill">' + ico('shuffle', 13) + LL('рандомизация', 'randomised') + '</span>' : '') + '</div>' + ((pr.syn && pr.syn.aim) || r.desc ? '<p class="sub">' + esc((pr.syn && pr.syn.aim) || r.desc) + '</p>' : '') + '</div>';
-  h += '<div class="actions"><button type="button" class="btn" data-act="editreg" data-id="' + r.id + '">' + ico('doc', 16) + LL('Протокол', 'Protocol') + '</button><button type="button" class="btn" data-act="csv">' + ico('download', 16) + LL('Экспорт', 'Export') + '</button><button type="button" class="btn primary" data-act="enroll" data-id="' + r.id + '">' + ico('plus', 16) + LL('Включить пациента', 'Enrol patient') + '</button>' + (canDelReg(r) ? '<button type="button" class="btn ghost danger-t" data-act="regdel" data-id="' + r.id + '" title="' + LL('Удалить исследование', 'Delete study') + '">' + ico('x', 16) + LL('Удалить', 'Delete') + '</button>' : '') + '</div></div>';
+  h += '<div class="actions"><button type="button" class="btn" data-act="editreg" data-id="' + r.id + '">' + ico('doc', 16) + LL('Протокол', 'Protocol') + '</button><button type="button" class="btn" data-act="csv">' + ico('download', 16) + LL('Экспорт', 'Export') + '</button><button type="button" class="btn primary" data-act="enroll" data-id="' + r.id + '">' + ico('plus', 16) + LL('Включить пациента', 'Enrol patient') + '</button>' + regDelBtn(r) + '</div></div>';
   h += '<div class="smeta"><div class="smi"><span>' + LL('Набор', 'Recruitment') + '</span><b>' + n + (tg ? '<i> / ' + tg + '</i>' : '') + '</b>' + (tg ? progressBar(n, tg) : '') + '</div><div class="smi"><span>' + LL('Дедлайн', 'Deadline') + '</span><b>' + (pr.deadline ? fmtDate(pr.deadline) : LL('не указан', 'not set')) + '</b><em class="' + (dl !== null && dl < 0 ? 'due' : '') + '">' + daysLabel(dl) + '</em></div><div class="smi"><span>' + LL('Ближайшая точка', 'Next checkpoint') + '</span><b>' + (cp ? esc(cp.title) : LL('нет', 'none')) + '</b><em>' + (cp ? fmtDate(cp.date) + ', ' + daysLabel(daysTo(cp.date)) : '') + '</em></div><div class="smi"><span>' + LL('Руководитель', 'Lead') + '</span><b>' + esc(lead || LL('не указан', 'not set')) + '</b><em>' + (pr.start ? LL('с ', 'since ') + fmtDate(pr.start) + ', ' + plural(Math.max(0, -daysTo(pr.start)), 'pl.day') : '') + '</em></div></div>';
   var tab = stabOf(r.id);
   h += '<div class="tabs pad">' + [['pts', LL('Пациенты', 'Patients'), n], ['proto', LL('Протокол', 'Protocol'), null], ['rand', LL('Рандомизация', 'Randomisation'), pr.rand.on === 'Да' ? (pr.log || []).length : null], ['cps', LL('Контрольные точки', 'Checkpoints'), (pr.cps || []).length], ['paper', LL('Статьи', 'Papers'), msPapers(r.id).length], ['lib', LL('Литература', 'Library'), msLib(r.id).length]].filter(function (x) { return x[0] !== 'rand' || pr.rand.on === 'Да'; }).map(function (x) { return '<button type="button" class="tab' + (tab === x[0] ? ' on' : '') + '" data-act="stab" data-v="' + x[0] + '">' + x[1] + (x[2] !== null ? '<span class="cnt">' + x[2] + '</span>' : '') + '</button>'; }).join('') + (tab === 'pts' ? '<span class="tabs-r"><input class="search" type="search" data-act="search" placeholder="' + t('reg.search') + '" aria-label="' + t('reg.search') + '" value="' + esc(S.q) + '"></span>' : '') + '</div>';
@@ -3755,6 +3776,8 @@ function inboxEvents() {
     if (a.okAt) ev.push({ id: 'ap1:' + r.id, ts: a.okAt, type: 'appr', ic: 'check', lvl: 'ok', t: LL('Одобрено: ', 'Approved: ') + kind + ' ' + nm, s: LL('одобрил(а) ', 'approved by ') + (a.okBy || ''), go: go });
     if (a.noAt && a.st === 'rejected') ev.push({ id: 'ap2:' + r.id + ':' + a.noAt, ts: a.noAt, type: 'appr', ic: 'alert', lvl: 'due', t: LL('Отклонено: ', 'Rejected: ') + kind + ' ' + nm, s: (a.noBy || '') + ': ' + (a.reason || LL('без комментария', 'no comment')), go: ['v', 'appr'] });
   });
+  (DB.delReq || []).forEach(function (q) { if (!(SESSION && q.uid === SESSION.id)) return; if (q.st === 'done') ev.push({ id: 'drd:' + q.id, ts: q.okAt, type: 'appr', ic: 'check', lvl: 'ok', t: LL('Удалено по вашему запросу: «', 'Deleted at your request: "') + q.name + LL('»', '"'), s: LL('подтвердил(а) ', 'confirmed by ') + (q.okBy || ''), go: ['v', 'studies'] }); else if (q.st === 'rejected') ev.push({ id: 'drn:' + q.id, ts: q.noAt, type: 'appr', ic: 'alert', lvl: 'due', t: LL('Запрос на удаление отклонён: «', 'Deletion request declined: "') + q.name + LL('»', '"'), s: (q.noBy || '') + (q.reason2 ? ': ' + q.reason2 : ''), go: ['v', 'reg:' + q.rid] }); });
+  if (isAdmin()) (DB.delReq || []).forEach(function (q) { if (q.st === 'pending') ev.push({ id: 'drw:' + q.id, ts: q.at, type: 'task', ic: 'alert', lvl: 'soon', t: LL('Запрос на удаление: «', 'Deletion request: "') + q.name + LL('»', '"'), s: q.by + (q.reason ? ': ' + q.reason : ''), go: ['v', 'appr'] }); });
   apprMine().filter(function (r) { var a = r.appr || {}; return !((SESSION && a.uid === SESSION.id) || meIs(a.by)); }).forEach(function (r) { ev.push({ id: 'apw:' + r.id, ts: (r.appr || {}).at || '', type: 'task', ic: 'check', lvl: 'soon', t: LL('Ждёт вашего одобрения: ', 'Awaiting your approval: ') + '«' + regName(r) + '»', s: LL('создал(а) ', 'by ') + ((r.appr || {}).by || ''), go: ['v', 'appr'] }); });
   var grp = {};
   DB.patients.forEach(function (p) {
@@ -3887,6 +3910,7 @@ function meAct(a, g) {
 /* ======================= Notifications ======================= */
 function notifs() {
   var out = [], td = isoOf(new Date()), tm = isoOf(addDays(td, 1));
+  if (isAdmin()) (DB.delReq || []).forEach(function (q) { if (q.st === 'pending') out.push({ id: 'dr:' + q.id, ic: 'alert', lvl: 'soon', t: LL('Запрос на удаление: «', 'Deletion request: "') + q.name + LL('»', '"'), s: q.by + (q.reason ? ': ' + q.reason : ''), go: ['v', 'appr'] }); });
   apprMine().forEach(function (r) { out.push({ id: 'ap:' + r.id, ic: 'check', lvl: 'soon', t: (r.kind === 'study' ? LL('Одобрить исследование: ', 'Approve study: ') : LL('Одобрить регистр: ', 'Approve registry: ')) + regName(r), s: LL('создал(а) ', 'by ') + (r.appr.by || ''), go: ['v', 'appr'] }); });
   fuDueAll().forEach(function (x) { if (x.f.st === 'overdue') out.push({ id: 'fu:' + x.p.id + ':' + x.f.key, ic: 'clock', lvl: 'due', t: LL('Просрочен контроль: ', 'Follow-up overdue: ') + x.f.label, s: pName(x.p) + ' · ' + daysLabel(x.f.days), go: ['p', x.p.id] }); });
   qDueAll(3).forEach(function (x) { if (asState(x.p, x.e) === 'plan' || asState(x.p, x.e) === 'sent') return; out.push({ id: 'q:' + x.p.id + ':' + x.e.id, ic: 'clipboard', lvl: x.n < 0 ? 'due' : 'soon', t: LL('Анкета ', 'Questionnaire ') + qShort(qTpl(x.e.tid)) + (x.n < 0 ? LL(' просрочена', ' overdue') : LL(' к заполнению', ' due')), s: pName(x.p) + ' · ' + daysLabel(x.n), go: ['p', x.p.id] }); });
@@ -4044,7 +4068,7 @@ function cloudDocs() {
   Object.keys(DB.ms || {}).forEach(function (sid) { var x = DB.ms[sid]; ['papers', 'secs', 'lib', 'cm', 'zcols'].forEach(function (g2) { Object.keys(x[g2] || {}).forEach(function (k) { m['m_' + sid + '__' + g2 + '__' + k] = x[g2][k]; }); }); });
   if (CLOUD.on) m.qsnap = qSnapAll();
   Object.keys(DB.profiles || {}).forEach(function (u) { m['pf_' + u] = DB.profiles[u]; });
-  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, qtext: DB.qtext, dictOv: DB.dictOv, autosend: DB.autosend, qconc: DB.qconc, studySeq: DB.studySeq, importedAt: DB.importedAt };
+  m.meta = { v: DB.v, seq: DB.seq, mig: DB.mig, templates: DB.templates, qtpl: DB.qtpl, qtext: DB.qtext, dictOv: DB.dictOv, autosend: DB.autosend, qconc: DB.qconc, delReq: DB.delReq, studySeq: DB.studySeq, importedAt: DB.importedAt };
   var out = {}; Object.keys(m).forEach(function (k) { out[k.replace(/\//g, '_')] = JSON.stringify(m[k]); }); return out;
 }
 function cloudPush() {
@@ -5508,7 +5532,10 @@ document.addEventListener('click', function (ev) {
     case 'eclose': S.edit = null; render(); break;
     case 'esave': saveEditor(); break;
     case 'regdel': regDelete(g('id')); break;
-    case 'edelete':
+    case 'regdelreq': regDelRequest(g('id')); break;
+    case 'drok': delReqAct('ok', g('id')); break;
+    case 'drno': delReqAct('no', g('id')); break;
+    case 'edelete': if (!isAdmin()) break;
       if (confirm(t('confirm.delReg', { n: regName(S.edit) }))) { var rid = S.edit.id; DB.registries.forEach(function (r) { if (r.parent === rid) r.parent = S.edit.parent; }); DB.registries = DB.registries.filter(function (r) { return r.id !== rid; }); DB.patients.forEach(function (p) { delete p.custom[rid]; }); S.edit = null; setView('reg:all'); save(); toast(t('toast.regDeleted')); }
       break;
     case 'radd': S.edit.rules.push({ f: 'loc', vals: [] }); render(); break;
