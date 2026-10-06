@@ -3770,7 +3770,11 @@ function isStudent() { return false; }
 function sha256(s) { return crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)).then(function (b) { return [].map.call(new Uint8Array(b), function (x) { return x.toString(16).padStart(2, '0'); }).join(''); }); }
 function localUsers() { try { return JSON.parse(localStorage.getItem('crr.users') || '[]'); } catch (e) { return []; } }
 function saveLocalUsers(u) { try { localStorage.setItem('crr.users', JSON.stringify(u)); } catch (e) {} }
-function setSession(s) { SESSION = s; if (s) { UI.me = s.name; saveUI(); if (s.role === 'student' && !s.admin) maskForStudent(); } try { if (!CLOUD.on) { if (s) localStorage.setItem('crr.session', JSON.stringify(s)); else localStorage.removeItem('crr.session'); } } catch (e) {} }
+function setSession(s) { SESSION = s; if (s) { UI.me = s.name; saveUI(); if (s.role === 'student' && !s.admin) maskForStudent(); } try { var sk = CLOUD.on ? 'crr.cloud.sess' : 'crr.session'; if (s) { localStorage.setItem(sk, JSON.stringify(s)); if (s.email) localStorage.setItem('crr.lastEmail', s.email); } else localStorage.removeItem(sk); } catch (e) {} }
+function lastEmail() { try { return localStorage.getItem('crr.lastEmail') || ''; } catch (e) { return ''; } }
+function authPrefill() { var em = lastEmail(); if (em && !SESSION) S.auth = { mode: 'login', role: 'doctor', email: em, show: true }; }
+/* облако: сразу показываем рабочий экран по сохранённой сессии, вход проверяется в фоне */
+if (CLOUD.on) { try { var cs0 = JSON.parse(localStorage.getItem('crr.cloud.sess') || 'null'); if (cs0 && cs0.id) { SESSION = cs0; if (cs0.name) UI.me = cs0.name; } } catch (e) { SESSION = null; } }
 if (!CLOUD.on) { try { SESSION = JSON.parse(localStorage.getItem('crr.session') || 'null'); if (SESSION) { var lu = localUsers().filter(function (u) { return u.id === SESSION.id; })[0]; if (!lu || lu.status !== 'active') SESSION = null; else { SESSION.role = lu.role; SESSION.admin = lu.admin; SESSION.name = lu.name; } } } catch (e) { SESSION = null; } }
 function authErr(code) {
   var m = { 'auth/email-already-in-use': LL('Эта почта уже зарегистрирована', 'This email is already registered'), 'auth/invalid-email': LL('Неверный формат почты', 'Invalid email'), 'auth/weak-password': LL('Пароль слишком короткий: минимум 6 символов', 'Password too short: at least 6 characters'), 'auth/invalid-credential': LL('Неверная почта или пароль', 'Wrong email or password'), 'auth/wrong-password': LL('Неверная почта или пароль', 'Wrong email or password'), 'auth/user-not-found': LL('Неверная почта или пароль', 'Wrong email or password'), 'auth/too-many-requests': LL('Слишком много попыток, подождите минуту', 'Too many attempts, wait a minute'), 'auth/network-request-failed': LL('Нет связи с сервером', 'No connection to the server') };
@@ -3793,7 +3797,8 @@ function doRegister() {
   });
 }
 function doLogin() {
-  var a = S.auth, email = String(a.email || '').trim().toLowerCase();
+  var a = S.auth, ie = document.getElementById('auth-email'), ip = document.getElementById('auth-pass'); if (ie && ie.value) a.email = ie.value; if (ip && ip.value) a.pass = ip.value;
+  var email = String(a.email || '').trim().toLowerCase();
   if (!email || !a.pass) { a.err = LL('Введите почту и пароль', 'Enter email and password'); render(); return; }
   a.busy = true; a.err = ''; render();
   if (CLOUD.on) { cloudLogin(email, a.pass); return; }
@@ -3809,7 +3814,7 @@ function doLogin() {
 function doLogout() {
   if (!confirm(LL('Выйти из аккаунта?', 'Sign out?'))) return;
   if (CLOUD.on && CLOUD.fb) CLOUD.fb.auth().signOut();
-  setSession(null); S.drawer = S.rec = S.edit = null; S.menu = null; render();
+  setSession(null); S.drawer = S.rec = S.edit = null; S.menu = null; authPrefill(); render();
 }
 
 /* Firebase (compat SDK, loaded on demand) */
@@ -3820,12 +3825,13 @@ function cloudInit() {
   loadScript(base + 'firebase-app-compat.js').then(function () { return Promise.all([loadScript(base + 'firebase-auth-compat.js'), loadScript(base + 'firebase-firestore-compat.js')]); }).then(function () {
     CLOUD.fb = window.firebase; CLOUD.fb.initializeApp(CLOUD.cfg); CLOUD.db = CLOUD.fb.firestore(); CLOUD.ready = true;
     CLOUD.fb.auth().onAuthStateChanged(function (u) {
-      if (!u) { SESSION = null; render(); return; }
+      if (!u) { CLOUD.authed = false; if (SESSION) setSession(null); authPrefill(); render(); return; }
+      if (SESSION && SESSION.id !== u.uid) setSession(null);
       CLOUD.db.collection('users').doc(u.uid).get().then(function (d) {
         var p = d.exists ? d.data() : null;
         if (!p) { CLOUD.fb.auth().signOut(); return; }
         if (p.status !== 'active') { S.auth = S.auth || { mode: 'login' }; S.auth.mode = 'wait'; S.auth.busy = false; CLOUD.fb.auth().signOut(); render(); return; }
-        setSession({ id: u.uid, email: u.email, name: p.name, role: p.role, admin: !!p.admin }); S.auth = null; if (S.view === 'portal') S.view = 'home';
+        CLOUD.authed = true; setSession({ id: u.uid, email: u.email, name: p.name, role: p.role, admin: !!p.admin }); S.auth = null; if (S.view === 'portal') S.view = 'home';
         cloudListen(); aiLoadShared(); qlListen(); render();
       });
     });
@@ -3856,7 +3862,7 @@ function cloudDocs() {
   var out = {}; Object.keys(m).forEach(function (k) { out[k.replace(/\//g, '_')] = JSON.stringify(m[k]); }); return out;
 }
 function cloudPush() {
-  if (!CLOUD.on || !CLOUD.db || !SESSION || !can('edit')) return;
+  if (!CLOUD.on || !CLOUD.db || !CLOUD.authed || !SESSION || !can('edit')) return;
   clearTimeout(CLOUD.timer);
   CLOUD.timer = setTimeout(function () {
     var cur = cloudDocs(), ops = [];
@@ -3991,13 +3997,14 @@ function renderAuthCard() {
     h += '<h2>' + (reg ? LL('Регистрация', 'Create account') : LL('Вход', 'Sign in')) + '</h2><p class="muted">' + (reg ? LL('Доступ к данным откроется после подтверждения администратором.', 'Access opens after administrator approval.') : LL('Рабочее пространство колоректального сектора.', 'Colorectal unit workspace.')) + '</p>';
     h += '<div class="seg full"><button type="button" class="' + (!reg ? 'on' : '') + '" data-act="amode" data-v="login">' + LL('Вход', 'Sign in') + '</button><button type="button" class="' + (reg ? 'on' : '') + '" data-act="amode" data-v="reg">' + LL('Регистрация', 'Sign up') + '</button></div>';
     if (reg) h += '<label class="af"><span>' + LL('Фамилия и имя', 'Full name') + '</span><input type="text" data-sb="auth.name" value="' + esc(a.name || '') + '" autocomplete="name" placeholder="' + LL('Иванов Иван', 'John Smith') + '"></label>';
-    h += '<label class="af"><span>' + LL('Рабочая почта', 'Work email') + '</span><input type="email" data-sb="auth.email" value="' + esc(a.email || '') + '" autocomplete="username" placeholder="name@cancercenter.kz"></label>';
-    h += '<label class="af"><span>' + LL('Пароль', 'Password') + '</span><input type="password" data-sb="auth.pass" data-enter="' + (reg ? 'reg' : 'login') + '" autocomplete="' + (reg ? 'new-password' : 'current-password') + '"></label>';
+    h += '<form class="aform" method="post" action="#" autocomplete="on" onsubmit="return false">';
+    h += '<label class="af"><span>' + LL('Рабочая почта', 'Work email') + '</span><input type="email" name="email" id="auth-email" data-sb="auth.email" value="' + esc(a.email || '') + '" autocomplete="username" placeholder="name@cancercenter.kz"></label>';
+    h += '<label class="af"><span>' + LL('Пароль', 'Password') + '</span><input type="password" name="password" id="auth-pass" data-sb="auth.pass" data-enter="' + (reg ? 'reg' : 'login') + '"' + (!reg && a.email && !a.pass ? ' autofocus' : '') + ' autocomplete="' + (reg ? 'new-password' : 'current-password') + '"></label>';
     if (reg) {
       h += '<label class="af"><span>' + LL('Повторите пароль', 'Repeat password') + '</span><input type="password" data-sb="auth.pass2" data-enter="reg" autocomplete="new-password"></label>';
     }
     if (a.err) h += '<div class="aerr">' + ico('alert', 15) + esc(a.err) + '</div>';
-    h += '<button type="button" class="btn primary wide" data-act="' + (reg ? 'aregister' : 'alogin') + '"' + (a.busy ? ' disabled' : '') + '>' + (a.busy ? LL('Подождите…', 'Please wait…') : reg ? LL('Отправить заявку', 'Request access') : LL('Войти', 'Sign in')) + '</button>';
+    h += '<button type="button" class="btn primary wide" data-act="' + (reg ? 'aregister' : 'alogin') + '"' + (a.busy ? ' disabled' : '') + '>' + (a.busy ? LL('Подождите…', 'Please wait…') : reg ? LL('Отправить заявку', 'Request access') : LL('Войти', 'Sign in')) + '</button></form>';
     if (!CLOUD.on && !localUsers().length) h += '<p class="pt-note">' + LL('Первый зарегистрированный пользователь становится администратором.', 'The first registered user becomes the administrator.') + '</p>';
   }
   h += '</div><div class="pt-mode">' + (CLOUD.on ? '<span class="dot ok"></span>' + LL('Общая база · ', 'Shared database · ') + esc(CLOUD.cfg.projectId) + (CLOUD.err ? ' · <span class="due">' + esc(CLOUD.err) + '</span>' : !CLOUD.ready ? LL(' · подключение…', ' · connecting…') : '') : '<span class="dot"></span>' + LL('Локальный режим: данные в этом браузере', 'Local mode: data in this browser')) + ' · <button type="button" class="linkbtn" data-act="cloudsetup">' + LL('Облако', 'Cloud') + '</button></div>';
@@ -8394,6 +8401,7 @@ document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') dd
 window.addEventListener('scroll', function () { if (Date.now() - (window.__ddAt || 0) > 400) ddPopClose(); }, true);
 window.__CRR = { SECTIONS: SECTIONS, MODULES: MODULES, MEDIA: MEDIA, COLS: COLS, DICT: DICT, OPT: OPT };
 if (SESSION && isStudent()) maskForStudent();
+if (!SESSION) authPrefill();
 themeApply();
 if (window.matchMedia) try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { if (!UI.theme) { themeApply(); render(); } }); } catch (e) {}
 cloudInit();
