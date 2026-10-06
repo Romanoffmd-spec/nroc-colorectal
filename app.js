@@ -1733,11 +1733,11 @@ function cardTabBody(dr, tab, tags) {
 function renderPatient() {
   var dr = S.drawer, p = dr.p, d = p.d;
   var tags = tagsOf(DB.registries.filter(function (r) { return draftIn(dr, r); }));
-  var h = '<div class="dim" data-act="close"></div><section class="drawer wide-drawer' + (dr.full ? ' full' : '') + '" role="dialog" aria-modal="true" aria-label="' + t('pc.title') + '">';
+  var h = '<div class="dim" data-act="close"></div><section class="drawer wide-drawer' + ' full' + '" role="dialog" aria-modal="true" aria-label="' + t('pc.title') + '">';
   h += '<div class="dhead"><span class="av xl">' + esc(d.fio ? initials(d.fio) : '+') + '</span><div class="dh-main"><div class="dh-kicker">' + (dr.isNew ? t('pc.new') : LL('Карточка пациента', 'Patient record')) + (d.ib ? ' · ИБ ' + esc(d.ib) : '') + '</div><div class="dh-title">' + esc(d.fio || (dr.isNew ? t('pc.new') : p.id)) + '</div>';
   h += '<div class="dh-sub"><span class="mono">' + p.id + '</span>' + [ [ov(d.sex), d.age ? d.age + ' ' + t('u.years') : ''].filter(Boolean).join(', '), ov(d.loc) ].filter(Boolean).map(function (s) { return ' · ' + esc(s); }).join('') + '</div>';
   h += '<div class="facts">' + [['cTNM', [d.cT, d.cN, d.cM].filter(Boolean).join(' ')], [t('col.proc'), ov(d.proc)], [LL('Дата операции', 'Surgery date'), fmtDate(d.date)], [LL('Врач', 'Surgeon'), ov(d.surgeon)], [LL('Поступление', 'Admission'), fmtDate(d.admDate)]].filter(function (x) { return x[1]; }).map(function (x) { return '<span class="fact"><em>' + esc(x[0]) + '</em>' + esc(x[1]) + '</span>'; }).join('') + '</div></div>';
-  h += '<div class="dh-r">' + (can('edit') && !isStudent() ? '<button type="button" class="btn small dxbtn" data-act="dxopen" title="' + LL('Загрузить PDF выписки, осмотра или протокола: ИИ сам заполнит поля и покажет сводку', 'Upload a PDF: AI fills the fields and shows a summary') + '">' + ico('upload', 14) + LL('Из документа', 'From document') + '</button>' : '') + (p.notion ? '<a class="btn small" href="' + esc(p.notion) + '" target="_blank" rel="noopener">' + ico('ext', 15) + 'Notion</a>' : '') + '<button type="button" class="btn small ai' + (UI.aip ? ' on' : '') + '" data-act="aitoggle">' + ico('sparkle', 14) + LL('Ассистент', 'Assistant') + '</button>' + '<button type="button" class="iconbtn" aria-label="' + t(dr.full ? 'a11y.shrink' : 'a11y.expandCard') + '" title="' + t(dr.full ? 'a11y.shrink' : 'a11y.expandCard') + '" data-act="full">' + ico(dr.full ? 'shrink' : 'expand', 18) + '</button><button type="button" class="iconbtn" aria-label="' + t('a11y.close') + '" data-act="close">' + ico('x', 20) + '</button></div></div>';
+  h += '<div class="dh-r">' + (can('edit') && !isStudent() ? '<button type="button" class="btn small dxbtn" data-act="dxopen" title="' + LL('Загрузить PDF выписки, осмотра или протокола: ИИ сам заполнит поля и покажет сводку', 'Upload a PDF: AI fills the fields and shows a summary') + '">' + ico('upload', 14) + LL('Из документа', 'From document') + '</button>' : '') + (p.notion ? '<a class="btn small" href="' + esc(p.notion) + '" target="_blank" rel="noopener">' + ico('ext', 15) + 'Notion</a>' : '') + '<button type="button" class="btn small ai' + (UI.aip ? ' on' : '') + '" data-act="aitoggle">' + ico('sparkle', 14) + LL('Ассистент', 'Assistant') + '</button>' + '<button type="button" class="iconbtn" aria-label="' + t('a11y.close') + '" data-act="close">' + ico('x', 20) + '</button></div></div>';
   var tab = dr.tab || (dr.isNew ? 'pre' : UI.ctab) || 'pre'; if (['pre', 'op', 'post', 'more', 'view'].indexOf(tab) < 0) tab = 'pre';
   h += cardTabs(dr, tab);
   if (tab === 'view') {
@@ -5146,7 +5146,7 @@ document.addEventListener('click', function (ev) {
       render(); break;
     }
     case 'pickclose': S.pick = null; render(); break;
-    case 'full': S.drawer.full = !S.drawer.full; render(); break;
+    case 'full': break;
     case 'calnav': { var ck = g('k'), cur2 = UI.cal[ck] || isoOf(new Date()).slice(0, 7); var dd = new Date(+cur2.slice(0, 4), +cur2.slice(5, 7) - 1 + (+g('d')), 1); UI.cal[ck] = isoOf(dd).slice(0, 7); saveUI(); S.inline = null; render(); break; }
     case 'caltoday': UI.cal[g('k')] = isoOf(new Date()).slice(0, 7); saveUI(); render(); break;
     case 'inline': S.inline = { k: g('k'), d: g('d') }; render(); break;
