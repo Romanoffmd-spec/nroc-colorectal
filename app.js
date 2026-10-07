@@ -141,6 +141,7 @@ var NEO_T = TACTICS.slice(1, 5);
 function tacShort(v) { var m = /\(([^)]+)\)$/.exec(v); return m ? m[1] : v; }
 function hasTac(d, list) { return (d.tactic || []).some(function (x) { return list.indexOf(x) >= 0; }); }
 var YN = ['Нет', 'Да'];
+var NEO_OPT = ['Нет', 'НАХТ', 'НАЛТ', 'НАХЛТ', 'TNT'];
 var MIS = ['Лапароскопический', 'Робот-ассистированный', 'Трансанальный (TaTME)', 'Гибридный (лапароскопия + TaTME)'];
 var ACCESS = ['Лапароскопический', 'Робот-ассистированный', 'Открытый', 'Трансанальный (TaTME)', 'Гибридный (лапароскопия + TaTME)'];
 var ENDO = ['ESD', 'EMR', 'Полипэктомия', 'Стентирование', 'Баллонная дилатация', 'Другое'];
@@ -223,11 +224,11 @@ var SECTIONS = [
     f('hb0', 'Hb (до операции)', 'Preoperative haemoglobin', 'num', { unit: 'u.gl' })
   ]},
   { id: 'neo', phase: 'pre', title: ['НАПХТ/ЛТ', 'Neoadjuvant chemoradiotherapy'], fields: [
-    f('neoCrt', 'Неоадъювантная ХЛТ', 'Neoadjuvant chemoradiotherapy', 'seg', { options: YN }),
+    f('neoCrt', 'Неоадъювантная терапия', 'Neoadjuvant therapy', 'seg', { options: NEO_OPT }),
     f('rtStart', 'Начало ЛТ', 'Radiotherapy start date', 'date'),
     f('rtEnd', 'Конец ЛТ', 'Radiotherapy end date', 'date'),
     f('sod', 'СОД', 'Total radiation dose', 'num', { unit: 'u.gy' }),
-    f('crtRegimen', 'Режим ХЛТ', 'Chemoradiotherapy regimen', 'text', { wide: true }),
+    f('crtRegimen', 'Режим неоадъювантной терапии', 'Neoadjuvant regimen', 'text', { wide: true }),
     f('crtInterval', 'Интервал ХЛТ', 'Interval from chemoradiotherapy to surgery', 'num', { unit: 'u.days' })
   ]},
   { id: 'mri', phase: 'pre', title: ['МРТ до операции/ХЛТ', 'Baseline MRI (before surgery or chemoradiotherapy)'], fields: [
@@ -389,6 +390,47 @@ var SECTIONS = [
     f('deathDate', 'Дата смерти', 'Date of death', 'date')
   ]}
 ];
+/* Подполя видны только при положительном ответе на родительский вопрос.
+   Заполненное поле не прячется, если родитель не задан или значение не «Нет», чтобы при сохранении не терять данные. */
+(function () {
+  function yes(id) { return function (d) { return d[id] === 'Да'; }; }
+  var NEO_RT = ['Да', 'НАЛТ', 'НАХЛТ', 'TNT'];
+  var DEPENDS = [
+    ['comorb', yes('comorb'), ['diab', 'htn', 'cvd', 'lung', 'cvb', 'liverDz', 'comorbOther']],
+    ['smoke', function (d) { return d.smoke === 'Да' || d.ecig === 'Да'; }, ['smokeYrs']],
+    ['multiPrim', yes('multiPrim'), ['otherTumor']],
+    ['neoCrt', function (d) { return NEO_RT.indexOf(d.neoCrt) >= 0; }, ['rtStart', 'rtEnd', 'sod']],
+    ['neoCrt', function (d) { return has(d.neoCrt) && d.neoCrt !== 'Нет'; }, ['crtRegimen', 'crtInterval']],
+    ['mrLat', yes('mrLat'), ['llBefore']],
+    ['mrLN', yes('mrLN'), ['mrLNsize']],
+    ['access', function (d) { return has(d.access) && d.access !== 'Открытый'; }, ['conv']],
+    ['anast', yes('anast'), ['anDet']],
+    ['simult', yes('simult'), ['sLiver', 'sBladder', 'sGyn', 'sLnd', 'sLndPelv', 'sLndIng', 'sGi', 'sOther']],
+    ['stoma', function (d) { return has(d.stoma) && d.stoma !== 'Нет'; }, ['stomaClose']],
+    ['reop30', yes('reop30'), ['reopName', 'reopDate']],
+    ['mort30', yes('mort30'), ['mortDate', 'mortCause']],
+    ['adj', yes('adj'), ['adjRegimen', 'adjComplete', 'adjStart', 'adjEnd']],
+    ['stomaStat', function (d) { return d.stomaStat === 'Временная'; }, ['stomaRevDate']],
+    ['recur', yes('recur'), ['recurDate', 'recurMethod']],
+    ['localRec', yes('localRec'), ['localRecLoc', 'localRecDate']],
+    ['distMets', yes('distMets'), ['metDate', 'metLoc']],
+    ['dead', yes('dead'), ['deathDate']]
+  ];
+  var byId = {};
+  SECTIONS.forEach(function (s) { s.fields.forEach(function (x) { byId[x.id] = x; }); });
+  DEPENDS.forEach(function (r) {
+    var parent = r[0], cond = r[1];
+    r[2].forEach(function (id) {
+      var x = byId[id]; if (!x) return;
+      var prev = x.show;
+      x.show = function (d) {
+        var v = d[id];
+        var ok = cond(d) || (has(v) && (!has(d[parent]) || v !== 'Нет'));
+        return ok && (!prev || prev(d));
+      };
+    });
+  });
+})();
 var MODULES = [];
 var MEDIA = [];
 var FU = [['d30', 30, 'fu.d30'], ['d90', 90, 'fu.d90'], ['m6', 182, 'fu.m6'], ['d365', 365, 'fu.y1'], ['y2', 730, 'fu.y2'], ['y3', 1095, 'fu.y3'], ['y5', 1826, 'fu.y5']];
@@ -469,7 +511,7 @@ var DDEF = {
   cM: ['Клиническая категория M до начала любого лечения.', 'Clinical M before any treatment.', 'tnm8', 1],
   emvi: ['Экстрамуральная венозная инвазия по МРТ до лечения.', 'Extramural venous invasion on pre-treatment MRI.', 'mercury'],
   mrCRM: ['Положительный: расстояние от опухоли или узла до мезоректальной фасции 1 мм и менее по МРТ.', 'Positive: tumour or node ≤1 mm from the mesorectal fascia on MRI.', 'mercury'],
-  neoCrt: ['Проводилась ли неоадъювантная химиолучевая или лучевая терапия.', 'Neoadjuvant chemoradiotherapy or radiotherapy given.', 'ichom'],
+  neoCrt: ['Какая неоадъювантная терапия проводилась: НАХТ (только химиотерапия), НАЛТ (только лучевая, в т.ч. короткий курс), НАХЛТ (химиолучевая), TNT (тотальная неоадъювантная).', 'Neoadjuvant therapy given: chemotherapy only, radiotherapy only (incl. short course), chemoradiotherapy, or total neoadjuvant therapy (TNT).', 'ichom'],
   rtStart: ['Дата первой фракции лучевой терапии.', 'Date of first RT fraction.', 'ichom'], rtEnd: ['Дата последней фракции лучевой терапии.', 'Date of last RT fraction.', 'ichom'],
   sod: ['Суммарная очаговая доза, Гр.', 'Total dose, Gy.', ''],
   date: ['Дата основной (индексной) операции.', 'Date of the index operation.', 'ichom', 1],
@@ -4781,7 +4823,7 @@ function buildHistory(p) {
   if (cm.length || d.comorbOther || d.asa) out.push('СОПУТСТВУЮЩИЕ\n' + [cm.join(', '), d.comorbOther, d.asa ? 'ASA ' + d.asa : ''].filter(Boolean).join('; ') + '.');
   var E = function (dt, t2) { if (t2) ev.push([dt || '', t2]); };
   E(d.regDate, d.regDate ? 'Регистрация в регистре.' : '');
-  if (d.neoCrt === 'Да') E(d.rtStart, 'Неоадъювантная ХЛТ' + (d.rtStart || d.rtEnd ? ' ' + [fmtDate(d.rtStart), fmtDate(d.rtEnd)].filter(Boolean).join(' - ') : '') + (d.sod ? ', СОД ' + d.sod + ' Гр' : '') + (d.crtRegimen ? ', ' + d.crtRegimen : '') + '.');
+  if (d.neoCrt && d.neoCrt !== 'Нет') E(d.rtStart, 'Неоадъювантная терапия' + (d.neoCrt !== 'Да' ? ' (' + d.neoCrt + ')' : '') + (d.rtStart || d.rtEnd ? ' ' + [fmtDate(d.rtStart), fmtDate(d.rtEnd)].filter(Boolean).join(' - ') : '') + (d.sod ? ', СОД ' + d.sod + ' Гр' : '') + (d.crtRegimen ? ', ' + d.crtRegimen : '') + '.');
   E(d.admDate, d.admDate ? 'Госпитализация.' : '');
   if (d.proc || d.date) E(d.date, 'Операция: ' + [F('proc'), F('access'), F('urg'), d.conv === 'Да' ? 'конверсия' : '', d.stoma ? 'стома: ' + F('stoma') : '', d.r ? F('r') : ''].filter(Boolean).join(', ') + (d.surgeon ? ' (хирург ' + d.surgeon + ')' : '') + '.');
   ['cd1', 'cd2', 'cd3', 'cd4', 'cd5'].forEach(function (k, i) { if (has(d[k])) E(d.date, 'Осложнение Clavien-Dindo ' + ['I', 'II', 'III', 'IV', 'V'][i] + ': ' + d[k] + '.'); });
@@ -6858,7 +6900,7 @@ function dxRules(doc) {
       if (pre) add('hb0', String(pre.v), LL('ОАК от ', 'CBC of ') + fmtDate(pre.d), 0.8); if (post) add('hb1', String(post.v), LL('последний ОАК после операции, ', 'last post-op CBC, ') + fmtDate(post.d), 0.75);
     }
     /* неоадъювантная ХЛТ */
-    if ((mm = /(?:ХЛТ|химио-?лучев[\wА-Яа-яЁё]*\s+терап[\wА-Яа-яЁё]*)[\s\S]{0,200}?(?<![А-Яа-яЁё])[Сс]\s+(\d{1,2}\.\d{1,2}\.\d{2,4})\s+по\s+(\d{1,2}\.\d{1,2}\.\d{2,4})[\s\S]{0,120}?СОД\s*([\d.,]+)\s*Гр/i.exec(tx))) { add('neoCrt', 'Да', mm[0].slice(0, 140), 0.85); add('rtStart', dt(mm[1]), mm[0].slice(0, 140), 0.8); add('rtEnd', dt(mm[2]), mm[0].slice(0, 140), 0.8); add('sod', String(numv(mm[3])), mm[0].slice(-60), 0.85); }
+    if ((mm = /(?:ХЛТ|химио-?лучев[\wА-Яа-яЁё]*\s+терап[\wА-Яа-яЁё]*)[\s\S]{0,200}?(?<![А-Яа-яЁё])[Сс]\s+(\d{1,2}\.\d{1,2}\.\d{2,4})\s+по\s+(\d{1,2}\.\d{1,2}\.\d{2,4})[\s\S]{0,120}?СОД\s*([\d.,]+)\s*Гр/i.exec(tx))) { add('neoCrt', 'НАХЛТ', mm[0].slice(0, 140), 0.85); add('rtStart', dt(mm[1]), mm[0].slice(0, 140), 0.8); add('rtEnd', dt(mm[2]), mm[0].slice(0, 140), 0.8); add('sod', String(numv(mm[3])), mm[0].slice(-60), 0.85); }
     if ((mm = /РЭА\s*[=:]\s*([\d.,]+)\s*нг/i.exec(tx))) add('cea0', String(numv(mm[1])), mm[0], 0.75, LL('проверьте дату анализа', 'check the test date'));
     if ((mm = /(?:С\s?А|CA)\s*19[-\s]?9\s*[-=:]\s*([\d.,]+)/i.exec(tx))) add('ca199_0', String(numv(mm[1])), mm[0], 0.75, LL('проверьте дату анализа', 'check the test date'));
     if (/Вредные\s+привычки\s*:?\s*отрицает/i.test(tx)) { add('smoke', 'Нет', ctx(/Вредные\s+привычки\s*:?\s*отрицает/i), 0.8); add('alcohol', 'Нет', ctx(/Вредные\s+привычки\s*:?\s*отрицает/i), 0.7); }
@@ -8537,13 +8579,15 @@ document.addEventListener('drop', function (ev) {
 
 function navGroups() {
   var g = [{ id: 'home', label: LL('Главная', 'Home'), v: 'home', icon: 'home' }];
-  g.push({ id: 'work', label: LL('Работа', 'Work'), icon: 'cal', items: ['planner', 'mdt'].map(function (k) { return { v: 'col:' + k, icon: COLS[k].icon, label: L(COLS[k].title), cnt: DB.cols[k].length }; }) });
-  var pts = [{ v: 'reg:all', icon: 'users', label: t('nav.allPatients'), cnt: DB.patients.length }, { sep: LL('По решению МДГ', 'By MDT decision') }];
-  TRACKS.forEach(function (tk) { var rr = regOf('trk_' + tk.key); if (rr) pts.push({ v: 'reg:' + rr.id, icon: tk.icon, label: LL(tk.ru, tk.en), cnt: regCount(rr), depth: 1 }); });
+  var wk = ['planner', 'mdt'].map(function (k) { return { v: 'col:' + k, icon: COLS[k].icon, label: L(COLS[k].title), cnt: DB.cols[k].length }; });
+  /* разделы маршрутов лечения вложены под МДГ: пациент попадает в них по решению МДГ */
+  TRACKS.forEach(function (tk) { var rr = regOf('trk_' + tk.key); if (rr) wk.push({ v: 'reg:' + rr.id, icon: tk.icon, label: LL(tk.ru, tk.en), cnt: regCount(rr), depth: 1 }); });
+  g.push({ id: 'work', label: LL('Работа', 'Work'), icon: 'cal', items: wk });
+  var pts = [{ v: 'reg:all', icon: 'users', label: t('nav.allPatients'), cnt: DB.patients.length }];
   pts.push({ sep: LL('Ещё', 'More') }); pts.push({ v: 'fu', icon: 'clock', label: t('nav.followup'), badge: fuDueAll().length || null });
   pts.push({ v: 'dq', icon: 'check', label: LL('Качество данных', 'Data quality'), badge: DB.patients.filter(function (p) { return dqCheck(p).some(function (x) { return x.sev === 'e'; }); }).length || null }); pts.push({ v: 'dict', icon: 'book', label: LL('Словарь данных', 'Data dictionary') });
   if (can('edit') && !isStudent()) pts.push({ v: 'retro', icon: 'upload', label: LL('Ретро-загрузка документов', 'Retrospective import'), cnt: RETRO.items.length || undefined });
-  g.push({ id: 'pts', label: t('nav.allPatients'), icon: 'users', items: pts, split: 'reg:all' });
+  g.push({ id: 'pts', label: t('nav.allPatients'), icon: 'users', items: pts, split: 'reg:all', cnt: DB.patients.length });
   var regs = [];
   (function walk(list, d) { list.forEach(function (r) { regs.push({ v: 'reg:' + r.id, icon: d ? 'dot' : (r.id === 'g_endo' ? 'scope' : r.id === 'g_surg' ? 'knife' : 'tag'), label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, false), d + 1); }); })(kids(null, false), 0);
   if (can('edit')) regs.push({ act: 'newreg', icon: 'plus', label: t('nav.newRegistry') });
@@ -8570,8 +8614,8 @@ function navItemHTML(x) {
 function renderMainNav() {
   return '<nav class="mnav" aria-label="' + t('a11y.sections') + '"><div class="mnav-in">' + navGroups().map(function (g) {
     if (g.v) return '<button type="button" class="mn-g' + (S.view === g.v ? ' on' : '') + '" data-act="view" data-v="' + g.v + '">' + esc(g.label) + '</button>';
-    var act = g.items.some(function (x) { return x.v && x.v === S.view; }), open = S.menu === 'nav:' + g.id, badge = g.items.reduce(function (a, x) { return a + (+x.badge || 0); }, 0);
-    if (g.split) return '<div class="dd mn-split"><button type="button" class="mn-g' + (act ? ' on' : '') + '" data-act="allcards">' + esc(g.label) + (badge ? '<i class="badge">' + badge + '</i>' : '') + '</button><button type="button" class="mn-caret' + (open ? ' open' : '') + '" data-act="menu" data-id="nav:' + g.id + '" aria-expanded="' + open + '" aria-label="' + LL('Разделы', 'Sections') + '">' + ico('down', 14) + '</button>' + (open ? '<div class="pop mn-pop" role="menu">' + g.items.map(navItemHTML).join('') + '</div>' : '') + '</div>';
+    var act = g.items.some(function (x) { return x.v && x.v === S.view; }), open = S.menu === 'nav:' + g.id, badge = g.cnt !== undefined ? 0 : g.items.reduce(function (a, x) { return a + (+x.badge || 0); }, 0);
+    if (g.split) return '<div class="dd mn-split"><button type="button" class="mn-g' + (act ? ' on' : '') + '" data-act="allcards">' + esc(g.label) + (badge ? '<i class="badge">' + badge + '</i>' : g.cnt !== undefined ? '<i class="cnt" style="font-style:normal;font-size:11.5px;font-weight:500;color:var(--faint);font-variant-numeric:tabular-nums">' + g.cnt + '</i>' : '') + '</button><button type="button" class="mn-caret' + (open ? ' open' : '') + '" data-act="menu" data-id="nav:' + g.id + '" aria-expanded="' + open + '" aria-label="' + LL('Разделы', 'Sections') + '">' + ico('down', 14) + '</button>' + (open ? '<div class="pop mn-pop" role="menu">' + g.items.map(navItemHTML).join('') + '</div>' : '') + '</div>';
     return '<div class="dd"><button type="button" class="mn-g' + (act ? ' on' : '') + (open ? ' open' : '') + '" data-act="menu" data-id="nav:' + g.id + '" aria-expanded="' + open + '">' + esc(g.label) + (badge ? '<i class="badge">' + badge + '</i>' : '') + ico('down', 14) + '</button>' + (open ? '<div class="pop mn-pop' + (g.wide ? ' wide' : '') + '" role="menu">' + g.items.map(navItemHTML).join('') + '</div>' : '') + '</div>';
   }).join('') + '</div></nav>';
 }
@@ -8596,8 +8640,8 @@ function renderNavSheet() {
   }
   return '<div class="dim" data-act="side"></div><aside class="nsheet" aria-label="' + t('a11y.sections') + '"><div class="ns-h">' + aaMark(34) + aaWord() + '<b>' + LL('Колоректальный сектор', 'Colorectal unit') + '</b><button type="button" class="iconbtn" data-act="side" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="ns-b">' + navGroups().map(function (g) {
     if (g.v) return navItemHTML({ v: g.v, icon: g.icon, label: g.label });
-    var k = 'g:' + g.id, open = isOpen(k, g.items.some(function (x) { return x.v && x.v === S.view; })), badge = g.items.reduce(function (a, x) { return a + (+x.badge || 0); }, 0);
-    return '<div class="ns-g' + (open ? ' open' : '') + '"><button type="button" class="ns-gh" data-act="nstog" data-k="' + k + '" data-o="' + (open ? 1 : 0) + '" aria-expanded="' + open + '">' + ico(g.icon, 16) + '<span>' + esc(g.label) + '</span>' + (badge ? '<i class="badge">' + badge + '</i>' : '') + ico('down', 16) + '</button>' + '<div class="ns-col' + (open ? ' open' : '') + '" data-col="' + k + '"><div class="ns-gb">' + items(g.items) + '</div></div></div>';
+    var k = 'g:' + g.id, open = isOpen(k, g.items.some(function (x) { return x.v && x.v === S.view; })), badge = g.cnt !== undefined ? 0 : g.items.reduce(function (a, x) { return a + (+x.badge || 0); }, 0);
+    return '<div class="ns-g' + (open ? ' open' : '') + '"><button type="button" class="ns-gh" data-act="nstog" data-k="' + k + '" data-o="' + (open ? 1 : 0) + '" aria-expanded="' + open + '">' + ico(g.icon, 16) + '<span>' + esc(g.label) + '</span>' + (badge ? '<i class="badge">' + badge + '</i>' : g.cnt !== undefined ? '<i class="cnt" style="font-style:normal;font-size:11.5px;font-weight:500;color:var(--faint);font-variant-numeric:tabular-nums">' + g.cnt + '</i>' : '') + ico('down', 16) + '</button>' + '<div class="ns-col' + (open ? ' open' : '') + '" data-col="' + k + '"><div class="ns-gb">' + items(g.items) + '</div></div></div>';
   }).join('') + '</div></aside>';
 }
 function renderTop2() {
