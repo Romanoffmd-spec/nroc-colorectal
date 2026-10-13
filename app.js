@@ -8978,7 +8978,7 @@ function navGroups() {
   /* разделы маршрутов лечения вложены под МДГ: пациент попадает в них по решению МДГ */
   TRACKS.forEach(function (tk) { var rr = regOf('trk_' + tk.key); if (rr) wk.push({ v: 'reg:' + rr.id, icon: tk.icon, label: LL(tk.ru, tk.en), cnt: regCount(rr), depth: 1 }); });
   wk.push({ v: 'rot', icon: 'cap', label: LL('Ротации', 'Rotations'), cnt: (DB.cols.rot || []).length || undefined });
-  g.push({ id: 'work', label: LL('Работа', 'Work'), icon: 'cal', items: wk });
+  g.push({ id: 'work', label: LL('Работа', 'Work'), icon: 'cal', items: wk, fly: true });
   var pts = [{ v: 'reg:all', icon: 'users', label: t('nav.allPatients'), cnt: DB.patients.length }];
   pts.push({ sep: LL('Ещё', 'More') }); pts.push({ v: 'fu', icon: 'clock', label: t('nav.followup'), badge: fuDueAll().length || null });
   pts.push({ v: 'dq', icon: 'check', label: LL('Качество данных', 'Data quality'), badge: DB.patients.filter(function (p) { return dqCheck(p).some(function (x) { return x.sev === 'e'; }); }).length || null }); pts.push({ v: 'dict', icon: 'book', label: LL('Словарь данных', 'Data dictionary') });
@@ -9007,12 +9007,26 @@ function navItemHTML(x) {
   var on = x.v && S.view === x.v;
   return '<button type="button" class="mn-it' + (on ? ' on' : '') + (x.act ? ' add' : '') + '" style="--d:' + (x.depth || 0) + '" data-act="' + (x.act || 'view') + '"' + (x.v ? ' data-v="' + x.v + '"' : '') + '>' + ico(x.icon, 16) + '<span>' + esc(x.label) + '</span>' + (x.badge ? '<i class="badge">' + x.badge + '</i>' : x.cnt !== undefined ? '<i class="cnt">' + x.cnt + '</i>' : '') + '</button>';
 }
+function navFlyHTML(list) {
+  /* пункт с вложенными (depth>0) показывается с выпадающим вбок подменю */
+  var h = '', i = 0;
+  while (i < list.length) {
+    var x = list[i], j = i + 1;
+    while (j < list.length && (list[j].depth || 0) > (x.depth || 0)) j++;
+    var kidsL = list.slice(i + 1, j);
+    if (!kidsL.length || x.sep) { h += navItemHTML(x); i++; continue; }
+    var act = kidsL.some(function (z) { return z.v && z.v === S.view; });
+    h += '<div class="mn-sub' + (act ? ' act' : '') + '">' + navItemHTML(x).replace('</button>', ico('right', 14) + '</button>') + '<div class="pop mn-fly" role="menu">' + kidsL.map(function (z) { return navItemHTML(Object.assign({}, z, { depth: (z.depth || 0) - (x.depth || 0) - 1 })); }).join('') + '</div></div>';
+    i = j;
+  }
+  return h;
+}
 function renderMainNav() {
   return '<nav class="mnav" aria-label="' + t('a11y.sections') + '"><div class="mnav-in">' + navGroups().map(function (g) {
     if (g.v) return '<button type="button" class="mn-g' + (S.view === g.v ? ' on' : '') + '" data-act="view" data-v="' + g.v + '">' + esc(g.label) + '</button>';
     var act = g.items.some(function (x) { return x.v && x.v === S.view; }), open = S.menu === 'nav:' + g.id, badge = g.cnt !== undefined ? 0 : g.items.reduce(function (a, x) { return a + (+x.badge || 0); }, 0);
     if (g.split) return '<div class="dd mn-split"><button type="button" class="mn-g' + (act ? ' on' : '') + '" data-act="allcards">' + esc(g.label) + (badge ? '<i class="badge">' + badge + '</i>' : g.cnt !== undefined ? '<i class="cnt" style="font-style:normal;font-size:11.5px;font-weight:500;color:var(--faint);font-variant-numeric:tabular-nums">' + g.cnt + '</i>' : '') + '</button><button type="button" class="mn-caret' + (open ? ' open' : '') + '" data-act="menu" data-id="nav:' + g.id + '" aria-expanded="' + open + '" aria-label="' + LL('Разделы', 'Sections') + '">' + ico('down', 14) + '</button>' + (open ? '<div class="pop mn-pop" role="menu">' + g.items.map(navItemHTML).join('') + '</div>' : '') + '</div>';
-    return '<div class="dd"><button type="button" class="mn-g' + (act ? ' on' : '') + (open ? ' open' : '') + '" data-act="menu" data-id="nav:' + g.id + '" aria-expanded="' + open + '">' + esc(g.label) + (badge ? '<i class="badge">' + badge + '</i>' : '') + ico('down', 14) + '</button>' + (open ? '<div class="pop mn-pop' + (g.wide ? ' wide' : '') + '" role="menu">' + g.items.map(navItemHTML).join('') + '</div>' : '') + '</div>';
+    return '<div class="dd"><button type="button" class="mn-g' + (act ? ' on' : '') + (open ? ' open' : '') + '" data-act="menu" data-id="nav:' + g.id + '" aria-expanded="' + open + '">' + esc(g.label) + (badge ? '<i class="badge">' + badge + '</i>' : '') + ico('down', 14) + '</button>' + (open ? '<div class="pop mn-pop' + (g.wide ? ' wide' : '') + (g.fly ? ' has-fly' : '') + '" role="menu">' + (g.fly ? navFlyHTML(g.items) : g.items.map(navItemHTML).join('')) + '</div>' : '') + '</div>';
   }).join('') + '</div></nav>';
 }
 function renderNavSheet() {

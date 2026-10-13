@@ -1481,6 +1481,16 @@ body{font-size:14px;color:var(--ink)}
 .mn-it:hover{background:var(--hover);color:var(--ink)}
 .mn-it.on{background:var(--accent-soft);color:var(--navy);font-weight:600}.mn-it.on svg{color:var(--navy)}
 .mn-it.add{color:var(--navy)}.mn-it.add svg{color:var(--navy)}
+.mn-pop.has-fly{overflow:visible;max-height:none}
+.mn-sub{position:relative}
+.mn-sub>.mn-it>svg:last-child{margin-left:auto;color:var(--faint);transition:transform .15s}
+.mn-sub.act>.mn-it{color:var(--navy);font-weight:600}
+.mn-fly{display:none;position:absolute;left:calc(100% + 4px);top:-8px;min-width:260px;padding:8px;border-radius:var(--r);z-index:60}
+.mn-fly:before{content:"";position:absolute;left:-10px;top:0;bottom:0;width:10px}
+.mn-sub:hover>.mn-fly,.mn-sub:focus-within>.mn-fly{display:flex}
+.mn-sub:hover>.mn-it{background:var(--hover);color:var(--ink)}
+.mn-sub:hover>.mn-it>svg:last-child{transform:translateX(2px);color:var(--ink)}
+@media (max-width:900px){.mn-fly{left:auto;right:calc(100% + 4px)}}
 .mn-sep{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding:12px 10px 6px}
 .nsheet{position:fixed;top:0;left:0;bottom:0;width:min(360px,88vw);background:var(--surface);z-index:70;display:flex;flex-direction:column;box-shadow:var(--sh3)}
 .ns-h{display:flex;align-items:center;gap:10px;padding:14px 12px 14px 16px;border-bottom:1px solid var(--line)}.ns-h img{height:28px}.ns-h b{flex:1;font-size:14px}
@@ -2338,6 +2348,6 @@ html[data-theme="dark"]{--aa-a:#95A3FF;--aa-b:#C9D0FF}
 <script src="firebase-config.js?v=4033212415"></script>
 <script src="i18n.js?v=4033212418"></script>
 <script src="ai-corpus.js?v=4033212415"></script>
-<script src="app.js?v=4033212419"></script>
+<script src="app.js?v=4033212420"></script>
 </body>
 </html>
