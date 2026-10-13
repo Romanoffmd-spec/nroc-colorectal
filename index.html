@@ -635,6 +635,22 @@ button.crumb:hover{color:var(--navy-l);text-decoration:underline}
 .dh-title{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.3;color:var(--ink)}
 .dh-sub{font-size:12.5px;color:var(--muted);margin-top:1px}
 .dh-r{display:flex;gap:6px;align-items:center}
+.qiw{position:relative}
+.h9 .qis .qiw>.qi{height:100%}
+.qhelp{position:absolute;top:7px;right:7px;width:19px;height:19px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--muted);font:700 11px/1 var(--f);display:grid;place-items:center;cursor:pointer;padding:0;z-index:2}
+.qhelp:hover,.qhelp.on{border-color:var(--accent);color:var(--accent)}
+.qiw.big .qhelp{top:0;right:auto;left:calc(100% - 4px)}
+.qpop{position:absolute;z-index:30;top:30px;right:0;width:min(340px,80vw);background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh3);padding:10px 12px;font-size:12.5px;line-height:1.45;color:var(--ink);text-align:left;font-weight:400}
+.qiw.big .qpop{left:0;right:auto;top:auto;bottom:-6px;transform:translateY(100%)}
+.qpop b{display:block;font-size:13px;margin-bottom:4px}
+.qpop p{margin:4px 0}
+.qpop em{font-style:normal;font-weight:600}
+.qpop-src{display:flex;gap:5px;align-items:flex-start;color:var(--muted);font-size:11.5px}
+.qpop-src svg{flex:none;margin-top:2px}
+.qpop.inl{position:static;width:auto;box-shadow:none;border:0;padding:4px 0 0;background:none}
+.qd-how summary{font-weight:600}
+.qpop.inl>b{display:none}
+.stats .tile.qiw{padding-right:26px}
 .foot .aa-foot{white-space:nowrap;flex:none}
 .h9 .qib{font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%;transition:border-color .15s,transform .15s}
 .h9 .qi.qib:hover,.h9 .qi.qib:focus-visible{border-color:var(--accent);transform:translateY(-1px)}
@@ -2247,9 +2263,9 @@ html[data-theme="dark"]{--aa-a:#95A3FF;--aa-b:#C9D0FF}
 <body>
 <div id="root"></div>
 <input type="file" id="importFile" accept=".json,.js,application/json,text/javascript" hidden>
-<script src="firebase-config.js?v=4033212412"></script>
-<script src="i18n.js?v=4033212412"></script>
-<script src="ai-corpus.js?v=4033212412"></script>
-<script src="app.js?v=4033212412"></script>
+<script src="firebase-config.js?v=4033212413"></script>
+<script src="i18n.js?v=4033212413"></script>
+<script src="ai-corpus.js?v=4033212413"></script>
+<script src="app.js?v=4033212413"></script>
 </body>
 </html>

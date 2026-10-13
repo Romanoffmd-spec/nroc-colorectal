@@ -1198,7 +1198,9 @@ function ruleText(reg) {
   }).join('; ');
 }
 function fuList(p) {
-  if (!p.d.date) return [];
+  if (!p.d.date || !hasProc(p.d)) return [];
+  if (p.d.vital === 'Умер' || p.d.mort30 === 'Да') return [];
+  if (typeof epTypeOf === 'function' && epTypeOf(p) !== 'Первичное лечение') return [];
   var td = today();
   return FU.map(function (x) {
     var due = addDays(p.d.date, x[1]); var days = Math.round((due - td) / 86400000);
@@ -1322,7 +1324,7 @@ function renderFilters() {
   if (any) h += '<button type="button" class="btn small ghost" data-act="fltreset">' + t('flt.reset') + '</button>';
   return h + '</div>';
 }
-function tile(v, l) { return '<div class="tile"><b>' + esc(v) + '</b><span>' + esc(l) + '</span></div>'; }
+function tile(v, l, hid) { var hp = hid && REG_HELP[hid]; return '<div class="tile' + (hp ? ' qiw' : '') + '"><b>' + esc(v) + '</b><span>' + esc(l) + '</span>' + (hp ? qHelpBtn('reg.' + hid) + (S.qhelp === 'reg.' + hid ? qiHelpHTML({ what: hp }) : '') : '') + '</div>'; }
 function renderRegistry() {
   var id = S.view.slice(4);
   if (id !== 'all' && !regOf(id)) { S.view = 'reg:all'; id = 'all'; }
@@ -1348,12 +1350,13 @@ function renderRegistry() {
     h += '<div class="dd"><button type="button" class="btn" data-act="menu" data-id="xl">' + ico('sheet', 16) + 'Excel' + ico('down', 14) + '</button>' + (S.menu === 'xl' ? '<div class="pop right" role="menu"><button type="button" class="opt" data-act="csv">' + ico('download', 16) + LL('Экспорт в Excel', 'Export to Excel') + '</button><button type="button" class="opt" data-act="imp">' + ico('upload', 16) + LL('Импорт из Excel или CSV', 'Import from Excel or CSV') + '</button><div class="pop-note">' + LL('Экспорт с кодами и кодбуком, обезличенный вариант. Импорт обновляет карточки по ID или № ИБ.', 'Export with codes and codebook, anonymised option. Import updates records by ID or case no.') + '</div></div>' : '') + '</div>';
     h += (can('edit') ? '<button type="button" class="btn primary" data-act="newp">' + ico('plus', 16) + t('reg.addPatient') + '</button>' : '') + (reg && reg.kind !== 'track' ? regDelBtn(reg) : '') + '</div></div>';
   }
-  var ages = list.map(function (p) { return num(p.d.age); }).filter(function (x) { return x !== null; });
+  var firstOf = {}; list.slice().sort(function (a, b) { return epDate(a).localeCompare(epDate(b)); }).forEach(function (p) { var k = patKey(p.d) || p.id; if (!firstOf[k] && num(p.d.age) !== null) firstOf[k] = num(p.d.age); });
+  var ages = Object.keys(firstOf).map(function (k) { return firstOf[k]; });
   var avg = ages.length ? Math.round(ages.reduce(function (a, b) { return a + b; }, 0) / ages.length) : null;
-  var op = list.filter(function (p) { return p.d.date; }).length;
-  var rK = list.filter(function (p) { return has(rOf(p.d)); }), r0 = rK.filter(function (p) { return rOf(p.d) === 'R0'; }).length;
+  var op = uniqPat(list.filter(qSg));
+  var rK = list.filter(function (p) { return qSg(p) && P_ONCO.indexOf(p.d.proc) >= 0 && has(rOf(p.d)); }), r0 = rK.filter(function (p) { return rEff(p.d) === 'R0'; }).length;
   var npat = uniqPat(list);
-  h += '<div class="stats">' + tile(npat, plural(npat, 'pl.patient').replace(/^\d+ /, '')) + tile(list.length, plural(list.length, 'pl.hosp').replace(/^\d+ /, '')) + tile(avg === null ? t('st.nodata') : avg, t('st.avgAge')) + tile(op, t('st.operated')) + tile(rK.length ? Math.round(r0 / rK.length * 100) + '%' : t('st.nodata'), t('st.r0')) + '</div>';
+  h += '<div class="stats">' + tile(npat, plural(npat, 'pl.patient').replace(/^\d+ /, ''), 'pat') + tile(list.length, plural(list.length, 'pl.hosp').replace(/^\d+ /, ''), 'hosp') + tile(avg === null ? t('st.nodata') : avg, t('st.avgAge'), 'age') + tile(op, t('st.operated'), 'op') + tile(rK.length ? pct(r0, rK.length) + '%' : t('st.nodata'), t('st.r0'), 'r0') + '</div>';
   h += opsSummary(list);
   h += renderFilters() + renderDateFilters(true);
   h += '<div class="tablewrap">';
@@ -4060,54 +4063,103 @@ function goNotif(i) {
 
 /* ======================= Home dashboard ======================= */
 function weekStart() { var d = today(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
-/* ======================= Показатели качества: определения, расшифровка, динамика ======================= */
+/* ======================= Показатели качества: определения по международным стандартам, расшифровка, динамика ======================= */
+var P_RESECT = P_COLON.concat(P_RECTAL);
+var P_ONCO = P_RESECT.concat(P_TEO);
 function rOf(d) { return d.rPath || d.r || ''; }
+/* R по UICC/AJCC; для рака прямой кишки CRM 1 мм и менее считается R1 (RCPath, Quirke) */
+function rEff(d) { var r = rOf(d), c = num(d.crmDist); if (r === 'R0' && P_RECTAL.concat(P_TEO).indexOf(d.proc) >= 0 && c !== null && c <= 1) return 'R1'; return r; }
 function leakPos(v) { return !!v && v !== 'Нет'; }
+function losOf(d) { var n = num(d.los); if (n !== null) return n; var a = d.admDate, b = d.disDate; if (!a || !b) return null; var x = Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 864e5); return x >= 0 ? x : null; }
 function qOp(p) { return hasProc(p.d) && !!p.d.date; }
 function qSg(p) { return qOp(p) && hasSurg(p.d); }
+function qRes(p) { return qSg(p) && P_RESECT.indexOf(p.d.proc) >= 0; }
+function noNeo(d) { return !d.neoCrt || d.neoCrt === 'Нет'; }
 var QI_DEFS = [
-  { id: 'cd3', l: ['Осложнения Clavien-Dindo III и выше', 'Clavien-Dindo III or higher'], good: 'low', th: [15, 25], base: qOp, den: qOp,
-    num: function (p) { return has(p.d.cd3) || has(p.d.cd4) || has(p.d.cd5); },
-    why: function (p) { var d = p.d; return ['cd3', 'cd4', 'cd5'].filter(function (k) { return has(d[k]); }).map(function (k) { return 'CD ' + ['III', 'IV', 'V'][+k.slice(2) - 3] + ': ' + d[k]; }).concat(d.reop30 === 'Да' ? [LL('повторная операция', 'reoperation') + (d.reopName ? ': ' + d.reopName : '')] : []).join('; '); } },
-  { id: 'leak', l: ['Несостоятельность анастомоза', 'Anastomotic leak'], good: 'low', th: [8, 12], base: function (p) { return qSg(p) && p.d.anast === 'Да'; }, den: function (p) { return qSg(p) && p.d.anast === 'Да' && has(p.d.leak); },
+  { id: 'cd3', l: ['Осложнения Clavien-Dindo III и выше', 'Clavien-Dindo III or higher'], good: 'low', th: [15, 25], base: qSg, den: qSg,
+    num: function (p) { return has(p.d.cd3) || has(p.d.cd4) || has(p.d.cd5) || p.d.mort30 === 'Да'; },
+    why: function (p) { var d = p.d; return ['cd3', 'cd4', 'cd5'].filter(function (k) { return has(d[k]); }).map(function (k) { return 'CD ' + ['III', 'IV', 'V'][+k.slice(2) - 3] + ': ' + d[k]; }).concat(d.mort30 === 'Да' && !has(d.cd5) ? [LL('летальный исход в 30 дней', '30-day death')] : []).concat(d.reop30 === 'Да' ? [LL('повторная операция', 'reoperation') + (d.reopName ? ': ' + d.reopName : '')] : []).join('; '); },
+    help: { what: ['Доля хирургических вмешательств с тяжёлым осложнением в течение 30 дней: требовалось вмешательство под наркозом или без (III), реанимация из-за органной недостаточности (IV) или смерть (V).', 'Share of operations with a major complication within 30 days.'],
+      num: ['Карточки, где заполнено «Осложнения CD 3/4/5» или отмечена послеоперационная смертность.', 'Records with CD III/IV/V filled or 30-day death.'],
+      den: ['Все хирургические вмешательства за период (эндоскопические не учитываются), включая закрытие стомы и повторные операции как отдельные госпитализации.', 'All surgical procedures (endoscopic excluded).'],
+      src: ['Классификация Clavien-Dindo (Dindo 2004, Clavien 2009); 30-дневный период по ICHOM Colorectal Cancer Standard Set.', 'Clavien-Dindo classification (Dindo 2004); 30-day window per ICHOM.'] } },
+  { id: 'leak', l: ['Несостоятельность анастомоза', 'Anastomotic leak'], good: 'low', th: [8, 12], base: function (p) { return qRes(p) && p.d.anast === 'Да'; }, den: function (p) { return qRes(p) && p.d.anast === 'Да' && has(p.d.leak); },
     num: function (p) { return leakPos(p.d.leak); },
-    why: function (p) { var d = p.d; return LL('Несостоятельность ', 'Leak ') + String(d.leak).replace('Степень ', LL('степень ', 'grade ')) + (d.reopName ? '; ' + d.reopName : ''); } },
-  { id: 'conv', l: ['Конверсия при малоинвазивном доступе', 'Conversion in MIS'], good: 'low', th: [10, 15], base: function (p) { return qSg(p) && MIS.indexOf(p.d.access) >= 0; }, den: function (p) { return qSg(p) && MIS.indexOf(p.d.access) >= 0; },
+    why: function (p) { var d = p.d; return LL('Несостоятельность ', 'Leak ') + String(d.leak).replace('Степень ', LL('степень ', 'grade ')) + (d.reopName ? '; ' + d.reopName : ''); },
+    help: { what: ['Доля резекций толстой и прямой кишки с анастомозом, после которых развилась несостоятельность любой степени (A, B или C).', 'Share of colorectal resections with an anastomosis that leaked (grade A, B or C).'],
+      num: ['Поле «Несостоятельность анастомоза (ISREC)» = степень A, B или C.', 'Leak field = grade A, B or C.'],
+      den: ['Резекции ободочной и прямой кишки с анастомозом, где поле несостоятельности заполнено (в том числе «Нет»). Закрытие стомы и тонкокишечные анастомозы не входят.', 'Colon and rectal resections with an anastomosis and the leak field filled.'],
+      src: ['Степени по ISREC (Rahbari 2010): A без изменения лечения, B лечение без релапаротомии, C релапаротомия.', 'ISREC grading (Rahbari 2010).'] } },
+  { id: 'conv', l: ['Конверсия при малоинвазивном доступе', 'Conversion in MIS'], good: 'low', th: [10, 15], base: function (p) { return qRes(p) && MIS.indexOf(p.d.access) >= 0; }, den: function (p) { return qRes(p) && MIS.indexOf(p.d.access) >= 0; },
     num: function (p) { return p.d.conv === 'Да'; },
-    why: function (p) { return ov(p.d.access) + LL(', конверсия', ', converted'); } },
-  { id: 'mis', l: ['Малоинвазивный доступ', 'Minimally invasive access'], good: 'high', th: [70, 50], base: qSg, den: function (p) { return qSg(p) && has(p.d.access); },
+    why: function (p) { return ov(p.d.access) + LL(', конверсия', ', converted'); },
+    help: { what: ['Доля начатых лапароскопически или роботом резекций, которые пришлось завершить открыто (незапланированный переход на лапаротомию).', 'Share of minimally invasive resections converted to open.'],
+      num: ['Резекции с отметкой «Конверсия: Да».', 'Resections with conversion = yes.'],
+      den: ['Резекции ободочной и прямой кишки, начатые лапароскопически, роботом или трансанально.', 'Colon and rectal resections started minimally invasively.'],
+      src: ['Конверсия как незапланированный переход к открытой операции (определение ESCP и рабочих групп EAES).', 'Unplanned conversion to open surgery.'] } },
+  { id: 'mis', l: ['Малоинвазивный доступ', 'Minimally invasive access'], good: 'high', th: [70, 50], base: qRes, den: function (p) { return qRes(p) && has(p.d.access); },
     num: function (p) { return MIS.indexOf(p.d.access) >= 0; },
-    why: function (p) { return LL('Доступ: ', 'Access: ') + ov(p.d.access); } },
-  { id: 'r0', l: ['Резекция R0', 'R0 resection'], good: 'high', th: [95, 90], base: qSg, den: function (p) { return qOp(p) && has(rOf(p.d)); },
-    num: function (p) { return rOf(p.d) === 'R0'; },
-    why: function (p) { var d = p.d; return rOf(d) + (d.marginPos && d.marginPos.length ? LL(': край ', ': margin ') + [].concat(d.marginPos).join(', ').toLowerCase() : '') + (has(d.crmDist) ? ', CRM ' + d.crmDist + LL(' мм', ' mm') : ''); } },
-  { id: 'ln', l: ['Удалено 12 и более лимфоузлов', '12 or more lymph nodes'], good: 'high', th: [90, 80], base: function (p) { return qSg(p) && P_COLON.concat(P_RECTAL).indexOf(p.d.proc) >= 0; }, den: function (p) { return qSg(p) && num(p.d.lnT) !== null && P_COLON.concat(P_RECTAL).indexOf(p.d.proc) >= 0; },
+    why: function (p) { return LL('Доступ: ', 'Access: ') + ov(p.d.access); },
+    help: { what: ['Доля резекций, начатых малоинвазивно (лапароскопия, робот, TaTME), по принципу intention-to-treat: конверсия всё равно засчитывается как малоинвазивный доступ.', 'Share of resections started minimally invasively (intention to treat).'],
+      num: ['Резекции с доступом лапароскопический, робот-ассистированный, TaTME или гибридный.', 'Laparoscopic, robotic, TaTME or hybrid.'],
+      den: ['Все резекции ободочной и прямой кишки с указанным доступом. Стомы, закрытие стомы и эндоскопия не входят.', 'All colon and rectal resections with access recorded.'],
+      src: ['Принцип intention-to-treat, как в аудитах DCRA (Нидерланды) и NBOCA (Великобритания).', 'Intention-to-treat, as in DCRA and NBOCA audits.'] } },
+  { id: 'r0', l: ['Резекция R0', 'R0 resection'], good: 'high', th: [95, 90], base: function (p) { return qSg(p) && P_ONCO.indexOf(p.d.proc) >= 0; }, den: function (p) { return qSg(p) && P_ONCO.indexOf(p.d.proc) >= 0 && has(rOf(p.d)); },
+    num: function (p) { return rEff(p.d) === 'R0'; },
+    why: function (p) { var d = p.d; return rEff(d) + (rEff(d) !== rOf(d) ? LL(' (CRM ', ' (CRM ') + d.crmDist + LL(' мм, в карточке R0)', ' mm, recorded as R0)') : '') + (d.marginPos && d.marginPos.length ? LL(': край ', ': margin ') + [].concat(d.marginPos).join(', ').toLowerCase() : '') + (has(d.crmDist) && rEff(d) === rOf(d) ? ', CRM ' + d.crmDist + LL(' мм', ' mm') : ''); },
+    help: { what: ['Доля онкологических резекций без опухоли в краях резекции по гистологии.', 'Share of oncological resections with clear margins on pathology.'],
+      num: ['R0 по гистологии («R по гистологии», при его отсутствии «R статус»). Для прямой кишки при CRM 1 мм и менее резекция считается R1, даже если в карточке R0.', 'Pathological R0; for rectal cancer CRM 1 mm or less counts as R1.'],
+      den: ['Резекции ободочной и прямой кишки и трансанальные местные иссечения, где известен R. Без гистологии случай попадает в список «Дозаполнить».', 'Colon, rectal resections and local excisions with known R.'],
+      src: ['R-классификация UICC/AJCC 8; CRM 1 мм и менее как положительный край: Royal College of Pathologists, Quirke.', 'UICC/AJCC R classification; CRM ≤1 mm positive (RCPath).'] } },
+  { id: 'ln', l: ['Удалено 12 и более лимфоузлов', '12 or more lymph nodes'], good: 'high', th: [90, 80], base: function (p) { return qRes(p) && noNeo(p.d); }, den: function (p) { return qRes(p) && noNeo(p.d) && num(p.d.lnT) !== null; },
     num: function (p) { return num(p.d.lnT) >= 12; },
-    why: function (p) { return LL('Исследовано ЛУ: ', 'Nodes examined: ') + p.d.lnT + (p.d.neoCrt && p.d.neoCrt !== 'Нет' ? LL(' (после неоадъюванта ', ' (after neoadjuvant ') + p.d.neoCrt + ')' : ''); } },
-  { id: 'tme', l: ['Качество ТМЭ: полная', 'Complete TME'], good: 'high', th: [80, 70], base: function (p) { return qSg(p) && P_RECTAL.indexOf(p.d.proc) >= 0; }, den: function (p) { return qSg(p) && has(p.d.tme); },
+    why: function (p) { return LL('Исследовано ЛУ: ', 'Nodes examined: ') + p.d.lnT; },
+    help: { what: ['Доля резекций, в препарате которых исследовано 12 и более лимфоузлов: минимум для надёжного N-стадирования.', 'Share of resections with 12 or more nodes examined.'],
+      num: ['«Количество ЛУ» 12 и больше.', 'Nodes examined ≥ 12.'],
+      den: ['Резекции ободочной и прямой кишки без неоадъювантной терапии, где указано число ЛУ. После химио- или лучевой терапии лимфоузлов закономерно меньше, поэтому такие случаи не входят.', 'Resections without neoadjuvant therapy and with node count recorded.'],
+      src: ['AJCC 8 / UICC, NCCN и ESMO: не менее 12 лимфоузлов.', 'AJCC 8, NCCN, ESMO: at least 12 nodes.'] } },
+  { id: 'tme', l: ['Качество ТМЭ: полная', 'Complete TME'], good: 'high', th: [80, 70], base: function (p) { return qSg(p) && P_RECTAL.indexOf(p.d.proc) >= 0; }, den: function (p) { return qSg(p) && P_RECTAL.indexOf(p.d.proc) >= 0 && has(p.d.tme); },
     num: function (p) { return /^Полное/.test(p.d.tme); },
-    why: function (p) { return LL('ТМЭ: ', 'TME: ') + ov(p.d.tme); } }
+    why: function (p) { return LL('ТМЭ: ', 'TME: ') + ov(p.d.tme); },
+    help: { what: ['Доля резекций прямой кишки, где патолог оценил мезоректум как полный (мезоректальная плоскость, Quirke 3).', 'Share of rectal resections graded complete (mesorectal plane).'],
+      num: ['«Качество ТМЭ» = полное.', 'TME grade = complete.'],
+      den: ['Резекции прямой кишки (передняя, низкая передняя, интерсфинктерная, БПЭ, Гартман, эвисцерация), где качество ТМЭ оценено.', 'Rectal resections with TME graded.'],
+      src: ['Градация Quirke / Nagtegaal 2002 (полное, почти полное, неполное).', 'Quirke/Nagtegaal 2002 grading.'] } }
 ];
+var QI_HELP_OPS = { what: ['Число хирургических и эндоскопических вмешательств с датой операции в выбранном периоде. Каждая госпитализация считается отдельно: закрытие стомы или релапаротомия у того же пациента входят в счёт.', 'Number of surgical and endoscopic procedures in the period; each admission counts.'],
+  more: [['Медиана койко-дня: по резекциям ободочной и прямой кишки, от поступления до выписки (поле «Койко-дни», при его отсутствии по датам). Медиана, а не среднее, как принято в ERAS и ICHOM: койко-день распределён несимметрично.', 'Median LOS: colon and rectal resections, admission to discharge; median per ERAS/ICHOM.'], ['Столбцы: число вмешательств по годам или месяцам, клик открывает список за этот период.', 'Bars: procedures per period; click to open the list.']] };
+var REG_HELP = {
+  pat: ['Уникальные пациенты в списке: карточки с одним ИИН (или ФИО и датой рождения) считаются одним пациентом.', 'Unique patients: records with the same ID count once.'],
+  hosp: ['Все карточки в списке: каждая госпитализация отдельно, включая закрытие стомы и повторные госпитализации.', 'All records: each admission separately.'],
+  age: ['Средний возраст уникальных пациентов на момент первой госпитализации в списке.', 'Mean age of unique patients at their first admission.'],
+  op: ['Уникальные пациенты, у которых есть хотя бы одно хирургическое вмешательство с датой (эндоскопия не учитывается).', 'Unique patients with at least one dated surgical procedure.'],
+  r0: ['Доля R0 среди онкологических резекций с известным R по гистологии; для прямой кишки CRM 1 мм и менее считается R1 (UICC/AJCC, RCPath).', 'R0 among oncological resections with known pathological R; rectal CRM ≤1 mm counts as R1.']
+};
+function qiHelpHTML(hp) {
+  return '<div class="qpop" role="dialog"><b>' + LL('Как считается', 'How it is calculated') + '</b><p>' + esc(L(hp.what)) + '</p>' + (hp.num ? '<p><em>' + LL('Числитель: ', 'Numerator: ') + '</em>' + esc(L(hp.num)) + '</p>' : '') + (hp.den ? '<p><em>' + LL('Знаменатель: ', 'Denominator: ') + '</em>' + esc(L(hp.den)) + '</p>' : '') + (hp.more ? hp.more.map(function (m) { return '<p>' + esc(L(m)) + '</p>'; }).join('') : '') + (hp.src ? '<p class="qpop-src">' + ico('book', 12) + esc(L(hp.src)) + '</p>' : '') + (hp.tgt ? '<p class="qpop-src">' + esc(hp.tgt) + '</p>' : '') + '</div>';
+}
+function qHelpBtn(id) { return '<button type="button" class="qhelp' + (S.qhelp === id ? ' on' : '') + '" data-act="qhelp" data-v="' + id + '" aria-label="' + esc(LL('Как считается', 'How it is calculated')) + '" aria-expanded="' + (S.qhelp === id) + '">?</button>'; }
+function qiTgtText(q) { return LL('Цель на плитке (', 'Tile target (') + (q.good === 'low' ? '≤ ' : '≥ ') + q.th[0] + '%' + LL(', жёлтый до ', ', amber up to ') + q.th[1] + '%' + LL('): ориентир сектора, задаётся в AddAll.', '): sector benchmark set in AddAll.'); }
 function qiDef(id) { return QI_DEFS.filter(function (x) { return x.id === id; })[0]; }
 function qiCalc(list) {
-  var ops = list.filter(qOp), out = { n: ops.length, surg: ops.filter(qSg).length, los: median(ops.map(function (p) { return num(p.d.los); })) };
+  var ops = list.filter(qOp), out = { n: ops.length, surg: ops.filter(qSg).length, los: median(ops.filter(qRes).map(function (p) { return losOf(p.d); })) };
   QI_DEFS.forEach(function (q) { var dn = list.filter(q.den); out[q.id] = [dn.filter(q.num).length, dn.length]; });
   return out;
 }
 function qiClass(q, v) { return v === null ? '' : q.good === 'low' ? (v <= q.th[0] ? 'ok' : v <= q.th[1] ? 'warn' : 'due') : (v >= q.th[0] ? 'ok' : v >= q.th[1] ? 'warn' : 'due'); }
 function qiPeriod() {
   var per = UI.qiPer || 'all', td = isoOf(new Date()), cy = new Date().getFullYear();
-  var from = per === 'year' ? cy + '-01-01' : per === '12m' ? isoOf(addDays(td, -365)) : '0000', keys = [], byYear = per === 'all';
+  var from = per === 'year' ? cy + '-01-01' : per === '12m' ? isoOf(addDays(td, -365)) : '0000', to = per === 'year' ? cy + '-12-31' : td, keys = [], byYear = per === 'all';
   if (byYear) { var ys = DB.patients.filter(qOp).map(function (p) { return +p.d.date.slice(0, 4); }), y0 = Math.max(cy - 11, Math.min.apply(null, ys.concat([cy - 4]))); for (var yy = y0; yy <= cy; yy++) keys.push(String(yy)); }
   else if (per === 'year') { for (var mi = 1; mi <= 12; mi++) keys.push(cy + '-' + String(mi).padStart(2, '0')); }
   else for (var m = 11; m >= 0; m--) { var md = new Date(); md.setDate(1); md.setMonth(md.getMonth() - m); keys.push(isoOf(md).slice(0, 7)); }
-  return { per: per, from: from, keys: keys, byYear: byYear, name: per === 'year' ? String(cy) : per === '12m' ? LL('последние 12 месяцев', 'last 12 months') : LL('всё время', 'all time'),
+  return { per: per, from: from, to: to, keys: keys, byYear: byYear, name: per === 'year' ? String(cy) : per === '12m' ? LL('последние 12 месяцев', 'last 12 months') : LL('всё время', 'all time'),
     lab: function (k) { return byYear ? k : new Date(+k.slice(0, 4), +k.slice(5) - 1, 1).toLocaleDateString(locale(), { month: 'short' }).replace('.', ''); },
     full: function (k) { return byYear ? k : monthName(+k.slice(0, 4), +k.slice(5) - 1); } };
 }
 function qiTileBtn(q, pair) {
   var v = pair[1] ? pct(pair[0], pair[1]) : null, cls = qiClass(q, v);
-  return '<button type="button" class="qi qib ' + cls + '" data-act="qiopen" data-v="' + q.id + '" title="' + esc(LL('Открыть расшифровку и динамику', 'Open breakdown and trend')) + '"><span class="qi-l">' + esc(L(q.l)) + '</span><b' + (v === null ? ' class="nd"' : '') + '>' + (v === null ? LL('нет данных', 'no data') : v + '%') + '</b><em>' + (pair[1] ? pair[0] + LL(' из ', ' of ') + pair[1] : '') + '</em>' + (v !== null ? '<div class="qi-bar"><span style="width:' + Math.min(100, v) + '%"></span></div>' : '') + '<span class="qi-go">' + ico('right', 13) + '</span></button>';
+  return '<div class="qiw"><button type="button" class="qi qib ' + cls + '" data-act="qiopen" data-v="' + q.id + '" title="' + esc(LL('Открыть расшифровку и динамику', 'Open breakdown and trend')) + '"><span class="qi-l">' + esc(L(q.l)) + '</span><b' + (v === null ? ' class="nd"' : '') + '>' + (v === null ? LL('нет данных', 'no data') : v + '%') + '</b><em>' + (pair[1] ? pair[0] + LL(' из ', ' of ') + pair[1] : '') + '</em>' + (v !== null ? '<div class="qi-bar"><span style="width:' + Math.min(100, v) + '%"></span></div>' : '') + '</button>' + qHelpBtn(q.id) + (S.qhelp === q.id ? qiHelpHTML(Object.assign({}, q.help, { tgt: qiTgtText(q) })) : '') + '</div>';
 }
 function qdRow(p, why, cls) {
   var d = p.d;
@@ -4120,7 +4172,7 @@ function qiGroup(list, f) { var c = {}; list.forEach(function (p) { var k = f(p)
 function qiChips(title, arr) { return arr.length ? '<div class="qd-g"><span class="qd-gh">' + esc(title) + '</span>' + arr.map(function (x) { return '<span class="opchip">' + esc(ov(x[0])) + ' <b>' + x[1] + '</b></span>'; }).join('') + '</div>' : ''; }
 function renderQiDrill() {
   var P = qiPeriod(), q = qiDef(S.qid), isOps = !q;
-  var inP = DB.patients.filter(function (p) { return p.d.date && p.d.date >= P.from; });
+  var inP = DB.patients.filter(function (p) { return p.d.date && p.d.date >= P.from && p.d.date <= P.to; });
   var bk = S.qbk && P.keys.indexOf(S.qbk) >= 0 ? S.qbk : null;
   var inB = function (p) { return !bk || String(p.d.date || '').slice(0, bk.length) === bk; };
   var title = isOps ? LL('Вмешательства', 'Procedures') : L(q.l);
@@ -4139,8 +4191,9 @@ function renderQiDrill() {
   h += '</div></div>';
   if (bk) h += '<div class="qd-flt">' + LL('Показаны случаи за ', 'Showing cases for ') + '<b>' + esc(P.full(bk)) + '</b><button type="button" class="btn small ghost" data-act="qibkt" data-v="' + bk + '">' + LL('Сбросить', 'Clear') + '</button></div>';
   if (isOps) {
-    var ops = inP.filter(qOp).filter(inB).sort(function (a, b) { return String(b.d.date).localeCompare(String(a.d.date)); }), los = median(ops.map(function (p) { return num(p.d.los); }));
-    h += '<div class="qd-sum"><div class="qd-k"><b>' + ops.length + '</b><span>' + LL('вмешательств', 'procedures') + '</span></div><div class="qd-k"><b>' + uniqPat(ops) + '</b><span>' + LL('пациентов', 'patients') + '</span></div><div class="qd-k"><b>' + (los === null ? LL('нет', 'n/a') : los) + '</b><span>' + LL('медиана койко-дня', 'median LOS') + '</span></div></div>';
+    h += '<details class="qd-d qd-how"><summary>' + LL('Как считается', 'How it is calculated') + '</summary>' + qiHelpHTML(QI_HELP_OPS).replace('class="qpop"', 'class="qpop inl"') + '</details>';
+    var ops = inP.filter(qOp).filter(inB).sort(function (a, b) { return String(b.d.date).localeCompare(String(a.d.date)); }), los = median(ops.filter(qRes).map(function (p) { return losOf(p.d); }));
+    h += '<div class="qd-sum"><div class="qd-k"><b>' + ops.length + '</b><span>' + LL('вмешательств', 'procedures') + '</span></div><div class="qd-k"><b>' + uniqPat(ops) + '</b><span>' + LL('пациентов', 'patients') + '</span></div><div class="qd-k"><b>' + (los === null ? LL('нет', 'n/a') : los) + '</b><span>' + LL('медиана койко-дня после резекций', 'median LOS after resections') + '</span></div></div>';
     h += qiChips(LL('По видам', 'By type'), qiGroup(ops, function (p) { return p.d.proc; })) + qiChips(LL('По хирургам', 'By surgeon'), qiGroup(ops, function (p) { return p.d.surgeon; })) + qiChips(LL('По типу госпитализации', 'By admission type'), qiGroup(ops, function (p) { return epTypeOf(p); }));
     h += qiTable(ops.map(function (p) { return qdRow(p); }), false);
     return h + '</div></section>';
@@ -4148,6 +4201,7 @@ function renderQiDrill() {
   var base = inP.filter(q.base).filter(inB), den = inP.filter(q.den).filter(inB), nm = den.filter(q.num), bad = q.good === 'low' ? nm : den.filter(function (p) { return !q.num(p); });
   var miss = base.filter(function (p) { return !q.den(p); }), v = den.length ? pct(nm.length, den.length) : null, cls = qiClass(q, v);
   var badT = q.good === 'low' ? LL('Случаи с событием', 'Cases with the event') : LL('Не достигнуто', 'Target not met');
+  h += '<details class="qd-d qd-how"><summary>' + LL('Как считается', 'How it is calculated') + '</summary>' + qiHelpHTML(Object.assign({}, q.help, { tgt: qiTgtText(q) })).replace('class="qpop"', 'class="qpop inl"') + '</details>';
   h += '<div class="qd-sum"><div class="qd-k big ' + cls + '"><b>' + (v === null ? LL('нет данных', 'no data') : v + '%') + '</b><span>' + nm.length + LL(' из ', ' of ') + den.length + '</span></div><div class="qd-k"><b>' + bad.length + '</b><span>' + esc(badT.toLowerCase()) + '</span></div><div class="qd-k"><b>' + miss.length + '</b><span>' + LL('без данных, не учтены', 'missing data, excluded') + '</span></div><div class="qd-k"><b>' + (q.good === 'low' ? '≤ ' : '≥ ') + q.th[0] + '%</b><span>' + LL('цель', 'target') + '</span></div></div>';
   if (bad.length) {
     h += '<h4 class="qd-h">' + esc(badT) + ': ' + bad.length + '</h4>';
@@ -5358,16 +5412,16 @@ function renderHome() {
   });
   h += '</div></section>';
   // quality
-  var per = UI.qiPer || 'all', from = per === 'year' ? new Date().getFullYear() + '-01-01' : per === '12m' ? isoOf(addDays(td, -365)) : '0000';
-  var q = qiCalc(DB.patients.filter(function (p) { return p.d.date && p.d.date >= from; }));
+  var per = UI.qiPer || 'all', QP = qiPeriod(), from = QP.from;
+  var q = qiCalc(DB.patients.filter(function (p) { return p.d.date && p.d.date >= QP.from && p.d.date <= QP.to; }));
   var months = [], cy = new Date().getFullYear(), byYear = per === 'all';
   if (byYear) { var ys = DB.patients.filter(function (p) { return hasProc(p.d) && p.d.date; }).map(function (p) { return +p.d.date.slice(0, 4); }), y0 = Math.max(cy - 11, Math.min.apply(null, ys.concat([cy - 4]))); for (var yy = y0; yy <= cy; yy++) months.push(String(yy)); }
   else if (per === 'year') { for (var mi = 1; mi <= 12; mi++) months.push(cy + '-' + String(mi).padStart(2, '0')); }
   else for (var m = 11; m >= 0; m--) { var md = new Date(); md.setDate(1); md.setMonth(md.getMonth() - m); months.push(isoOf(md).slice(0, 7)); }
   var mc = months.map(function (mm) { return DB.patients.filter(function (p) { return hasProc(p.d) && String(p.d.date || '').slice(0, mm.length) === mm; }).length; }), mx = Math.max.apply(null, mc.concat([1]));
   h += '<section class="panel qip wide"><div class="ph"><h2>' + LL('Показатели качества', 'Quality indicators') + '</h2><div class="seg sm">' + [['12m', LL('12 мес', '12 mo')], ['year', String(cy)], ['all', LL('всё время', 'all time')]].map(function (x) { return '<button type="button" class="' + (per === x[0] ? 'on' : '') + '" data-act="qiper" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div>';
-  h += '<div class="qi-top"><button type="button" class="qi-big qib" data-act="qiopen" data-v="ops" title="' + esc(LL('Открыть список вмешательств', 'Open the list of procedures')) + '"><b>' + q.n + '</b><span>' + LL('вмешательств за период', 'procedures in period') + '</span><em>' + LL('медиана койко-дня: ', 'median LOS: ') + (q.los === null ? LL('нет данных', 'no data') : q.los + LL(' дн.', ' d')) + '</em></button><div class="bars" style="grid-template-columns:repeat(' + months.length + ',minmax(0,1fr))">' + months.map(function (mm, i) { return '<button type="button" class="bar" data-act="qiopen" data-v="ops" data-b="' + mm + '"><span class="bv" style="height:' + Math.round(mc[i] / mx * 100) + '%"><i>' + (mc[i] || '') + '</i></span><em>' + (byYear ? mm : new Date(+mm.slice(0, 4), +mm.slice(5) - 1, 1).toLocaleDateString(locale(), { month: 'short' }).replace('.', '')) + '</em></button>'; }).join('') + '</div></div>';
-  h += '<div class="qis">' + QI_DEFS.map(function (x) { return qiTileBtn(x, q[x.id]); }).join('') + '</div><p class="qnote">' + LL('Зелёный: соответствует целевым значениям, жёлтый: требует внимания, красный: хуже ожидаемого. Считается по пациентам с датой вмешательства в выбранном периоде.', 'Green meets targets, amber needs attention, red is worse than expected.') + '</p></section>';
+  h += '<div class="qi-top"><div class="qiw big"><button type="button" class="qi-big qib" data-act="qiopen" data-v="ops" title="' + esc(LL('Открыть список вмешательств', 'Open the list of procedures')) + '"><b>' + q.n + '</b><span>' + LL('вмешательств за период', 'procedures in period') + '</span><em>' + LL('медиана койко-дня после резекций: ', 'median LOS after resections: ') + (q.los === null ? LL('нет данных', 'no data') : q.los + LL(' дн.', ' d')) + '</em></button>' + qHelpBtn('ops') + (S.qhelp === 'ops' ? qiHelpHTML(QI_HELP_OPS) : '') + '</div><div class="bars" style="grid-template-columns:repeat(' + months.length + ',minmax(0,1fr))">' + months.map(function (mm, i) { return '<button type="button" class="bar" data-act="qiopen" data-v="ops" data-b="' + mm + '"><span class="bv" style="height:' + Math.round(mc[i] / mx * 100) + '%"><i>' + (mc[i] || '') + '</i></span><em>' + (byYear ? mm : new Date(+mm.slice(0, 4), +mm.slice(5) - 1, 1).toLocaleDateString(locale(), { month: 'short' }).replace('.', '')) + '</em></button>'; }).join('') + '</div></div>';
+  h += '<div class="qis">' + QI_DEFS.map(function (x) { return qiTileBtn(x, q[x.id]); }).join('') + '</div><p class="qnote">' + LL('Зелёный: соответствует целевым значениям, жёлтый: требует внимания, красный: хуже ожидаемого. Считается по вмешательствам с датой операции в выбранном периоде; знак «?» на плитке показывает, как именно.', 'Green meets targets, amber needs attention, red is worse than expected.') + '</p></section>';
   // research
   var act = studies().filter(function (r) { return !/Завершено|Приостановлено/.test(stProto(r).status); });
   h += '<section class="panel res"><div class="ph"><h2>' + LL('Наука', 'Research') + '</h2><button type="button" class="linkbtn" data-act="view" data-v="studies">' + LL('Все исследования', 'All studies') + '</button></div>';
@@ -5588,6 +5642,7 @@ document.addEventListener('click', function (ev) {
   var NEED = { qlnew: 'edit', qllink: 'edit', qldel: 'edit', savep: 'edit', saverec: 'edit', delp: 'delete', delrec: 'delete', esave: 'edit', edelete: 'delete', enrgo: 'edit', enroll: 'edit', rand: 'rand', unlockf: 'unlock', impgo: 'edit', imp: 'edit', newp: 'edit', newrec: 'edit', newreg: 'edit', newstudy: 'edit', qbsave: 'edit', qbnew: 'edit', fillsave: 'edit', cmtadd: 'edit', labsdone: 'edit', reset: 'admin', restore: 'admin', tplsave: 'edit', qsched: 'edit', qnow: 'edit', toreg: 'edit', addlinked: 'edit' };
   if (msAct(a, g)) return;
   if (meAct(a, g)) return;
+  if (S.qhelp && a !== 'qhelp') S.qhelp = null;
   if (NEED[a] && !can(NEED[a])) { toast(LL('Недостаточно прав для роли «', 'Not allowed for role "') + (SESSION ? roleName(SESSION.role) : '') + LL('»', '"')); return; }
   switch (a) {
     case 'nstog': {
@@ -5844,7 +5899,8 @@ document.addEventListener('click', function (ev) {
     case 'nseen': { UI.seen = UI.seen || {}; notifs().forEach(function (n) { UI.seen[n.id] = 1; }); saveUI(); render(); break; }
     case 'ngo': goNotif(g('i')); break;
     case 'qiper': UI.qiPer = g('v'); saveUI(); render(); break;
-    case 'qiopen': S.qid = g('v'); S.qbk = g('b') || null; render(); break;
+    case 'qiopen': S.qhelp = null; S.qid = g('v'); S.qbk = g('b') || null; render(); break;
+    case 'qhelp': S.qhelp = S.qhelp === g('v') ? null : g('v'); render(); break;
     case 'qiclose': S.qid = null; S.qbk = null; render(); break;
     case 'qibkt': S.qbk = S.qbk === g('v') ? null : g('v'); render(); break;
     case 'wgo': { var wa = JSON.parse(g('a')); if (wa[0] === 'r') openRec(wa[1], wa[2]); else if (wa[0] === 's') setView('reg:' + wa[1]); break; }
@@ -5959,7 +6015,7 @@ document.addEventListener('keydown', function (ev) {
     if (ev.key === 'Escape') { S.inline = null; render(); }
     return;
   }
-  if (ev.key === 'Escape') { if (S.lpop) S.lpop = null; else if (S.pick) S.pick = null; else if (S.menu) S.menu = null; else if (S.edit) S.edit = null; else if (S.rec) S.rec = null; else if (S.drawer) S.drawer = null; else if (S.qid) { S.qid = null; S.qbk = null; } else if (S.inline) S.inline = null; render(); return; }
+  if (ev.key === 'Escape') { if (S.lpop) S.lpop = null; else if (S.pick) S.pick = null; else if (S.menu) S.menu = null; else if (S.edit) S.edit = null; else if (S.rec) S.rec = null; else if (S.qhelp) S.qhelp = null; else if (S.drawer) S.drawer = null; else if (S.qid) { S.qid = null; S.qbk = null; } else if (S.inline) S.inline = null; render(); return; }
   if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('tr[data-act]')) { ev.preventDefault(); ev.target.click(); }
 });
 document.addEventListener('input', function (ev) {
