@@ -1100,6 +1100,9 @@ function patStays(p) { var sn = nameTokens(p.d.fio)[0]; return (DB.cols.planner 
 function dfltPat(p) { return !dfltOn() || patStays(p).some(dfltStay) || ((p.d.admDate || p.d.disDate) && dfltStay({ date: p.d.admDate, discharge: p.d.disDate })); }
 function dfltRec(k, r) { if (!dfltOn()) return true; if (k === 'planner') return dfltStay(r); var p = r.pid ? DB.patients.filter(function (x) { return x.id === r.pid; })[0] : null; if (!p && r.fio) { var sn = nameTokens(r.fio)[0]; p = DB.patients.filter(function (x) { return nameTokens(x.d.fio)[0] === sn; })[0]; } return p ? dfltPat(p) : false; }
 function inWardNow(p) { var td = isoOf(new Date()); if (patStays(p).some(function (r) { return inWard(r, td); })) return true; var a = p.d.admDate, dd = p.d.disDate; return !!a && a <= td && (dd ? dd >= td : ddays(a, td) <= 60); }
+/* карточка без записи в планировщике: в отделении по датам госпитализации из карточки */
+function cardInWard(p, td) { td = td || isoOf(new Date()); if (patStays(p).length) return false; var a = p.d.admDate, dd = p.d.disDate; return !!a && a <= td && (dd ? dd >= td : ddays(a, td) <= 30); }
+function cardOpsIn(from, to) { return DB.patients.filter(function (p) { var d = p.d.date; return d && d >= from && d <= to && !patStays(p).some(function (r) { return r.surgeryDate === d; }); }); }
 function patPhase(p) { var td = isoOf(new Date()); if (inWardNow(p)) return 'ward'; return p.d.date && p.d.date <= td ? 'post' : 'pre'; }
 function stagesDone(p) { var f = fuList(p); return f.length > 0 && f.every(function (x) { return x.st === 'done'; }) && !(p.q || []).some(function (e) { return !e.date; }); }
 function renderDateFilters(withStage) {
@@ -5304,6 +5307,12 @@ function briefing(forAI) {
     var st = pod < win[0] ? 'soon' : pod <= win[1] ? 'now' : 'late';
     out.labs.push({ rid: r.id, pid: r.pid, who: pubName(r.fio, r.pid), name: r.fio || '', pod: pod, op: r.dx || '', route: route ? (route === 'Палата пробуждения' ? LL('через палату пробуждения', 'via recovery room') : LL('через реанимацию', 'via ICU')) : LL('путь не указан', 'route not set'), noRoute: !route, win: win, st: st, stTxt: st === 'soon' ? LL('окно открывается завтра', 'window opens tomorrow') : st === 'now' ? LL('в окне: назначить и взять', 'in window: order and take') : LL('окно прошло, анализы не отмечены', 'window passed, not marked') });
   });
+  DB.patients.forEach(function (p) {
+    if (!p.d.date || !cardInWard(p, td) || p.d.labsDone) return;
+    var pod = -daysTo(p.d.date); if (pod < 1 || pod > 10) return;
+    var route = p.d.postRoute || '', win = ROUTE_WIN[route] || [2, 5]; if (pod < win[0] - 1) return;
+    var st = pod < win[0] ? 'soon' : pod <= win[1] ? 'now' : 'late'; out.labs.push({ rid: 'p:' + p.id, pid: p.id, who: pubName(p.d.fio, p.id), name: p.d.fio || '', pod: pod, op: p.d.proc || '', route: LL('по карточке', 'from card'), noRoute: false, win: win, st: st, stTxt: st === 'soon' ? LL('окно открывается завтра', 'window opens tomorrow') : st === 'now' ? LL('в окне: назначить и взять', 'in window: order and take') : LL('окно прошло, анализы не отмечены', 'window passed, not marked') });
+  });
   var rk = { late: 0, now: 1, soon: 2 }; out.labs.sort(function (a, b) { return rk[a.st] - rk[b.st] || b.pod - a.pod; });
   DB.cols.planner.forEach(function (r) { if ((r.surgeryDate === td || r.surgeryDate === tm) && r.status !== 'Отменено') out.ops.push({ rid: r.id, when: r.surgeryDate === td ? LL('Сегодня', 'Today') : LL('Завтра', 'Tomorrow'), who: pubName(r.fio, r.pid), name: r.fio || '', what: [r.dx, r.surgeon ? ov(r.surgeon) : ''].filter(Boolean).join(' · ') }); });
   DB.cols.mdt.forEach(function (r) { if (r.date === td) out.mdt.push(nm(r.fio, r.pid) + (r.rec ? ': ' + String(r.rec).slice(0, 80) : ' (' + LL('ожидает решения', 'awaiting decision') + ')')); });
@@ -5360,6 +5369,7 @@ function briefSumLines(S2) {
   return L2;
 }
 function markLabs(rid) {
+  if (String(rid).indexOf('p:') === 0) { var pp = patOf(String(rid).slice(2)); if (!pp) return; pp.d.labsDone = isoOf(new Date()); save(); toast(LL('Отмечено: контрольные анализы взяты', 'Marked: control labs taken')); render(); return; }
   var r = DB.cols.planner.filter(function (x) { return x.id === rid; })[0]; if (!r) return;
   r.labsDone = isoOf(new Date()); r.log = (r.log || []).concat([{ ts: nowIso(), by: me(), act: 'edit', ch: [{ f: 'labsDone', a: null, b: r.labsDone }] }]);
   save(); toast(LL('Отмечено: контрольные анализы взяты', 'Marked: control labs taken')); render();
@@ -5527,8 +5537,8 @@ function renderHome() {
   var td = isoOf(new Date()), ws = weekStart(), we = new Date(ws); we.setDate(we.getDate() + 6);
   var wsI = isoOf(ws), weI = isoOf(we), hr = new Date().getHours(), b = briefing();
   var greet = hr < 5 ? LL('Доброй ночи', 'Good night') : hr < 12 ? LL('Доброе утро', 'Good morning') : hr < 18 ? LL('Добрый день', 'Good afternoon') : LL('Добрый вечер', 'Good evening');
-  var inDept = DB.cols.planner.filter(function (r) { return inWard(r, td); }).length;
-  var opsWeek = DB.cols.planner.filter(function (r) { return r.surgeryDate >= wsI && r.surgeryDate <= weI && r.status !== 'Отменено'; });
+  var inDept = DB.cols.planner.filter(function (r) { return inWard(r, td); }).length + DB.patients.filter(function (p) { return cardInWard(p, td); }).length;
+  var opsWeek = DB.cols.planner.filter(function (r) { return r.surgeryDate >= wsI && r.surgeryDate <= weI && r.status !== 'Отменено'; }).concat(cardOpsIn(wsI, weI));
   var mdtWait = DB.cols.mdt.filter(mdtWaiting).length;
   var dateStr = new Date().toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   var first = String(me() || '').split(' ');
