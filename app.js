@@ -1007,6 +1007,7 @@ function migrate(db) {
     TRACKS.forEach(function (tk) { if (!(db.registries || []).some(function (r) { return r.id === 'trk_' + tk.key; })) db.registries.push(trackReg(tk.key)); });
     db.mig.t1 = 1; db._dirty = true;
   }
+  if (!db.mig.rot1) { if (!db.cols.rot || !db.cols.rot.length) db.cols.rot = rotSeed(); db.mig.rot1 = 1; db._dirty = true; }
   if (!db.cols.pubs) db.cols.pubs = [];
   plannerAuto(db);
   return db;
@@ -1310,7 +1311,7 @@ function opsSummary(list) {
   list.forEach(function (p) { var pr = p.d.proc; if (pr) { c[pr] = (c[pr] || 0) + 1; n++; } if (p.d.reop30 === 'Да') reopIn++; });
   var ks = Object.keys(c).sort(function (a, b) { return c[b] - c[a] || a.localeCompare(b); });
   if (!n) return '';
-  return '<div class="opsum"><span class="opsum-h">' + ico('knife', 14) + LL('Операций: ', 'Operations: ') + n + '</span>' + ks.map(function (k) { return '<span class="opchip">' + esc(ov(k)) + ' <b>' + c[k] + '</b></span>'; }).join('') + (reopIn ? '<span class="opchip muted" title="' + esc(LL('Ранние повторные операции, записанные внутри карточек (поле «Повторная операция (30 д)»)', 'Early reoperations recorded inside records')) + '">' + LL('Повторные операции в 30 дней (в карточках) ', 'Reoperations within 30 d (in records) ') + '<b>' + reopIn + '</b></span>' : '') + '</div>';
+  return '<div class="opsum"><span class="opsum-h">' + ico('knife', 14) + LL('Операций: ', 'Operations: ') + n + '</span>' + ks.map(function (k) { var on = UI.opf === k; return '<button type="button" class="opchip sgchip' + (on ? ' on' : '') + '" data-act="opf" data-v="' + esc(k) + '" aria-pressed="' + on + '" title="' + esc(on ? LL('Снять фильтр', 'Clear filter') : LL('Показать только эту операцию', 'Show only this procedure')) + '">' + esc(ov(k)) + ' <b>' + c[k] + '</b></button>'; }).join('') + (UI.opf ? '<button type="button" class="btn small ghost" data-act="opf" data-v="">' + LL('Все операции', 'All procedures') + '</button>' : '') + (reopIn ? '<span class="opchip muted" title="' + esc(LL('Ранние повторные операции, записанные внутри карточек (поле «Повторная операция (30 д)»)', 'Early reoperations recorded inside records')) + '">' + LL('Повторные операции в 30 дней (в карточках) ', 'Reoperations within 30 d (in records) ') + '<b>' + reopIn + '</b></span>' : '') + '</div>';
 }
 /* ======================= Registry list ======================= */
 function listForReg() {
@@ -1357,6 +1358,7 @@ function renderRegistry() {
   });
   admSortList(list, admKeyP);
   var listAll = list.slice(); list = list.filter(sgfOk);
+  var opAll = list.slice(); if (UI.opf && !list.some(function (p) { return p.d.proc === UI.opf; }) && !listAll.some(function (p) { return p.d.proc === UI.opf; })) delete UI.opf; if (UI.opf) list = list.filter(function (p) { return p.d.proc === UI.opf; });
   if (reg && reg.kind === 'study' && stabOf(reg.id) !== 'pts') return studyHead(reg) + studyTabBody(reg);
   var crumbs = reg ? ancestors(reg).map(function (a) { return '<button type="button" class="crumb" data-act="view" data-v="reg:' + a.id + '">' + esc(regName(a)) + '</button>'; }).join('<span class="csep">/</span>') : '';
   if (reg && reg.kind === 'study') crumbs = '<span class="crumb">' + t('nav.studies') + '</span>';
@@ -1377,7 +1379,7 @@ function renderRegistry() {
   var rK = list.filter(function (p) { return qSg(p) && P_ONCO.indexOf(p.d.proc) >= 0 && has(rOf(p.d)); }), r0 = rK.filter(function (p) { return rEff(p.d) === 'R0'; }).length;
   var npat = uniqPat(list);
   h += '<div class="stats">' + tile(npat, plural(npat, 'pl.patient').replace(/^\d+ /, ''), 'pat') + tile(list.length, plural(list.length, 'pl.hosp').replace(/^\d+ /, ''), 'hosp') + tile(avg === null ? t('st.nodata') : avg, t('st.avgAge'), 'age') + tile(op, t('st.operated'), 'op') + tile(rK.length ? pct(r0, rK.length) + '%' : t('st.nodata'), t('st.r0'), 'r0') + '</div>';
-  h += opsSummary(list);
+  h += opsSummary(opAll);
   h += sgChips(listAll.filter(function (p) { return p.d.surgeon || p.d.proc; }));
   h += renderFilters() + renderDateFilters(true);
   h += '<div class="tablewrap">';
@@ -1437,6 +1439,128 @@ function fuTable(rows) {
     var p = x.p, d = p.d;
     return '<tr data-act="openp" data-id="' + p.id + '" tabindex="0"><td class="mono">' + p.id + '</td><td class="strong">' + esc(d.fio || '') + '</td><td><div>' + fmtDate(d.date) + '</div><div class="muted small">' + esc(ov(d.proc || d.endo || '')) + '</div></td><td>' + fuCell(x.i.late, 'late', p.id) + '</td><td>' + fuCell(x.i.next, 'next', p.id) + '</td><td>' + fuCell(x.i.done, 'done') + '</td></tr>';
   }).join('') + '</tbody></table></div>';
+}
+/* ======================= Ротации резидентов ======================= */
+/* DB.cols.rot: одна запись на резидента { id, name, order, items: [{ id, start: 'YYYY-MM-DD', dur, unit: 'w'|'m', tent, note }] } */
+var ROT_HUES = [214, 158, 28, 278, 340, 190, 48, 120, 2, 250, 300, 90];
+function rotList() { DB.cols.rot = DB.cols.rot || []; return DB.cols.rot.slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0) || String(a.name).localeCompare(String(b.name)); }); }
+function rotOf(id) { return (DB.cols.rot || []).filter(function (r) { return r.id === id; })[0]; }
+function rotEnd(it) { var d = new Date(it.start + 'T00:00:00'), n = +it.dur || 1; if (it.unit === 'w') d.setDate(d.getDate() + n * 7 - 1); else { d.setMonth(d.getMonth() + n); d.setDate(d.getDate() - 1); } return isoOf(d); }
+function rotDurTxt(it) { var n = +it.dur || 1; return it.unit === 'w' ? n + ' ' + LL(n === 1 ? 'неделя' : n < 5 ? 'недели' : 'недель', n === 1 ? 'week' : 'weeks') : n + ' ' + LL(n === 1 ? 'месяц' : n < 5 ? 'месяца' : 'месяцев', n === 1 ? 'month' : 'months'); }
+function rotWin() {
+  var f = UI.rotFrom || rotDefFrom(), y = +f.slice(0, 4), m = +f.slice(5, 7) - 1, n = UI.rotSpan || 12, keys = [];
+  for (var i = 0; i < n; i++) { var d = new Date(y, m + i, 1); keys.push(isoOf(d)); }
+  var end = new Date(y, m + n, 1); return { from: keys[0], to: isoOf(end), keys: keys, n: n };
+}
+function rotDefFrom() { var d = new Date(), y = d.getFullYear(), m = d.getMonth(); if (m < 9) y--; return y + '-10-01'; }
+function rotDays(a, b) { return (new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000; }
+function rotPct(iso, W) { var tot = rotDays(W.from, W.to); return Math.max(0, Math.min(100, rotDays(W.from, iso) / tot * 100)); }
+function rotMonLab(iso, long) { var d = new Date(iso + 'T00:00:00'), s = d.toLocaleDateString(locale(), { month: long ? 'long' : 'short' }).replace('.', ''); s = s.charAt(0).toUpperCase() + s.slice(1); return s; }
+function rotActiveOn(day) { return rotList().filter(function (r) { return (r.items || []).some(function (it) { return !it.tent && it.start <= day && rotEnd(it) >= day; }); }); }
+function renderRot() {
+  var W = rotWin(), list = rotList(), td = isoOf(new Date()), ed = can('edit');
+  var h = '<div class="head"><div><div class="kicker">' + t('side.work') + '</div><h1>' + LL('Ротации', 'Rotations') + '</h1><p class="sub">' + LL('Кто из резидентов и когда работает в секторе. Нажмите на пустую клетку, чтобы добавить ротацию, на полосу, чтобы изменить.', 'Which residents rotate through the unit and when. Click an empty cell to add a rotation, a bar to edit it.') + '</p></div><div class="actions">';
+  h += '<div class="rot-per" role="group" aria-label="' + LL('Период', 'Period') + '"><button type="button" class="btn small ghost" data-act="rotshift" data-v="-1" aria-label="' + LL('Раньше', 'Earlier') + '">‹</button><span class="rot-per-l">' + esc(rotMonLab(W.keys[0], true) + ' ' + W.keys[0].slice(0, 4) + ' – ' + rotMonLab(W.keys[W.n - 1], true) + ' ' + W.keys[W.n - 1].slice(0, 4)) + '</span><button type="button" class="btn small ghost" data-act="rotshift" data-v="1" aria-label="' + LL('Позже', 'Later') + '">›</button>' + (UI.rotFrom && UI.rotFrom !== rotDefFrom() ? '<button type="button" class="btn small ghost" data-act="rotshift" data-v="0">' + LL('Учебный год', 'Academic year') + '</button>' : '') + '</div>';
+  if (ed) h += '<button type="button" class="btn primary" data-act="rotres" data-id="">' + ico('plus', 16) + LL('Резидент', 'Resident') + '</button>';
+  h += '</div></div>';
+  var now = rotActiveOn(td), all = 0, tent = 0; list.forEach(function (r) { (r.items || []).forEach(function (it) { if (rotEnd(it) >= W.from && it.start < W.to) { if (it.tent) tent++; else all++; } }); });
+  var nextIt = null; list.forEach(function (r) { (r.items || []).forEach(function (it) { if (!it.tent && it.start > td && (!nextIt || it.start < nextIt.it.start)) nextIt = { r: r, it: it }; }); });
+  h += '<div class="stats rot-stats">' + tile(list.length, LL('резидентов в списке', 'residents listed')) + tile(now.length, LL('сейчас на ротации', 'on rotation now')) + tile(all, LL('ротаций в периоде', 'rotations in period')) + tile(tent || '0', LL('под вопросом', 'tentative')) + (nextIt ? tile(fmtDate(nextIt.it.start), LL('следующий заезд: ', 'next start: ') + nextIt.r.name) : '') + '</div>';
+  if (now.length) h += '<div class="rot-now">' + ico('cap', 15) + '<b>' + LL('Сейчас в секторе:', 'In the unit now:') + '</b>' + now.map(function (r) { return '<span class="rot-chip" style="--h:' + rotHue(r) + '">' + esc(r.name) + '</span>'; }).join('') + '</div>';
+  h += '<section class="rot-board" style="--n:' + W.n + '"><div class="rot-row rot-hd"><div class="rot-name">' + LL('Резидент', 'Resident') + '</div><div class="rot-track">' + W.keys.map(function (k) { var cur = td.slice(0, 7) === k.slice(0, 7); return '<div class="rot-mh' + (cur ? ' cur' : '') + '"><b>' + esc(rotMonLab(k)) + '</b><span>' + k.slice(0, 4) + '</span></div>'; }).join('') + '</div></div>';
+  if (!list.length) h += '<div class="empty">' + LL('Резидентов пока нет. Добавьте первого кнопкой «Резидент».', 'No residents yet. Add one with the «Resident» button.') + '</div>';
+  var tdIn = td >= W.from && td < W.to, tdP = rotPct(td, W);
+  list.forEach(function (r) {
+    var its = (r.items || []).filter(function (it) { return rotEnd(it) >= W.from && it.start < W.to; }).sort(function (a, b) { return a.start.localeCompare(b.start); });
+    var mon = 0; its.forEach(function (it) { if (!it.tent) mon += Math.max(0, rotDays(it.start < W.from ? W.from : it.start, rotEnd(it) >= W.to ? W.to : isoOf(addDays(rotEnd(it), 1)))) / 30.44; });
+    h += '<div class="rot-row" style="--h:' + rotHue(r) + '"><div class="rot-name">' + (ed ? '<button type="button" class="rot-nb" data-act="rotres" data-id="' + r.id + '" title="' + esc(LL('Переименовать или удалить', 'Rename or remove')) + '">' : '<span class="rot-nb">') + '<i class="rot-dot"></i><span>' + esc(r.name) + '</span><em>' + (mon ? (Math.round(mon * 2) / 2).toString().replace('.', ',') + LL(' мес', ' mo') : '') + '</em>' + (ed ? '</button>' : '</span>') + '</div><div class="rot-track">';
+    W.keys.forEach(function (k) { h += ed ? '<button type="button" class="rot-cell" data-act="rotadd" data-id="' + r.id + '" data-v="' + k + '" aria-label="' + esc(LL('Добавить ротацию: ', 'Add rotation: ') + r.name + ', ' + rotMonLab(k, true)) + '"></button>' : '<span class="rot-cell"></span>'; });
+    its.forEach(function (it) {
+      var a = rotPct(it.start, W), b = rotPct(isoOf(addDays(rotEnd(it), 1)), W), lab = rotDurTxt(it) + (it.note ? ' · ' + it.note : '');
+      h += '<button type="button" class="rot-bar' + (it.tent ? ' tent' : '') + (it.start < W.from ? ' cutl' : '') + (rotEnd(it) >= W.to ? ' cutr' : '') + '" style="left:' + a + '%;width:' + Math.max(b - a, 1.2) + '%" data-act="rotedit" data-id="' + r.id + '" data-v="' + it.id + '" title="' + esc(r.name + ': ' + fmtDate(it.start) + ' – ' + fmtDate(rotEnd(it)) + ' (' + rotDurTxt(it) + ')' + (it.tent ? LL(', под вопросом', ', tentative') : '') + (it.note ? '. ' + it.note : '')) + '"' + (ed ? '' : ' disabled') + '><span>' + (it.tent ? '? ' : '') + esc(lab) + '</span></button>';
+    });
+    if (tdIn) h += '<i class="rot-today" style="left:' + tdP + '%"></i>';
+    h += '</div></div>';
+  });
+  if (list.length) {
+    h += '<div class="rot-row rot-ft"><div class="rot-name">' + LL('В секторе', 'In the unit') + '</div><div class="rot-track">' + W.keys.map(function (k) {
+      var e = isoOf(addDays(isoOf(new Date(+k.slice(0, 4), +k.slice(5, 7), 1)), -1)), c = list.filter(function (r) { return (r.items || []).some(function (it) { return !it.tent && it.start <= e && rotEnd(it) >= k; }); }).length, q = list.filter(function (r) { return (r.items || []).some(function (it) { return it.tent && it.start <= e && rotEnd(it) >= k; }); }).length;
+      return '<div class="rot-cnt' + (c ? '' : ' z') + '" title="' + esc(c + LL(' резидентов', ' residents') + (q ? LL(', под вопросом ещё ', ', tentative ') + q : '')) + '"><b>' + c + '</b>' + (q ? '<span>+' + q + '?</span>' : '') + '</div>';
+    }).join('') + '</div></div>';
+  }
+  h += '</section>';
+  h += '<p class="qnote rot-leg"><span class="rot-bar demo"></span>' + LL('ротация', 'rotation') + '<span class="rot-bar tent demo"></span>' + LL('под вопросом', 'tentative') + '<i class="rot-today demo"></i>' + LL('сегодня', 'today') + '</p>';
+  if (S.rotEd) h += renderRotModal();
+  return h;
+}
+function rotHue(r) { var L0 = rotList(), i = L0.indexOf(r); if (i < 0) i = (DB.cols.rot || []).indexOf(r); return ROT_HUES[(i < 0 ? 0 : i) % ROT_HUES.length]; }
+function renderRotModal() {
+  var e = S.rotEd, r = rotOf(e.rid), h = '<div class="dim" data-act="rotclose"></div><section class="modal rot-m" role="dialog" aria-modal="true" aria-label="' + esc(LL('Ротация', 'Rotation')) + '"><div class="dhead"><div><div class="dh-kicker">' + LL('Ротации', 'Rotations') + '</div><div class="dh-title">';
+  if (e.kind === 'res') {
+    h += esc(r ? r.name : LL('Новый резидент', 'New resident')) + '</div></div><button type="button" class="iconbtn" data-act="rotclose" aria-label="' + LL('Закрыть', 'Close') + '">' + ico('x', 18) + '</button></div><div class="dbody rot-mb">';
+    h += '<label class="rot-f"><span>' + LL('Имя резидента', 'Resident name') + '</span><input id="rot-name" type="text" value="' + esc(r ? r.name : '') + '" placeholder="' + esc(LL('Например, Ахрор', 'e.g. Akhror')) + '" autocomplete="off"></label>';
+    if (r) h += '<p class="muted small">' + LL('Ротаций: ', 'Rotations: ') + (r.items || []).length + '</p>';
+    h += '</div><div class="dfoot"><div>' + (r ? (e.del ? '<button type="button" class="btn danger" data-act="rotresdel" data-id="' + r.id + '">' + LL('Точно удалить вместе с ротациями', 'Delete with all rotations') + '</button>' : '<button type="button" class="btn ghost" data-act="rotdelask">' + LL('Удалить резидента', 'Remove resident') + '</button>') : '') + '</div><div class="actions"><button type="button" class="btn" data-act="rotclose">' + t('b.cancel') + '</button><button type="button" class="btn primary" data-act="rotressave">' + t('b.save') + '</button></div></div></section>';
+    return h;
+  }
+  var it = (r && (r.items || []).filter(function (x) { return x.id === e.iid; })[0]) || { start: e.start || isoOf(new Date()), dur: 1, unit: 'm', tent: false, note: '' };
+  h += esc((r ? r.name : '') + (e.iid ? '' : LL(': новая ротация', ': new rotation'))) + '</div></div><button type="button" class="iconbtn" data-act="rotclose" aria-label="' + LL('Закрыть', 'Close') + '">' + ico('x', 18) + '</button></div><div class="dbody rot-mb">';
+  h += '<div class="rot-fr"><label class="rot-f"><span>' + LL('Начало', 'Start') + '</span><input id="rot-start" type="date" value="' + esc(it.start) + '"></label><label class="rot-f sm"><span>' + LL('Длительность', 'Duration') + '</span><input id="rot-dur" type="number" min="1" max="36" value="' + esc(it.dur) + '"></label><label class="rot-f sm"><span>' + LL('Единица', 'Unit') + '</span><select id="rot-unit"><option value="m"' + (it.unit !== 'w' ? ' selected' : '') + '>' + LL('месяцев', 'months') + '</option><option value="w"' + (it.unit === 'w' ? ' selected' : '') + '>' + LL('недель', 'weeks') + '</option></select></label></div>';
+  h += '<div class="rot-quick">' + [[2, 'w', LL('2 недели', '2 weeks')], [1, 'm', LL('1 месяц', '1 month')], [2, 'm', LL('2 месяца', '2 months')], [3, 'm', LL('3 месяца', '3 months')], [6, 'm', LL('6 месяцев', '6 months')]].map(function (q) { return '<button type="button" class="opchip sgchip" data-act="rotquick" data-v="' + q[0] + q[1] + '">' + q[2] + '</button>'; }).join('') + '</div>';
+  h += '<label class="rot-chk"><input id="rot-tent" type="checkbox"' + (it.tent ? ' checked' : '') + '> ' + LL('Под вопросом (не подтверждено)', 'Tentative (not confirmed)') + '</label>';
+  h += '<label class="rot-f"><span>' + LL('Комментарий', 'Note') + '</span><input id="rot-note" type="text" value="' + esc(it.note || '') + '" placeholder="' + esc(LL('Например, отпуск со 2-й недели', 'e.g. leave from week 2')) + '"></label>';
+  h += '<p class="muted small" id="rot-end">' + LL('Окончание: ', 'Ends: ') + fmtDate(rotEnd(it)) + '</p>';
+  h += '</div><div class="dfoot"><div>' + (e.iid ? '<button type="button" class="btn ghost" data-act="rotitdel">' + LL('Удалить ротацию', 'Delete rotation') + '</button>' : '') + '</div><div class="actions"><button type="button" class="btn" data-act="rotclose">' + t('b.cancel') + '</button><button type="button" class="btn primary" data-act="rotitsave">' + t('b.save') + '</button></div></div></section>';
+  return h;
+}
+function rotAct(a, g) {
+  var v = function (id) { var el = document.getElementById(id); return el ? (el.type === 'checkbox' ? el.checked : el.value) : ''; };
+  switch (a) {
+    case 'rotshift': { var s = +g('v'); if (!s) delete UI.rotFrom; else { var W = rotWin(), d = new Date(W.from + 'T00:00:00'); d.setMonth(d.getMonth() + s); UI.rotFrom = isoOf(d); } saveUI(); render(); return true; }
+    case 'rotres': if (!can('edit')) return true; S.rotEd = { kind: 'res', rid: g('id') || null }; render(); setTimeout(function () { var el = document.getElementById('rot-name'); if (el) el.focus(); }, 30); return true;
+    case 'rotdelask': if (S.rotEd) S.rotEd.del = true; render(); return true;
+    case 'rotresdel': DB.cols.rot = (DB.cols.rot || []).filter(function (r) { return r.id !== g('id'); }); S.rotEd = null; save(); render(); toast(LL('Резидент удалён', 'Resident removed')); return true;
+    case 'rotressave': {
+      var nm = String(v('rot-name')).trim(); if (!nm) { toast(LL('Введите имя', 'Enter a name')); return true; }
+      var r = rotOf(S.rotEd.rid); DB.cols.rot = DB.cols.rot || [];
+      if (r) r.name = nm; else DB.cols.rot.push({ id: uid('rot_'), name: nm, order: DB.cols.rot.reduce(function (m, x) { return Math.max(m, x.order || 0); }, 0) + 1, items: [] });
+      S.rotEd = null; save(); render(); return true;
+    }
+    case 'rotadd': if (!can('edit')) return true; S.rotEd = { kind: 'it', rid: g('id'), iid: null, start: g('v') }; render(); return true;
+    case 'rotedit': if (!can('edit')) return true; S.rotEd = { kind: 'it', rid: g('id'), iid: g('v') }; render(); return true;
+    case 'rotquick': { var q = g('v'), du = document.getElementById('rot-dur'), un = document.getElementById('rot-unit'); if (du) du.value = parseInt(q, 10); if (un) un.value = q.slice(-1); rotEndUpd(); return true; }
+    case 'rotitdel': { var r2 = rotOf(S.rotEd.rid); if (r2) r2.items = (r2.items || []).filter(function (x) { return x.id !== S.rotEd.iid; }); S.rotEd = null; save(); render(); toast(LL('Ротация удалена', 'Rotation deleted')); return true; }
+    case 'rotitsave': {
+      var r3 = rotOf(S.rotEd.rid), st = v('rot-start'), du2 = Math.max(1, Math.min(36, parseInt(v('rot-dur'), 10) || 1)), un2 = v('rot-unit') === 'w' ? 'w' : 'm';
+      if (!r3 || !/^\d{4}-\d\d-\d\d$/.test(st)) { toast(LL('Укажите дату начала', 'Set a start date')); return true; }
+      r3.items = r3.items || []; var it = r3.items.filter(function (x) { return x.id === S.rotEd.iid; })[0];
+      if (!it) { it = { id: uid('ri_') }; r3.items.push(it); }
+      it.start = st; it.dur = du2; it.unit = un2; it.tent = !!v('rot-tent'); it.note = String(v('rot-note')).trim();
+      S.rotEd = null; save(); render(); return true;
+    }
+    case 'rotclose': S.rotEd = null; render(); return true;
+  }
+  return false;
+}
+function rotEndUpd() { var el = document.getElementById('rot-end'); if (!el) return; var st = (document.getElementById('rot-start') || {}).value, du = (document.getElementById('rot-dur') || {}).value, un = (document.getElementById('rot-unit') || {}).value; if (!/^\d{4}-\d\d-\d\d$/.test(st || '')) return; el.textContent = LL('Окончание: ', 'Ends: ') + fmtDate(rotEnd({ start: st, dur: du, unit: un })); }
+document.addEventListener('input', function (ev) { if (ev.target && /^rot-(start|dur|unit)$/.test(ev.target.id || '')) rotEndUpd(); });
+document.addEventListener('change', function (ev) { if (ev.target && /^rot-(start|dur|unit)$/.test(ev.target.id || '')) rotEndUpd(); });
+/* стартовое расписание из таблицы Ахрора (октябрь 2026 - август 2027) */
+function rotSeed() {
+  function R(name, its) { return { id: uid('rot_'), name: name, items: its.map(function (x) { return { id: uid('ri_'), start: x[0], dur: x[1], unit: x[2] || 'm', tent: !!x[3], note: x[4] || '' }; }) }; }
+  var L0 = [
+    R('Ануар', [['2026-10-01', 11]]),
+    R('Ахрор', [['2026-10-01', 1], ['2027-01-01', 1], ['2027-04-01', 2]]),
+    R('Жанель', [['2026-11-01', 2]]),
+    R('Аяжан', [['2027-02-01', 2, 'm', true]]),
+    R('Бауржан', [['2027-04-01', 2]]),
+    R('Жанибек', [['2027-02-01', 2]]),
+    R('Темирлан', [['2026-10-01', 1], ['2026-11-01', 2, 'w'], ['2026-12-01', 1], ['2027-06-01', 1], ['2027-07-01', 2, 'w']]),
+    R('Шамшырак', []), R('Ерасыл', []), R('Арман', []),
+    R('Томирис', [['2026-10-01', 2]])
+  ];
+  L0.forEach(function (r, i) { r.order = i + 1; });
+  return L0;
 }
 function renderFu() {
   var rows = DB.patients.filter(function (p) { return (p.d.date || (p.q || []).length) && dfltPat(p); }).map(function (p) { return { p: p, i: fuPatInfo(p) }; });
@@ -5502,7 +5626,7 @@ function viewTitle() {
 function crumbGroup() {
   var v = S.view;
   if (v === 'home') return '';
-  if (/^col:(planner|mdt|mm)$/.test(v)) return t('side.work');
+  if (/^col:(planner|mdt|mm)$/.test(v) || v === 'rot') return t('side.work');
   if (v === 'studies' || v === 'q' || /^col:(pubs|redcap|goals)$/.test(v)) return t('side.research');
   if (v.indexOf('reg:') === 0) { var r = regOf(v.slice(4)); if (r && r.kind === 'study') return t('side.research'); }
   if (v === 'users') return LL('Администрирование', 'Admin');
@@ -5584,6 +5708,7 @@ function renderSide() {
   h += navBtn('home', 'home', LL('Главная', 'Home'));
   h += '<div class="side-h">' + t('side.work') + '</div>';
   ['planner', 'mdt'].forEach(function (k) { h += navBtn('col:' + k, COLS[k].icon, L(COLS[k].title), DB.cols[k].length); });
+  h += navBtn('rot', 'cap', LL('Ротации', 'Rotations'), (DB.cols.rot || []).length || undefined);
   h += '<div class="side-h">' + t('side.registry') + '</div>';
   h += navBtn('reg:all', 'users', t('nav.allPatients'), DB.patients.length);
   var due = fuDueAll().length;
@@ -5615,6 +5740,7 @@ function renderMain() {
   if (v === 'appr') return renderAppr();
   if (v === 'write') return renderWrite();
   if (v === 'fu') return renderFu();
+  if (v === 'rot') return renderRot();
   if (v === 'retro') return renderRetro();
   if (v === 'studies') return renderStudies();
   if (v === 'q') return renderQPage();
@@ -5630,7 +5756,7 @@ function renderMain() {
 /* ======================= v10: command palette ======================= */
 function cmdItems() {
   var q = String(S.cmd.q || '').trim().toLowerCase(), out = [];
-  var nav = [['home', 'home', LL('Главная', 'Home')], ['col:planner', 'cal', L(COLS.planner.title)], ['col:mdt', 'mdt', L(COLS.mdt.title)], ['col:mm', 'alert', 'M&M'], ['reg:all', 'users', t('nav.allPatients')], ['write', 'doc', LL('Рукописи и литература', 'Manuscripts and library')], ['fu', 'clock', t('nav.followup')], ['studies', 'flask', t('nav.studies')], ['q', 'clipboard', LL('Анкеты', 'Questionnaires')], ['col:pubs', 'book', L(COLS.pubs.title)], ['col:redcap', 'flask', 'RedCap'], ['col:goals', 'flag', L(COLS.goals.title)]];
+  var nav = [['home', 'home', LL('Главная', 'Home')], ['col:planner', 'cal', L(COLS.planner.title)], ['col:mdt', 'mdt', L(COLS.mdt.title)], ['col:mm', 'alert', 'M&M'], ['rot', 'cap', LL('Ротации', 'Rotations')], ['reg:all', 'users', t('nav.allPatients')], ['write', 'doc', LL('Рукописи и литература', 'Manuscripts and library')], ['fu', 'clock', t('nav.followup')], ['studies', 'flask', t('nav.studies')], ['q', 'clipboard', LL('Анкеты', 'Questionnaires')], ['col:pubs', 'book', L(COLS.pubs.title)], ['col:redcap', 'flask', 'RedCap'], ['col:goals', 'flag', L(COLS.goals.title)]];
   DB.registries.forEach(function (r) { nav.push(['reg:' + r.id, r.kind === 'study' ? 'flask' : 'tag', regName(r)]); });
   var acts = [];
   if (can('edit')) acts = [['newp', 'plus', LL('Новый пациент', 'New patient')], ['newstudy', 'flask', LL('Новое исследование', 'New study')], ['newreg', 'plus', LL('Новый регистр', 'New registry')]];
@@ -5678,6 +5804,7 @@ document.addEventListener('click', function (ev) {
   var g = function (x) { return tg.getAttribute('data-' + x); };
   var NEED = { qlnew: 'edit', qllink: 'edit', qldel: 'edit', savep: 'edit', saverec: 'edit', delp: 'delete', delrec: 'delete', esave: 'edit', edelete: 'delete', enrgo: 'edit', enroll: 'edit', rand: 'rand', unlockf: 'unlock', impgo: 'edit', imp: 'edit', newp: 'edit', newrec: 'edit', newreg: 'edit', newstudy: 'edit', qbsave: 'edit', qbnew: 'edit', fillsave: 'edit', cmtadd: 'edit', labsdone: 'edit', reset: 'admin', restore: 'admin', tplsave: 'edit', qsched: 'edit', qnow: 'edit', toreg: 'edit', addlinked: 'edit' };
   if (msAct(a, g)) return;
+  if (rotAct(a, g)) return;
   if (meAct(a, g)) return;
   if (S.qhelp && a !== 'qhelp') S.qhelp = null;
   if (NEED[a] && !can(NEED[a])) { toast(LL('Недостаточно прав для роли «', 'Not allowed for role "') + (SESSION ? roleName(SESSION.role) : '') + LL('»', '"')); return; }
@@ -5939,6 +6066,7 @@ document.addEventListener('click', function (ev) {
     case 'qiopen': S.qhelp = null; S.qid = g('v'); S.qbk = g('b') || null; render(); break;
     case 'qhelp': S.qhelp = S.qhelp === g('v') ? null : g('v'); render(); break;
     case 'qiclose': S.qid = null; S.qbk = null; render(); break;
+    case 'opf': { var ov2 = g('v'); if (!ov2 || UI.opf === ov2) delete UI.opf; else UI.opf = ov2; saveUI(); render(); break; }
     case 'sgf': { var sv = g('v'); if (!sv || UI.sgf === sv) delete UI.sgf; else UI.sgf = sv; saveUI(); render(); break; }
     case 'qibkt': S.qbk = S.qbk === g('v') ? null : g('v'); render(); break;
     case 'wgo': { var wa = JSON.parse(g('a')); if (wa[0] === 'r') openRec(wa[1], wa[2]); else if (wa[0] === 's') setView('reg:' + wa[1]); break; }
@@ -8848,6 +8976,7 @@ function navGroups() {
   var wk = ['planner', 'mdt'].map(function (k) { return { v: 'col:' + k, icon: COLS[k].icon, label: L(COLS[k].title), cnt: DB.cols[k].length }; });
   /* разделы маршрутов лечения вложены под МДГ: пациент попадает в них по решению МДГ */
   TRACKS.forEach(function (tk) { var rr = regOf('trk_' + tk.key); if (rr) wk.push({ v: 'reg:' + rr.id, icon: tk.icon, label: LL(tk.ru, tk.en), cnt: regCount(rr), depth: 1 }); });
+  wk.push({ v: 'rot', icon: 'cap', label: LL('Ротации', 'Rotations'), cnt: (DB.cols.rot || []).length || undefined });
   g.push({ id: 'work', label: LL('Работа', 'Work'), icon: 'cal', items: wk });
   var pts = [{ v: 'reg:all', icon: 'users', label: t('nav.allPatients'), cnt: DB.patients.length }];
   pts.push({ sep: LL('Ещё', 'More') }); pts.push({ v: 'fu', icon: 'clock', label: t('nav.followup'), badge: fuDueAll().length || null });
