@@ -5612,6 +5612,7 @@ function viewTitle() {
   if (v === 'me') return LL('Личный кабинет', 'My account');
   if (v === 'users') return LL('Пользователи', 'Users');
   if (v === 'fu') return t('nav.followup');
+  if (v === 'rot') return LL('Ротации', 'Rotations');
   if (v === 'retro') return LL('Ретро-загрузка документов', 'Retrospective import');
   if (v === 'studies') return t('nav.studies');
   if (v === 'q') return LL('Анкеты', 'Questionnaires');
