@@ -81,6 +81,7 @@ var P_COLECT = ['Субтотальная колэктомия', 'Тотальн
 var P_EVISC = ['Тазовая эвисцерация'];
 var P_STFORM = ['Формирование стомы'];
 var P_STCLOSE = ['Закрытие петлевой стомы', 'Восстановление непрерывности после операции Гартмана'];
+var P_STOMA_ONLY = ['Формирование стомы', 'Закрытие петлевой стомы', 'Восстановление непрерывности после операции Гартмана'];
 var P_CRS = ['Циторедуктивная операция'];
 var P_ENDO = ['ESD', 'EMR', 'Полипэктомия', 'Стентирование', 'Баллонная дилатация'];
 var P_REOP = ['Релапаротомия', 'Релапароскопия', 'Программированная санация брюшной полости'];
@@ -152,7 +153,7 @@ var NOT_ENDO = function (d) { return !isEndo(d); };
 var APPROACH = ['TNT', 'Оппортунистическая TNT', 'Оппортунистический W&W после ХТ', 'Оппортунистический W&W после ЛТ', 'ТЭО', 'Операция после ЛТ', 'Первичная операция'];
 function f(id, ru, en, type, o) { var x = { id: id, label: [ru, en], type: type }; if (o) Object.keys(o).forEach(function (k) { x[k] = o[k]; }); return x; }
 
-var SURGEONS = ['Мамлин', 'Хамзина', 'Кожахметов', 'Батырбеков', 'Ускенбаев', 'Адылханов', 'Усипбеков', 'Дигай'];
+var SURGEONS = ['Мамлин', 'Хамзина', 'Кожахметов', 'Батырбеков', 'Ускенбаев', 'Адылханов', 'Усипбеков', 'Дигай', 'Арингазина', 'Родионов', 'Ермешев', 'Айсин', 'Керимкулов', 'Кенжин'];
 var RESIDENTS = ['Ахрор', 'Шамшырак', 'Жанна', 'Ануар'];
 var STOMAS = ['Нет', 'Петлевая илеостома', 'Концевая илеостома', 'Петлевая трансверзостома', 'Петлевая сигмостома', 'Петлевая колостома', 'Концевая колостома', 'Раздельная двуствольная колостома'];
 var INCISIONS = ['Срединная лапаротомия', 'Нижнесрединная лапаротомия', 'Верхнесрединная лапаротомия', 'Поперечная лапаротомия', 'Лапаротомия по Пфанненштилю'];
@@ -820,7 +821,7 @@ var KEY = CLOUD_MODE ? KEY_CLOUD : 'crr.v3', UIKEY = 'crr.ui';
 var DB;
 function defaultRegistries() {
   function A(id, key, rules, parent, kind) { var r = { id: id, nameKey: key, name: '', mode: 'auto', rules: rules, members: [], custom: [] }; if (parent) r.parent = parent; if (kind) r.kind = kind; return r; }
-  function L1(id, key, locs) { return A(id, key, [{ f: 'loc', vals: locs }], 'g_surg'); }
+  function L1(id, key, locs) { return A(id, key, [{ f: 'loc', vals: locs }, { f: 'proc', not: P_STOMA_ONLY.slice() }], 'g_surg'); }
   return [
     A('g_surg', 'reg.surg', [{ f: 'proc', not: P_ENDO.slice() }]),
     L1('rg_rect', 'reg.rectum', ['Прямая кишка']),
@@ -830,10 +831,11 @@ function defaultRegistries() {
     L1('rg_trans', 'reg.trans', ['Поперечная ободочная']),
     L1('rg_right', 'reg.right', RIGHT.slice()),
     L1('rg_anal', 'reg.anal', ['Анальный канал']),
-    A('g_endo', 'reg.endo', [{ f: 'proc', vals: P_ENDO.slice() }])
+    A('g_endo', 'reg.endo', [{ f: 'proc', vals: P_ENDO.slice() }]),
+    A('g_stoma', 'reg.stoma', [{ f: 'proc', vals: P_STOMA_ONLY.slice() }])
   ];
 }
-var MOTHER_REGS = ['g_surg', 'rg_rect', 'rg_rs', 'rg_sig', 'rg_left', 'rg_trans', 'rg_right', 'rg_anal', 'g_endo'];
+var MOTHER_REGS = ['g_surg', 'rg_rect', 'rg_rs', 'rg_sig', 'rg_left', 'rg_trans', 'rg_right', 'rg_anal', 'g_endo', 'g_stoma'];
 function freshDB() {
   if (CLOUD_MODE || !window.NOTION_IMPORT) return emptyDB();
   return dbFromImport(window.NOTION_IMPORT);
@@ -993,6 +995,13 @@ function migrate(db) {
     (db.registries || []).forEach(function (r) { if (DEF12[r.id] && (r.id === 'g_surg' || r.id === 'g_endo')) r.rules = clone(DEF12[r.id].rules); });
     db.mig.p12 = 1; db._dirty = true;
   }
+  if (!db.mig.p13) {
+    /* регистр «Стомы»: только формирование или закрытие стомы; из регистров по локализации такие операции убраны */
+    var DEF13 = {}; defaultRegistries().forEach(function (r) { DEF13[r.id] = r; });
+    (db.registries || []).forEach(function (r) { if (/^rg_(rect|rs|sig|left|trans|right|anal)$/.test(r.id) && DEF13[r.id]) { var other = (r.rules || []).filter(function (x) { return x.f !== 'loc' && !(x.f === 'proc' && x.not); }); r.rules = clone(DEF13[r.id].rules).concat(other); } });
+    if (!(db.registries || []).some(function (r) { return r.id === 'g_stoma'; })) db.registries.push(clone(DEF13.g_stoma));
+    db.mig.p13 = 1; db._dirty = true;
+  }
   if (!db.mig.t1) {
     /* маршруты лечения по решению МДГ: встроенные разделы со своими полями */
     TRACKS.forEach(function (tk) { if (!(db.registries || []).some(function (r) { return r.id === 'trk_' + tk.key; })) db.registries.push(trackReg(tk.key)); });
@@ -1072,7 +1081,7 @@ function inReg(p, reg) {
   if (reg.mode === 'manual') return reg.members.indexOf(p.id) >= 0;
   return reg.rules.every(function (r) { return ruleOk(p, r); });
 }
-var REG_ORDER = { g_surg: 0, g_endo: 1 };
+var REG_ORDER = { g_surg: 0, g_endo: 1, g_stoma: 2 };
 function kids(pid, study, sci) {
   var out = DB.registries.filter(function (r) { return r.kind !== 'track' && (r.parent || null) === (pid || null) && !!(r.kind === 'study') === !!study && (study || pid || !!r.sci === !!sci); });
   if (!pid && !study) out = out.map(function (r, i) { return [r, i]; }).sort(function (x, y) { var ox = REG_ORDER[x[0].id], oy = REG_ORDER[y[0].id]; ox = ox === undefined ? 9 : ox; oy = oy === undefined ? 9 : oy; return ox - oy || x[1] - y[1]; }).map(function (x) { return x[0]; });
@@ -1102,8 +1111,17 @@ function renderDateFilters(withStage) {
     h += '<label class="fsel' + (fl.ph ? ' on' : '') + '"><span class="sr">' + LL('Этап лечения', 'Treatment stage') + '</span><select data-act="flt" data-id="ph"><option value="">' + LL('Этап: любой', 'Stage: any') + '</option>' + [['pre', LL('Этап: до операции', 'Stage: before surgery')], ['ward', LL('Этап: сейчас в стационаре', 'Stage: in hospital now')], ['post', LL('Этап: после операции', 'Stage: after surgery')]].map(function (o) { return '<option value="' + o[0] + '"' + (fl.ph === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>';
     h += '<label class="fsel' + (fl.stg ? ' on' : '') + '"><span class="sr">' + LL('Контроли наблюдения', 'Follow-up checks') + '</span><select data-act="flt" data-id="stg"><option value="">' + LL('Контроли: любые', 'Follow-up: any') + '</option><option value="done"' + (fl.stg === 'done' ? ' selected' : '') + '>' + LL('Контроли: все выполнены', 'Follow-up: all done') + '</option><option value="open"' + (fl.stg === 'open' ? ' selected' : '') + '>' + LL('Контроли: есть невыполненные', 'Follow-up: some pending') + '</option></select></label>';
   }
+  var so = UI.admSort || '';
+  h += '<label class="fsel' + (so ? ' on' : '') + '"><span class="sr">' + LL('Сортировка по дате госпитализации', 'Sort by admission date') + '</span><select data-act="admsort"><option value="">' + LL('Порядок: по умолчанию', 'Order: default') + '</option><option value="asc"' + (so === 'asc' ? ' selected' : '') + '>' + LL('Госпитализация: сначала ранние ↑', 'Admission: oldest first ↑') + '</option><option value="desc"' + (so === 'desc' ? ' selected' : '') + '>' + LL('Госпитализация: сначала поздние ↓', 'Admission: newest first ↓') + '</option></select></label>';
   if (any) h += '<button type="button" class="btn small ghost" data-act="dfltreset">' + LL('Сбросить даты', 'Clear dates') + '</button>';
   return h + '</div>';
+}
+/* сортировка по дате госпитализации (поступление, иначе дата операции); пустые в конце */
+function admKeyP(p) { var d = (p && p.d) || p || {}; return String(d.admDate || d.date || ''); }
+function admSortList(list, getKey) {
+  var so = UI.admSort; if (!so) return false; var dir = so === 'asc' ? 1 : -1;
+  list.sort(function (a, b) { var x = getKey(a), y = getKey(b); if (!x && !y) return 0; if (!x) return 1; if (!y) return -1; return x.localeCompare(y) * dir || String(a.id || '').localeCompare(String(b.id || '')) * dir; });
+  return true;
 }
 function ancestors(reg) { var out = [], r = reg; while (r && r.parent) { r = regOf(r.parent); if (r) out.unshift(r); } return out; }
 function tagsOf(match) {
@@ -1337,6 +1355,7 @@ function renderRegistry() {
     if (an !== null && bn !== null && s.k === 'age') return (an - bn) * s.d;
     return String(av).localeCompare(String(bv), locale()) * s.d;
   });
+  admSortList(list, admKeyP);
   if (reg && reg.kind === 'study' && stabOf(reg.id) !== 'pts') return studyHead(reg) + studyTabBody(reg);
   var crumbs = reg ? ancestors(reg).map(function (a) { return '<button type="button" class="crumb" data-act="view" data-v="reg:' + a.id + '">' + esc(regName(a)) + '</button>'; }).join('<span class="csep">/</span>') : '';
   if (reg && reg.kind === 'study') crumbs = '<span class="crumb">' + t('nav.studies') + '</span>';
@@ -1422,6 +1441,7 @@ function renderFu() {
   var att = rows.filter(function (x) { return x.i.late.length || x.i.next.some(function (n) { return n.soon; }); }), fine = rows.filter(function (x) { return att.indexOf(x) < 0; });
   att.sort(function (a, b) { return b.i.late.length - a.i.late.length || String(a.p.d.date).localeCompare(String(b.p.d.date)); });
   fine.sort(function (a, b) { return String(b.p.d.date || '').localeCompare(String(a.p.d.date || '')); });
+  admSortList(att, function (x) { return admKeyP(x.p); }); admSortList(fine, function (x) { return admKeyP(x.p); });
   var late = att.filter(function (x) { return x.i.late.length; }).length;
   var h = '<div class="head"><div><h1>' + t('nav.followup') + '</h1><p class="sub">' + LL('Контроли через 30 дней, 90 дней и 1 год после операции и назначенные анкеты', 'Follow-ups at 30 days, 90 days and 1 year after surgery, plus scheduled questionnaires') + '</p></div></div>';
   h += renderDateFilters(false);
@@ -2046,6 +2066,7 @@ function cellVal(x, val) {
 function renderTable(k, list, keepOrder) {
   var c = COLS[k], s = S.sort[k] || { k: c.dateField || c.titleField, d: -1 };
   if (!keepOrder) list.sort(function (a, b) { var av = a[s.k], bv = b[s.k]; if (!has(av)) return 1; if (!has(bv)) return -1; return String(av).localeCompare(String(bv), locale(), { numeric: true }) * s.d; });
+  if (!keepOrder && c.dateField) admSortList(list, function (r) { return String(r[c.dateField] || ''); });
   var h = '<div class="tablewrap">';
   if (!list.length) return h + '<div class="empty">' + t('col.empty') + '</div></div>';
   h += '<table class="grid"><thead><tr>' + c.list.map(function (id) { return thSort(k, id, L(c.F[id].label)); }).join('') + '</tr></thead><tbody>';
@@ -6048,6 +6069,7 @@ document.addEventListener('change', function (ev) {
   }
   if (tg.id === 'dxfile' && S.dx) { var kp0 = root.querySelector('#dxkeep'), ag0 = root.querySelector('#dxagree'); if (kp0) S.dx.keep = kp0.checked; if (ag0) S.dx.agree = ag0.checked; S.dx.files = filesAcc(S.dx.files, tg.files ? Array.prototype.slice.call(tg.files) : []); try { tg.value = ''; } catch (e) {} S.dx.file = S.dx.files[0] || null; render(); return; }
   if (tg.getAttribute('data-act') === 'dflt') { if (tg.value) dfltOf()[tg.getAttribute('data-id')] = tg.value; else delete dfltOf()[tg.getAttribute('data-id')]; saveUI(); render(); return; }
+  if (tg.getAttribute('data-act') === 'admsort') { if (tg.value) UI.admSort = tg.value; else delete UI.admSort; saveUI(); render(); return; }
   if (tg.getAttribute('data-act') === 'flt') { if (tg.value) fltOf()[tg.getAttribute('data-id')] = tg.value; else delete fltOf()[tg.getAttribute('data-id')]; saveUI(); render(); return; }
   if (b) { bind(b, tg.type === 'checkbox' ? tg.checked : tg.value); if (tg.tagName === 'SELECT' || tg.type === 'checkbox' || tg.type === 'date') render(); return; }
   var e = tg.getAttribute('data-ebind');

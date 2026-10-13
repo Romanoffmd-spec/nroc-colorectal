@@ -22,6 +22,7 @@ ui: {
   'nav.newStudy': ['Новое исследование', 'New study'],
   'reg.surg': ['Хирургические', 'Surgical'],
   'reg.endo': ['Эндоскопические', 'Endoscopic'],
+  'reg.stoma': ['Стомы', 'Stomas'],
   'reg.llnd': ['Латеральная ЛД', 'Lateral LND'],
   'reg.relapse': ['Местный рецидив', 'Local recurrence'],
   'reg.rs': ['Ректосигмоидный отдел', 'Rectosigmoid'],
