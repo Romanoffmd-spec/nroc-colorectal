@@ -8900,6 +8900,25 @@ document.addEventListener('click', function (ev) {
 document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') ddPopClose(); else if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.getAttribute && ev.target.getAttribute('data-ddq')) { ev.preventDefault(); ddPopOpen(ev.target); } });
 window.addEventListener('scroll', function () { if (Date.now() - (window.__ddAt || 0) > 400) ddPopClose(); }, true);
 window.__CRR = { SECTIONS: SECTIONS, MODULES: MODULES, MEDIA: MEDIA, COLS: COLS, DICT: DICT, OPT: OPT };
+/* служебный импорт записей журналов (M&M, МДГ и т.д.): без дублей по r.src, с привязкой к карточке по фамилии+имени */
+window.__CRR.addRecs = function (k, arr, note) {
+  if (!DB || !DB.cols || !DB.cols[k] || !can('edit')) return { err: 'no access or no collection' };
+  var have = {}, rep = [];
+  DB.cols[k].forEach(function (r) { if (r.src) have[r.src] = 1; });
+  (arr || []).forEach(function (r) {
+    if (r.src && have[r.src]) { rep.push({ t: r.title, skip: 'dup' }); return; }
+    var x = clone(r), who = x._who; delete x._who; x.id = k + '_' + uid('');
+    if (who) {
+      var w = nameTokens(who), m = DB.patients.filter(function (p) { var pt = nameTokens(p.d.fio); return w.every(function (t) { return pt.indexOf(t) >= 0; }); });
+      var keys = {}; m.forEach(function (p) { keys[patKey(p.d) || p.id] = 1; });
+      if (m.length && Object.keys(keys).length === 1) { m.sort(function (a, b) { return epDate(a).localeCompare(epDate(b)); }); var idx = m.filter(function (p) { return epTypeOf(p) === 'Первичное лечение'; })[0] || m[0]; x.pid = idx.id; }
+      rep.push({ t: x.title, pid: x.pid || null, cand: Object.keys(keys).length });
+    } else rep.push({ t: x.title });
+    x.log = [{ ts: nowIso(), by: me(), act: 'import', note: note || 'import', ch: [] }];
+    DB.cols[k].push(x);
+  });
+  save(); render(); return rep;
+};
 if (SESSION && isStudent()) maskForStudent();
 if (!SESSION) authPrefill();
 themeApply();
