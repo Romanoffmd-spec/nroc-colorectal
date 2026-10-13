@@ -1356,6 +1356,7 @@ function renderRegistry() {
     return String(av).localeCompare(String(bv), locale()) * s.d;
   });
   admSortList(list, admKeyP);
+  var listAll = list.slice(); list = list.filter(sgfOk);
   if (reg && reg.kind === 'study' && stabOf(reg.id) !== 'pts') return studyHead(reg) + studyTabBody(reg);
   var crumbs = reg ? ancestors(reg).map(function (a) { return '<button type="button" class="crumb" data-act="view" data-v="reg:' + a.id + '">' + esc(regName(a)) + '</button>'; }).join('<span class="csep">/</span>') : '';
   if (reg && reg.kind === 'study') crumbs = '<span class="crumb">' + t('nav.studies') + '</span>';
@@ -1377,6 +1378,7 @@ function renderRegistry() {
   var npat = uniqPat(list);
   h += '<div class="stats">' + tile(npat, plural(npat, 'pl.patient').replace(/^\d+ /, ''), 'pat') + tile(list.length, plural(list.length, 'pl.hosp').replace(/^\d+ /, ''), 'hosp') + tile(avg === null ? t('st.nodata') : avg, t('st.avgAge'), 'age') + tile(op, t('st.operated'), 'op') + tile(rK.length ? pct(r0, rK.length) + '%' : t('st.nodata'), t('st.r0'), 'r0') + '</div>';
   h += opsSummary(list);
+  h += sgChips(listAll.filter(function (p) { return p.d.surgeon || p.d.proc; }));
   h += renderFilters() + renderDateFilters(true);
   h += '<div class="tablewrap">';
   if (!list.length) h += '<div class="empty">' + (reg && reg.mode === 'manual' ? t('reg.emptyManual') : t('reg.empty')) + '</div>';
@@ -4191,16 +4193,27 @@ function qiTable(rows, withWhy, whyHead) {
 }
 function qiGroup(list, f) { var c = {}; list.forEach(function (p) { var k = f(p) || LL('не указано', 'not set'); c[k] = (c[k] || 0) + 1; }); return Object.keys(c).sort(function (a, b) { return c[b] - c[a] || a.localeCompare(b); }).map(function (k) { return [k, c[k]]; }); }
 function qiChips(title, arr) { return arr.length ? '<div class="qd-g"><span class="qd-gh">' + esc(title) + '</span>' + arr.map(function (x) { return '<span class="opchip">' + esc(ov(x[0])) + ' <b>' + x[1] + '</b></span>'; }).join('') + '</div>' : ''; }
+/* фильтр по врачу: клик по врачу в сводке фильтрует всё ниже (оценка качества, регистры) */
+var SG_NONE = 'не указан';
+function sgOf(p) { return (p.d && p.d.surgeon) || SG_NONE; }
+function sgfOk(p) { return !UI.sgf || sgOf(p) === UI.sgf; }
+function sgChips(list, title) {
+  var c = {}; list.forEach(function (p) { var k = sgOf(p); c[k] = (c[k] || 0) + 1; });
+  var ks = Object.keys(c).sort(function (a, b) { return c[b] - c[a] || a.localeCompare(b); });
+  if (UI.sgf && ks.indexOf(UI.sgf) < 0) ks.unshift(UI.sgf);
+  if (!ks.length) return '';
+  return '<div class="qd-g sgf" role="group" aria-label="' + esc(LL('Фильтр по врачу', 'Filter by surgeon')) + '"><span class="qd-gh">' + esc(title || LL('Врачи', 'Surgeons')) + '</span>' + ks.map(function (k) { var on = UI.sgf === k; return '<button type="button" class="opchip sgchip' + (on ? ' on' : '') + '" data-act="sgf" data-v="' + esc(k) + '" aria-pressed="' + on + '" title="' + esc(on ? LL('Снять фильтр', 'Clear filter') : LL('Показать только этого врача', 'Show only this surgeon')) + '">' + esc(k === SG_NONE ? LL('не указан', 'not set') : ov(k)) + ' <b>' + (c[k] || 0) + '</b></button>'; }).join('') + (UI.sgf ? '<button type="button" class="btn small ghost" data-act="sgf" data-v="">' + LL('Все врачи', 'All surgeons') + '</button>' : '') + '</div>';
+}
 function renderQiDrill() {
   var P = qiPeriod(), q = qiDef(S.qid), isOps = !q;
-  var inP = DB.patients.filter(function (p) { return p.d.date && p.d.date >= P.from && p.d.date <= P.to; });
+  var inP0 = DB.patients.filter(function (p) { return p.d.date && p.d.date >= P.from && p.d.date <= P.to; }), inP = inP0.filter(sgfOk);
   var bk = S.qbk && P.keys.indexOf(S.qbk) >= 0 ? S.qbk : null;
   var inB = function (p) { return !bk || String(p.d.date || '').slice(0, bk.length) === bk; };
   var title = isOps ? LL('Вмешательства', 'Procedures') : L(q.l);
   var h = '<div class="dim" data-act="qiclose"></div><section class="modal qim" role="dialog" aria-modal="true" aria-label="' + esc(title) + '"><div class="dhead"><div><div class="dh-kicker">' + LL('Показатели качества · ', 'Quality indicators · ') + esc(P.name) + '</div><div class="dh-title">' + esc(title) + '</div></div><button type="button" class="iconbtn" data-act="qiclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></div><div class="dbody qd">';
   /* динамика по периодам */
   var cols = P.keys.map(function (k) {
-    var pl = DB.patients.filter(function (p) { return String(p.d.date || '').slice(0, k.length) === k; });
+    var pl = DB.patients.filter(function (p) { return sgfOk(p) && String(p.d.date || '').slice(0, k.length) === k; });
     if (isOps) { var n0 = pl.filter(qOp).length; return { k: k, v: n0, txt: n0 ? String(n0) : '', sub: '' }; }
     var dn = pl.filter(q.den), nm = dn.filter(q.num).length, v = dn.length ? pct(nm, dn.length) : null;
     return { k: k, v: v, txt: v === null ? '' : Math.round(v) + '%', sub: dn.length ? nm + '/' + dn.length : '', cls: qiClass(q, v) };
@@ -4215,18 +4228,19 @@ function renderQiDrill() {
     h += '<details class="qd-d qd-how"><summary>' + LL('Как считается', 'How it is calculated') + '</summary>' + qiHelpHTML(QI_HELP_OPS).replace('class="qpop"', 'class="qpop inl"') + '</details>';
     var ops = inP.filter(qOp).filter(inB).sort(function (a, b) { return String(b.d.date).localeCompare(String(a.d.date)); }), los = median(ops.filter(qRes).map(function (p) { return losOf(p.d); }));
     h += '<div class="qd-sum"><div class="qd-k"><b>' + ops.length + '</b><span>' + LL('вмешательств', 'procedures') + '</span></div><div class="qd-k"><b>' + uniqPat(ops) + '</b><span>' + LL('пациентов', 'patients') + '</span></div><div class="qd-k"><b>' + (los === null ? LL('нет', 'n/a') : los) + '</b><span>' + LL('медиана койко-дня после резекций', 'median LOS after resections') + '</span></div></div>';
-    h += qiChips(LL('По видам', 'By type'), qiGroup(ops, function (p) { return p.d.proc; })) + qiChips(LL('По хирургам', 'By surgeon'), qiGroup(ops, function (p) { return p.d.surgeon; })) + qiChips(LL('По типу госпитализации', 'By admission type'), qiGroup(ops, function (p) { return epTypeOf(p); }));
+    h += qiChips(LL('По видам', 'By type'), qiGroup(ops, function (p) { return p.d.proc; })) + sgChips(inP0.filter(qOp).filter(inB), LL('По хирургам (нажмите, чтобы отфильтровать)', 'By surgeon (click to filter)')) + qiChips(LL('По типу госпитализации', 'By admission type'), qiGroup(ops, function (p) { return epTypeOf(p); }));
     h += qiTable(ops.map(function (p) { return qdRow(p); }), false);
     return h + '</div></section>';
   }
   var base = inP.filter(q.base).filter(inB), den = inP.filter(q.den).filter(inB), nm = den.filter(q.num), bad = q.good === 'low' ? nm : den.filter(function (p) { return !q.num(p); });
   var miss = base.filter(function (p) { return !q.den(p); }), v = den.length ? pct(nm.length, den.length) : null, cls = qiClass(q, v);
   var badT = q.good === 'low' ? LL('Случаи с событием', 'Cases with the event') : LL('Не достигнуто', 'Target not met');
+  h += sgChips(inP0.filter(q.den).filter(inB), LL('По хирургам (нажмите, чтобы отфильтровать)', 'By surgeon (click to filter)'));
   h += '<details class="qd-d qd-how"><summary>' + LL('Как считается', 'How it is calculated') + '</summary>' + qiHelpHTML(Object.assign({}, q.help, { tgt: qiTgtText(q) })).replace('class="qpop"', 'class="qpop inl"') + '</details>';
   h += '<div class="qd-sum"><div class="qd-k big ' + cls + '"><b>' + (v === null ? LL('нет данных', 'no data') : v + '%') + '</b><span>' + nm.length + LL(' из ', ' of ') + den.length + '</span></div><div class="qd-k"><b>' + bad.length + '</b><span>' + esc(badT.toLowerCase()) + '</span></div><div class="qd-k"><b>' + miss.length + '</b><span>' + LL('без данных, не учтены', 'missing data, excluded') + '</span></div><div class="qd-k"><b>' + (q.good === 'low' ? '≤ ' : '≥ ') + q.th[0] + '%</b><span>' + LL('цель', 'target') + '</span></div></div>';
   if (bad.length) {
     h += '<h4 class="qd-h">' + esc(badT) + ': ' + bad.length + '</h4>';
-    h += qiChips(LL('По хирургам', 'By surgeon'), qiGroup(bad, function (p) { return p.d.surgeon; })) + qiChips(LL('По видам операций', 'By procedure'), qiGroup(bad, function (p) { return p.d.proc; }));
+    h += qiChips(LL('По видам операций', 'By procedure'), qiGroup(bad, function (p) { return p.d.proc; }));
     h += qiTable(bad.sort(function (a, b) { return String(b.d.date).localeCompare(String(a.d.date)); }).map(function (p) { return qdRow(p, q.why(p), 'qd-why'); }), true);
   } else if (den.length) h += '<p class="qd-ok">' + ico('check', 15) + LL('Проблемных случаев за период нет.', 'No problem cases in this period.') + '</p>';
   var good = q.good === 'low' ? den.filter(function (p) { return !q.num(p); }) : nm;
@@ -5434,14 +5448,16 @@ function renderHome() {
   h += '</div></section>';
   // quality
   var per = UI.qiPer || 'all', QP = qiPeriod(), from = QP.from;
-  var q = qiCalc(DB.patients.filter(function (p) { return p.d.date && p.d.date >= QP.from && p.d.date <= QP.to; }));
+  var qAll = DB.patients.filter(function (p) { return p.d.date && p.d.date >= QP.from && p.d.date <= QP.to; });
+  var q = qiCalc(qAll.filter(sgfOk));
   var months = [], cy = new Date().getFullYear(), byYear = per === 'all';
   if (byYear) { var ys = DB.patients.filter(function (p) { return hasProc(p.d) && p.d.date; }).map(function (p) { return +p.d.date.slice(0, 4); }), y0 = Math.max(cy - 11, Math.min.apply(null, ys.concat([cy - 4]))); for (var yy = y0; yy <= cy; yy++) months.push(String(yy)); }
   else if (per === 'year') { for (var mi = 1; mi <= 12; mi++) months.push(cy + '-' + String(mi).padStart(2, '0')); }
   else for (var m = 11; m >= 0; m--) { var md = new Date(); md.setDate(1); md.setMonth(md.getMonth() - m); months.push(isoOf(md).slice(0, 7)); }
-  var mc = months.map(function (mm) { return DB.patients.filter(function (p) { return hasProc(p.d) && String(p.d.date || '').slice(0, mm.length) === mm; }).length; }), mx = Math.max.apply(null, mc.concat([1]));
+  var mc = months.map(function (mm) { return DB.patients.filter(function (p) { return sgfOk(p) && hasProc(p.d) && String(p.d.date || '').slice(0, mm.length) === mm; }).length; }), mx = Math.max.apply(null, mc.concat([1]));
   h += '<section class="panel qip wide"><div class="ph"><h2>' + LL('Показатели качества', 'Quality indicators') + '</h2><div class="seg sm">' + [['12m', LL('12 мес', '12 mo')], ['year', String(cy)], ['all', LL('всё время', 'all time')]].map(function (x) { return '<button type="button" class="' + (per === x[0] ? 'on' : '') + '" data-act="qiper" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div>';
   h += '<div class="qi-top"><div class="qiw big"><button type="button" class="qi-big qib" data-act="qiopen" data-v="ops" title="' + esc(LL('Открыть список вмешательств', 'Open the list of procedures')) + '"><b>' + q.n + '</b><span>' + LL('вмешательств за период', 'procedures in period') + '</span><em>' + LL('медиана койко-дня после резекций: ', 'median LOS after resections: ') + (q.los === null ? LL('нет данных', 'no data') : q.los + LL(' дн.', ' d')) + '</em></button>' + qHelpBtn('ops') + (S.qhelp === 'ops' ? qiHelpHTML(QI_HELP_OPS) : '') + '</div><div class="bars" style="grid-template-columns:repeat(' + months.length + ',minmax(0,1fr))">' + months.map(function (mm, i) { return '<button type="button" class="bar" data-act="qiopen" data-v="ops" data-b="' + mm + '"><span class="bv" style="height:' + Math.round(mc[i] / mx * 100) + '%"><i>' + (mc[i] || '') + '</i></span><em>' + (byYear ? mm : new Date(+mm.slice(0, 4), +mm.slice(5) - 1, 1).toLocaleDateString(locale(), { month: 'short' }).replace('.', '')) + '</em></button>'; }).join('') + '</div></div>';
+  h += sgChips(qAll.filter(qOp), LL('Врачи (нажмите, чтобы показать показатели одного врача)', 'Surgeons (click to show one surgeon)'));
   h += '<div class="qis">' + QI_DEFS.map(function (x) { return qiTileBtn(x, q[x.id]); }).join('') + '</div><p class="qnote">' + LL('Зелёный: соответствует целевым значениям, жёлтый: требует внимания, красный: хуже ожидаемого. Считается по вмешательствам с датой операции в выбранном периоде; знак «?» на плитке показывает, как именно.', 'Green meets targets, amber needs attention, red is worse than expected.') + '</p></section>';
   // research
   var act = studies().filter(function (r) { return !/Завершено|Приостановлено/.test(stProto(r).status); });
@@ -5923,6 +5939,7 @@ document.addEventListener('click', function (ev) {
     case 'qiopen': S.qhelp = null; S.qid = g('v'); S.qbk = g('b') || null; render(); break;
     case 'qhelp': S.qhelp = S.qhelp === g('v') ? null : g('v'); render(); break;
     case 'qiclose': S.qid = null; S.qbk = null; render(); break;
+    case 'sgf': { var sv = g('v'); if (!sv || UI.sgf === sv) delete UI.sgf; else UI.sgf = sv; saveUI(); render(); break; }
     case 'qibkt': S.qbk = S.qbk === g('v') ? null : g('v'); render(); break;
     case 'wgo': { var wa = JSON.parse(g('a')); if (wa[0] === 'r') openRec(wa[1], wa[2]); else if (wa[0] === 's') setView('reg:' + wa[1]); break; }
     case 'labsdone': markLabs(g('id')); break;
