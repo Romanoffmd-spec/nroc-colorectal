@@ -83,7 +83,7 @@ var P_STFORM = ['Формирование стомы'];
 var P_STCLOSE = ['Закрытие петлевой стомы', 'Восстановление непрерывности после операции Гартмана'];
 var P_STOMA_ONLY = ['Формирование стомы', 'Закрытие петлевой стомы', 'Восстановление непрерывности после операции Гартмана'];
 var P_CRS = ['Циторедуктивная операция'];
-var P_ENDO = ['ESD', 'EMR', 'Полипэктомия', 'Стентирование', 'Баллонная дилатация'];
+var P_ENDO = ['ESD', 'EMR', 'Полипэктомия', 'Стентирование', 'Баллонная дилатация', 'Рассечение стриктуры'];
 var P_REOP = ['Релапаротомия', 'Релапароскопия', 'Программированная санация брюшной полости'];
 var PROC_GROUPS = [
   [['Ободочная кишка', 'Colon'], P_RIGHT.concat(P_TRANS, P_LEFT, P_SIG)],
@@ -249,7 +249,7 @@ var SECTIONS = [
   { id: 'op', phase: 'op', title: ['Информация об операции', 'Operation'], fields: [
     f('date', 'Дата операции', 'Date of surgery', 'date'),
     f('surgeon', 'Врач', 'Operating surgeon', 'sel', { options: SURGEONS }),
-    f('proc', 'Название операции', 'Procedure', 'sel', { options: PROCS, groups: PROC_GROUPS, wide: true }),
+    f('proc', 'Название операции', 'Procedure', 'sel', { options: PROCS, groups: PROC_GROUPS, wide: true }), f('opName', 'Операция по протоколу', 'Procedure as written in the operative note', 'text', { wide: true }),
     f('urg', 'Характер операции', 'Urgency of surgery', 'seg', { options: ['Плановая', 'Экстренная'] }),
     f('r', 'R статус', 'Residual tumour (R) classification', 'seg', { options: ['R0', 'R1', 'R2'] }),
     f('anast', 'Анастомоз', 'Primary anastomosis', 'seg', { options: YN }),
