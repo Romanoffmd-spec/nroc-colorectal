@@ -1102,7 +1102,9 @@ function dfltRec(k, r) { if (!dfltOn()) return true; if (k === 'planner') return
 function inWardNow(p) { var td = isoOf(new Date()); if (patStays(p).some(function (r) { return inWard(r, td); })) return true; var a = p.d.admDate, dd = p.d.disDate; return !!a && a <= td && (dd ? dd >= td : ddays(a, td) <= 60); }
 /* карточка без записи в планировщике: в отделении по датам госпитализации из карточки */
 function cardInWard(p, td) { td = td || isoOf(new Date()); if (patStays(p).length) return false; var a = p.d.admDate, dd = p.d.disDate; return !!a && a <= td && (dd ? dd >= td : ddays(a, td) <= 30); }
-function cardOpsIn(from, to) { return DB.patients.filter(function (p) { var d = p.d.date; return d && d >= from && d <= to && !patStays(p).some(function (r) { return r.surgeryDate === d; }); }); }
+/* все вмешательства из карточки: основная операция (date) и повторные (reopDate, а также даты дд.мм.гггг в тексте reopName) */
+function cardOpDates(p) { var o = []; if (p.d.date) o.push(p.d.date); if (p.d.reopDate) o.push(p.d.reopDate); String(p.d.reopName || '').replace(/(\d{2})\.(\d{2})\.(\d{4})/g, function (m, d, mo, y) { o.push(y + '-' + mo + '-' + d); return m; }); return o.filter(function (x, k) { return o.indexOf(x) === k; }); }
+function cardOpsIn(from, to) { var ev = []; DB.patients.forEach(function (p) { var st = patStays(p); cardOpDates(p).forEach(function (d) { if (d >= from && d <= to && !st.some(function (r) { return r.surgeryDate === d; })) ev.push({ p: p, date: d }); }); }); return ev; }
 function patPhase(p) { var td = isoOf(new Date()); if (inWardNow(p)) return 'ward'; return p.d.date && p.d.date <= td ? 'post' : 'pre'; }
 function stagesDone(p) { var f = fuList(p); return f.length > 0 && f.every(function (x) { return x.st === 'done'; }) && !(p.q || []).some(function (e) { return !e.date; }); }
 function renderDateFilters(withStage) {
@@ -1326,7 +1328,7 @@ function listForReg() {
   if (dfltOn()) list = list.filter(dfltPat);
   if (fl.stg) list = list.filter(function (p) { return stagesDone(p) === (fl.stg === 'done'); });
   if (fl.ph) list = list.filter(function (p) { return patPhase(p) === fl.ph; });
-  if (fl.opF || fl.opT) list = list.filter(function (p) { var d = p.d.date; return !!d && (!fl.opF || d >= fl.opF) && (!fl.opT || d <= fl.opT); });
+  if (fl.opF || fl.opT) list = list.filter(function (p) { return cardOpDates(p).some(function (d) { return (!fl.opF || d >= fl.opF) && (!fl.opT || d <= fl.opT); }); });
   var q = S.q.trim().toLowerCase();
   if (q) list = list.filter(function (p) { return (p.id + ' ' + (p.d.fio || '') + ' ' + (p.d.ib || '') + ' ' + (p.d.iin || '') + ' ' + (p.d.loc || '') + ' ' + (p.d.proc || '')).toLowerCase().indexOf(q) >= 0; });
   return { reg: reg, list: list };
