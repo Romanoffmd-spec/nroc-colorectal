@@ -1106,7 +1106,7 @@ function cardOpsIn(from, to) { return DB.patients.filter(function (p) { var d = 
 function patPhase(p) { var td = isoOf(new Date()); if (inWardNow(p)) return 'ward'; return p.d.date && p.d.date <= td ? 'post' : 'pre'; }
 function stagesDone(p) { var f = fuList(p); return f.length > 0 && f.every(function (x) { return x.st === 'done'; }) && !(p.q || []).some(function (e) { return !e.date; }); }
 function renderDateFilters(withStage) {
-  var d = dfltOf(), fl = fltOf(), any = dfltOn() || (withStage && (fl.stg || fl.ph));
+  var d = dfltOf(), fl = fltOf(), any = dfltOn() || (withStage && (fl.stg || fl.ph || fl.opF || fl.opT));
   function di(id, ph) { return '<input type="date" class="fdate-i' + (d[id] ? ' on' : '') + '" data-act="dflt" data-id="' + id + '" value="' + esc(d[id] || '') + '" aria-label="' + ph + '" title="' + ph + '">'; }
   var h = '<div class="filters fdates" role="group" aria-label="' + LL('Фильтры по датам', 'Date filters') + '"><span class="flabel">' + ico('cal', 15) + LL('Даты', 'Dates') + '</span>';
   h += '<span class="fdate"><b>' + LL('Поступление', 'Admission') + '</b>' + di('aF', LL('с', 'from')) + '<i>–</i>' + di('aT', LL('по', 'to')) + '</span>';
@@ -1326,6 +1326,7 @@ function listForReg() {
   if (dfltOn()) list = list.filter(dfltPat);
   if (fl.stg) list = list.filter(function (p) { return stagesDone(p) === (fl.stg === 'done'); });
   if (fl.ph) list = list.filter(function (p) { return patPhase(p) === fl.ph; });
+  if (fl.opF || fl.opT) list = list.filter(function (p) { var d = p.d.date; return !!d && (!fl.opF || d >= fl.opF) && (!fl.opT || d <= fl.opT); });
   var q = S.q.trim().toLowerCase();
   if (q) list = list.filter(function (p) { return (p.id + ' ' + (p.d.fio || '') + ' ' + (p.d.ib || '') + ' ' + (p.d.iin || '') + ' ' + (p.d.loc || '') + ' ' + (p.d.proc || '')).toLowerCase().indexOf(q) >= 0; });
   return { reg: reg, list: list };
@@ -5545,12 +5546,12 @@ function renderHome() {
   var h = '<div class="h9"><section class="hero"><div class="hero-bg" style="background-image:url(media/nroc-hero-hd.webp)"></div><div class="hero-in"><div class="hero-k">' + aaMark(44, 'sq') + aaWord('inv') + '<span>' + LL('Национальный научный онкологический центр · Астана', 'National Research Oncology Center · Astana') + '</span></div><h1>' + greet + (SESSION ? ', ' + esc(meFirst()) : '') + '</h1><p>' + LL('Колоректальная хирургия: регистр, операции и наука в одном месте.', 'Colorectal surgery: registry, operations and research in one place.') + '</p><div class="hero-date">' + esc(dateStr.charAt(0).toUpperCase() + dateStr.slice(1)) + '</div><div class="hero-act">' + (can('edit') ? '<button type="button" class="btn light" data-act="newp">' + ico('plus', 16) + LL('Новый пациент', 'New patient') + '</button>' : '') + '<button type="button" class="btn glass" data-act="aiopen">' + ico('sparkle', 16) + LL('Брифинг ИИ', 'AI briefing') + '</button><button type="button" class="btn glass" data-act="view" data-v="col:planner">' + ico('cal', 16) + LL('Планировщик', 'Planner') + '</button><button type="button" class="btn glass" data-act="view" data-v="studies">' + ico('flask', 16) + LL('Исследования', 'Studies') + '</button></div></div></section>';
   h += '<div class="kpis home">' + [
     [uniqPat(DB.patients), LL('пациентов в общем регистре, ', 'patients in the master registry, ') + plural(DB.patients.length, 'pl.hosp'), 'users', 'reg:all'],
-    [inDept, LL('сейчас в отделении', 'in the ward now'), 'bed', 'col:planner'],
-    [opsWeek.length, LL('операций на этой неделе', 'operations this week'), 'knife', 'col:planner'],
+    [inDept, LL('сейчас в отделении', 'in the ward now'), 'bed', 'reg:all', 'ph=ward'],
+    [opsWeek.length, LL('операций на этой неделе', 'operations this week'), 'knife', 'reg:all', 'opF=' + wsI + '&opT=' + weI],
     [b.labs.filter(function (x) { return x.st !== 'soon'; }).length, LL('контрольных анализов сегодня', 'control labs due'), 'flask', 'home'],
     [mdtWait, LL('ждут обсуждения на МДГ', 'awaiting MDT'), 'mdt', 'col:mdt'],
     [fuDueAll().filter(function (x) { return x.f.st === 'overdue'; }).length, LL('контролей просрочено', 'follow-ups overdue'), 'clock', 'fu']
-  ].map(function (k) { return '<button type="button" class="kpi" data-act="view" data-v="' + k[3] + '"><span class="kpi-ic">' + ico(k[2], 18) + '</span><b>' + k[0] + '</b><span>' + k[1] + '</span></button>'; }).join('') + '</div>';
+  ].map(function (k) { return '<button type="button" class="kpi" data-act="' + (k[4] ? 'kpiflt' : 'view') + '" data-v="' + k[3] + '"' + (k[4] ? ' data-f="' + k[4] + '"' : '') + '><span class="kpi-ic">' + ico(k[2], 18) + '</span><b>' + k[0] + '</b><span>' + k[1] + '</span></button>'; }).join('') + '</div>';
   h += '<div class="dash">';
   // briefing
   function sec(title, icon, body, n) { return '<div class="bs"><div class="bs-h">' + ico(icon, 15) + '<b>' + title + '</b><span class="cnt">' + n + '</span></div>' + body + '</div>'; }
@@ -5834,6 +5835,7 @@ document.addEventListener('click', function (ev) {
     case 'authhide': if (S.auth) { S.auth.show = false; if (S.auth.mode === 'wait') S.auth.mode = 'login'; } render(); break;
     case 'lang': LANG = g('v'); UI.lang = LANG; saveUI(); render(); break;
     case 'menu': S.menu = S.menu === g('id') ? null : g('id'); render(); break;
+    case 'kpiflt': { S.drawer = null; S.rec = null; S.edit = null; S.qb = null; S.menu = null; S.cmd = null; UI.fltBy = UI.fltBy || {}; var kf = {}; String(g('f') || '').split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) kf[kv.slice(0, i)] = kv.slice(i + 1); }); UI.fltBy[g('v')] = kf; UI.dfltBy = UI.dfltBy || {}; UI.dfltBy[g('v')] = {}; setView(g('v')); break; }
     case 'allcards': S.drawer = null; S.rec = null; S.edit = null; S.qb = null; S.menu = null; UI.fltBy = UI.fltBy || {}; UI.fltBy['reg:all'] = {}; setView('reg:all'); break;
     case 'view': { S.cmd = null; if (g('v') && root.querySelector('.mnav [data-v="' + g('v') + '"], .t2-brand[data-v="' + g('v') + '"]')) { S.drawer = null; S.rec = null; S.edit = null; S.qb = null; } if (g('v') === 'users') S.users = null; var vv = g('v'), rg = vv.indexOf('reg:') === 0 ? regOf(vv.slice(4)) : null; if (rg) { UI.open = UI.open || {}; ancestors(rg).concat([rg]).forEach(function (a) { if (kids(a.id, a.kind === 'study').length) UI.open[a.id] = true; }); if (rg.kind === 'study') UI.open.studies = true; } setView(vv); break; }
     case 'openp': if (ev.target.closest('button') && ev.target.closest('button') !== tg) return; openPatient(g('id')); break;
