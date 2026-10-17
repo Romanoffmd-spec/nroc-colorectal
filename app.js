@@ -1417,10 +1417,11 @@ function renderRegistry() {
   return h + '</div>';
 }
 /* монитор отделения: сводка анализов и назначений лежащих (документы c_ward__ДАТА, обновляются по запросу) */
-var WM_FLAG = { 'гемоглобин': [[80, 'c', '<'], [100, 'w', '<']], 'лейкоциты': [[12, 'c', '>'], [10, 'w', '>'], [4, 'w', '<']], 'тромбоциты': [[100, 'c', '<'], [150, 'w', '<']], 'СРБ': [[150, 'c', '>'], [50, 'w', '>']], 'прокальцитонин': [[2, 'c', '>'], [0.5, 'w', '>']], 'альбумин': [[25, 'c', '<'], [30, 'w', '<']], 'К': [[3.5, 'w', '<'], [5.5, 'w', '>']], 'Na': [[135, 'w', '<'], [145, 'w', '>']], 'фибриноген': [[6, 'w', '>']], 'креатинин': [[115, 'w', '>']] };
-function wmChip(x) { var k = x[0], v = String(x[1]), n = parseFloat(v.replace(',', '.')), cls = ''; (WM_FLAG[k] || []).some(function (r) { if (isNaN(n)) return false; if (r[2] === '<' ? n < r[0] : n > r[0]) { cls = r[1]; return true; } return false; }); return '<span class="wm-chip' + (cls ? ' ' + cls : '') + '">' + esc(k) + ' <b>' + esc(v) + '</b></span>'; }
+var WM_FLAG = { 'гемоглобин': [[80, 'c', '<'], [100, 'w', '<']], 'лейкоциты': [[12, 'c', '>'], [10, 'w', '>'], [4, 'w', '<']], 'тромбоциты': [[100, 'c', '<'], [150, 'w', '<']], 'СРБ': [[150, 'c', '>'], [50, 'w', '>']], 'прокальцитонин': [[2, 'c', '>'], [0.5, 'w', '>']], 'альбумин': [[25, 'c', '<'], [30, 'w', '<']], 'К': [[3.5, 'w', '<'], [5.5, 'w', '>']], 'Na': [[135, 'w', '<'], [145, 'w', '>']], 'фибриноген': [[6, 'w', '>'], [2, 'w', '<']], 'креатинин крови': [[115, 'w', '>']], 'глюкоза': [[11, 'c', '>'], [7.8, 'w', '>']], 'билирубин общий': [[21, 'w', '>']], 'МНО': [[1.5, 'w', '>']] };
+function wmChip(x) { var k = String(x[0]), v = String(x[1]), n = parseFloat(v.replace(',', '.')), cls = ''; var key = /дренаж/i.test(k) ? null : Object.keys(WM_FLAG).filter(function (f) { return k === f || k.indexOf(f + ' ') === 0; })[0]; (WM_FLAG[key] || []).some(function (r) { if (isNaN(n)) return false; if (r[2] === '<' ? n < r[0] : n > r[0]) { cls = r[1]; return true; } return false; }); return '<span class="wm-chip' + (cls ? ' ' + cls : '') + '">' + esc(k) + ' <b>' + esc(v) + '</b></span>'; }
+function wmList(v) { if (!v) return ''; if (!Array.isArray(v)) return '<div class="wm-meds">' + esc(v) + '</div>'; return '<ul class="wm-ul">' + v.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>'; }
 function wardMonitor() {
-  var reps = ((DB.cols || {}).ward || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); }), r = reps[0];
+  var reps = ((DB.cols || {}).ward || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)) || String(b.at || '').localeCompare(String(a.at || '')); }), r = reps[0];
   var td = isoOf(new Date()), early = new Date().getHours() < 9;
   var h = '<section class="wm' + (early ? ' wm-hot' : '') + '"><div class="wm-h"><div><b>' + LL('Монитор отделения', 'Ward monitor') + '</b><span>' + LL('анализы и назначения', 'labs and orders') + (r ? ' · ' + fmtDate(r.date) + (r.at ? ', ' + String(r.at).slice(11, 16) : '') : '') + '</span></div>' + (early ? '<span class="wm-badge"><i></i>' + LL('до операций, обход', 'before surgery, rounds') + '</span>' : '') + '</div>';
   if (!r) return h + '<p class="wm-empty">' + LL('Сводки пока нет. Обновляется по запросу.', 'No summary yet.') + '</p></section>';
@@ -1428,10 +1429,11 @@ function wardMonitor() {
   h += '<div class="wm-grid">' + (r.items || []).map(function (it) {
     var row = function (lab, body) { return body ? '<div class="wm-r"><div class="wm-l">' + lab + '</div>' + body + '</div>' : ''; };
     return '<article class="wm-c' + (it.icu ? ' icu' : '') + '"><div class="wm-top"><button type="button" class="wm-n" data-act="openp" data-id="' + esc(it.pid || '') + '">' + esc(it.name) + '</button><span class="muted">' + esc(it.age || '') + '</span>' + (it.icu ? '<span class="wm-icu">' + esc(it.icu) + '</span>' : '') + '</div>'
-      + row(LL('Анализы сегодня', 'Labs today'), (it.today || []).map(wmChip).join(''))
+      + row(LL('Анализы сегодня', 'Labs today') + (it.todayLabel ? ' (' + esc(it.todayLabel) + ')' : ''), (it.today || []).map(wmChip).join(''))
       + (it.prev ? row(LL('Контрольные анализы за ', 'Control labs on ') + esc(it.prev.date), (it.prev.vals || []).map(wmChip).join('')) : '')
       + row(LL('Контрольные анализы назначены на завтра', 'Control labs ordered for tomorrow'), it.tomorrow ? '<div class="wm-meds">' + esc(it.tomorrow) + '</div>' : '')
-      + row(LL('Назначения', 'Orders'), it.meds ? '<div class="wm-meds">' + esc(it.meds) + '</div>' : '')
+      + row(LL('Назначения', 'Orders'), wmList(it.meds))
+      + (it.note ? '<div class="wm-note">' + esc(it.note) + '</div>' : '')
       + '</article>';
   }).join('') + '</div></section>';
   return h;
