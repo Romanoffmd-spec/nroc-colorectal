@@ -1385,6 +1385,7 @@ function renderRegistry() {
   var rK = list.filter(function (p) { return qSg(p) && P_ONCO.indexOf(p.d.proc) >= 0 && has(rOf(p.d)); }), r0 = rK.filter(function (p) { return rEff(p.d) === 'R0'; }).length;
   var npat = uniqPat(list);
   h += '<div class="stats">' + tile(npat, plural(npat, 'pl.patient').replace(/^\d+ /, ''), 'pat') + tile(list.length, plural(list.length, 'pl.hosp').replace(/^\d+ /, ''), 'hosp') + tile(avg === null ? t('st.nodata') : avg, t('st.avgAge'), 'age') + tile(op, t('st.operated'), 'op') + tile(rK.length ? pct(r0, rK.length) + '%' : t('st.nodata'), t('st.r0'), 'r0') + '</div>';
+  if (!isSt && fltOf().ph === 'ward') h += wardMonitor();
   h += opsSummary(opAll);
   h += sgChips(listAll.filter(function (p) { return p.d.surgeon || p.d.proc; }));
   h += renderFilters() + renderDateFilters(true);
@@ -1413,7 +1414,6 @@ function renderRegistry() {
     });
     h += '</tbody></table>';
   }
-  if (!isSt && fltOf().ph === 'ward') h += wardMonitor();
   return h + '</div>';
 }
 /* монитор отделения: сводка анализов и назначений лежащих (документы c_ward__ДАТА, обновляются по запросу) */
