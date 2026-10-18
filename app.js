@@ -4461,6 +4461,15 @@ function doRegister() {
     else { a.mode = 'wait'; a.pass = a.pass2 = ''; render(); }
   });
 }
+/* сброс пароля со страницы входа: Firebase присылает на почту ссылку для смены пароля */
+function doForgot() {
+  var a = S.auth || (S.auth = { mode: 'login' }), ie = document.getElementById('auth-email'); if (ie && ie.value) a.email = ie.value;
+  var email = String(a.email || '').trim().toLowerCase(); a.ok = '';
+  if (!/^\S+@\S+\.\S+$/.test(email)) { a.err = LL('Введите рабочую почту, на неё придёт ссылка для смены пароля', 'Enter your work email to receive a reset link'); render(); return; }
+  if (!CLOUD.on || !CLOUD.fb) { a.err = LL('Сброс пароля работает только в облачном режиме. Обратитесь к администратору.', 'Password reset works only in cloud mode. Contact the administrator.'); render(); return; }
+  a.busy = true; a.err = ''; render();
+  CLOUD.fb.auth().sendPasswordResetEmail(email).then(function () { a.busy = false; a.ok = LL('Если эта почта зарегистрирована, на неё отправлена ссылка для смены пароля. Проверьте также папку «Спам».', 'If this email is registered, a reset link has been sent. Check your spam folder too.'); render(); }).catch(function (e) { a.busy = false; a.err = e && e.code === 'auth/user-not-found' ? LL('Пользователь с такой почтой не найден', 'No user with this email') : authErr(e && e.code); render(); });
+}
 function doLogin() {
   var a = S.auth, ie = document.getElementById('auth-email'), ip = document.getElementById('auth-pass'); if (ie && ie.value) a.email = ie.value; if (ip && ip.value) a.pass = ip.value;
   var email = String(a.email || '').trim().toLowerCase();
@@ -4673,7 +4682,8 @@ function renderAuthCard() {
       h += '<div class="af"><span>' + LL('Роль', 'Role') + '</span><div class="roles">' + [['doctor', 'stethoscope', LL('Врач', 'Doctor'), LL('полный доступ: ввод, правка, удаление, рандомизация, одобрение регистров и исследований', 'full access: entry, edit, delete, randomisation, approval of registries and studies')], ['resident', 'users', LL('Резидент', 'Resident'), LL('ввод и правка данных, комментарии, заявки на новые регистры и исследования', 'data entry and edit, comments, requests for new registries and studies')], ['student', 'cap', LL('Студент', 'Student'), LL('просмотр обезличенных данных и комментарии', 'view anonymised data and comment')]].map(function (r) { return '<button type="button" class="role' + (a.role === r[0] ? ' on' : '') + '" data-act="arole" data-v="' + r[0] + '">' + ico(r[1], 18) + '<b>' + r[2] + '</b><em>' + r[3] + '</em></button>'; }).join('') + '</div><p class="fhint">' + LL('Роль подтверждает администратор.', 'The administrator confirms the role.') + '</p></div>';
     }
     if (a.err) h += '<div class="aerr">' + ico('alert', 15) + esc(a.err) + '</div>';
-    h += '<button type="button" class="btn primary wide" data-act="' + (reg ? 'aregister' : 'alogin') + '"' + (a.busy ? ' disabled' : '') + '>' + (a.busy ? LL('Подождите…', 'Please wait…') : reg ? LL('Отправить заявку', 'Request access') : LL('Войти', 'Sign in')) + '</button></form>';
+    if (a.ok && !reg) h += '<div class="aok">' + esc(a.ok) + '</div>';
+    h += '<button type="button" class="btn primary wide" data-act="' + (reg ? 'aregister' : 'alogin') + '"' + (a.busy ? ' disabled' : '') + '>' + (a.busy ? LL('Подождите…', 'Please wait…') : reg ? LL('Отправить заявку', 'Request access') : LL('Войти', 'Sign in')) + '</button>' + (!reg ? '<button type="button" class="linkbtn aforgot" data-act="aforgot">' + LL('Забыли пароль?', 'Forgot password?') + '</button>' : '') + '</form>';
     if (!CLOUD.on && !localUsers().length) h += '<p class="pt-note">' + LL('Первый зарегистрированный пользователь становится администратором.', 'The first registered user becomes the administrator.') + '</p>';
   }
   h += '</div><div class="pt-mode">' + (CLOUD.on ? '<span class="dot ok"></span>' + LL('Общая база · ', 'Shared database · ') + esc(CLOUD.cfg.projectId) + (CLOUD.err ? ' · <span class="due">' + esc(CLOUD.err) + '</span>' : !CLOUD.ready ? LL(' · подключение…', ' · connecting…') : '') : '<span class="dot"></span>' + LL('Локальный режим: данные в этом браузере', 'Local mode: data in this browser')) + ' · <button type="button" class="linkbtn" data-act="cloudsetup">' + LL('Облако', 'Cloud') + '</button></div>';
@@ -6188,7 +6198,8 @@ document.addEventListener('click', function (ev) {
     case 'drnundo': drNoteUndo(g('id'), g('f')); break;
     case 'copysum': { var ts = root.querySelector('#sumText'); if (!ts) break; var tx0 = ts.value, dn = function () { toast(LL('Резюме скопировано', 'Summary copied')); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tx0).then(dn, function () { ts.select(); document.execCommand('copy'); dn(); }); else { ts.select(); document.execCommand('copy'); dn(); } break; }
     case 'logout': doLogout(); if (!SESSION) location.reload(); break;
-    case 'amode': S.auth = S.auth || {}; S.auth.mode = g('v'); S.auth.err = ''; render(); break;
+    case 'amode': S.auth = S.auth || {}; S.auth.mode = g('v'); S.auth.err = ''; S.auth.ok = ''; render(); break;
+    case 'aforgot': doForgot(); break;
     case 'arole': S.auth.role = g('v'); render(); break;
     case 'alogin': doLogin(); break;
     case 'aregister': doRegister(); break;
