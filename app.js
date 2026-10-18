@@ -7060,11 +7060,14 @@ function dxOfficeText(buf, name) {
   if (t16.replace(/[^А-Яа-яЁё]/g, '').length < 30) { var t8 = new TextDecoder('windows-1251').decode(u8).split(/[\x00-\x08\x0e-\x1f]+/).filter(function (z) { return z.replace(/[^А-Яа-яЁё]/g, '').length > 8; }).join('\n'); if (t8.length > t16.length) t16 = t8; }
   return Promise.resolve(t16.replace(/\r/g, '\n').replace(/\n{3,}/g, '\n\n').trim());
 }
+/* лимит ИИ на PDF (Claude 32 МБ на запрос с учётом base64, Gemini 20 МБ): большие PDF уходят текстом или картинками страниц */
+var DX_PDF_MAX = 18 * 1024 * 1024, DX_REQ_MAX = 26 * 1024 * 1024;
+function dxBudget(docs) { var used = 0; docs.forEach(function (d) { if (d.kind === 'pdf' && !d.big && d.b64) { if (used + d.b64.length > (AI.prov === 'gemini' ? 18 * 1024 * 1024 : DX_REQ_MAX)) d.big = true; else used += d.b64.length; } (d.kind !== 'pdf' || d.big ? d.images || [] : []).forEach(function (b) { used += b.length; }); }); }
 function dxReadFile(file) {
   return file.arrayBuffer().then(function (buf) {
     var name = file.name || 'document', type = file.type || '', out = { name: name, type: type, size: file.size, text: '', pages: 0, images: [], b64: '' };
     if (/pdf/i.test(type) || /\.pdf$/i.test(name)) {
-      out.kind = 'pdf'; out.b64 = dxB64(buf);
+      out.kind = 'pdf'; out.big = buf.byteLength > DX_PDF_MAX; if (!out.big) out.b64 = dxB64(buf);
       return dxPdfLib().then(function (lib) { return lib.getDocument({ data: new Uint8Array(buf) }).promise; }).then(function (pdf) {
         out.pages = pdf.numPages; var seq = Promise.resolve(), texts = [];
         for (var i = 1; i <= pdf.numPages; i++) (function (i) {
@@ -7072,9 +7075,9 @@ function dxReadFile(file) {
             return pg.getTextContent().then(function (tc) {
               var t = '', lastY = null, lastEnd = null; tc.items.forEach(function (it) { var tr = it.transform || [0,0,0,0,0,0], y = Math.round(tr[5]), x = tr[4], fs = Math.abs(tr[3]) || Math.abs(tr[0]) || 10; if (lastY !== null && Math.abs(y - lastY) > 2) t += '\n'; else if (t && !/\s$/.test(t) && !/^\s/.test(it.str)) { if (lastEnd === null || x - lastEnd > fs * 0.18 || x < lastEnd - fs) t += ' '; } t += it.str; lastY = y; lastEnd = x + (it.width || 0); if (it.hasEOL) { t += '\n'; lastY = null; lastEnd = null; } });
               texts.push('--- Страница ' + i + ' ---\n' + t.trim());
-              if (t.replace(/\s/g, '').length < 40 && out.images.length < 8) {
-                var vp = pg.getViewport({ scale: 1.6 }), cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
-                return pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise.then(function () { out.images.push(cv.toDataURL('image/jpeg', 0.82).split(',')[1]); });
+              if (t.replace(/\s/g, '').length < 40 && out.images.length < (out.big ? 40 : 8)) {
+                var vp = pg.getViewport({ scale: out.big ? 1.3 : 1.6 }), cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+                return pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise.then(function () { out.images.push(cv.toDataURL('image/jpeg', out.big ? 0.65 : 0.82).split(',')[1]); });
               }
             });
           }); });
@@ -7159,7 +7162,8 @@ function dxCall(doc, schema, extra) {
   var fail = function (r) { return r.json().then(function (j) { throw new Error(aiErrMsg(j, 'HTTP ' + r.status)); }, function () { throw new Error('HTTP ' + r.status); }); };
   if (pv === 'gemini') {
     var parts = [];
-    if (doc.kind === 'pdf') parts.push({ inline_data: { mime_type: 'application/pdf', data: doc.b64 } });
+    if (doc.kind === 'pdf' && !doc.big) parts.push({ inline_data: { mime_type: 'application/pdf', data: doc.b64 } });
+    else if (doc.kind === 'pdf') { if (doc.scanned) doc.images.forEach(function (b) { parts.push({ inline_data: { mime_type: 'image/jpeg', data: b } }); }); }
     else if (doc.kind === 'image') parts.push({ inline_data: { mime_type: doc.imgType, data: doc.images[0] } });
     parts.push({ text: prompt });
     var body = { systemInstruction: { parts: [{ text: dxSys() }] }, contents: [{ role: 'user', parts: parts }], generationConfig: { temperature: 0.1, maxOutputTokens: 32768, responseMimeType: 'application/json' } };
@@ -7169,7 +7173,8 @@ function dxCall(doc, schema, extra) {
   }
   if (pv === 'anthropic') {
     var content = [];
-    if (doc.kind === 'pdf') content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: doc.b64 } });
+    if (doc.kind === 'pdf' && !doc.big) content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: doc.b64 } });
+    else if (doc.kind === 'pdf') { if (doc.scanned) doc.images.forEach(function (b) { content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b } }); }); }
     else if (doc.kind === 'image') content.push({ type: 'image', source: { type: 'base64', media_type: doc.imgType, data: doc.images[0] } });
     content.push({ type: 'text', text: prompt });
     return fetch(AI_URL.anthropic + '/messages', { method: 'POST', headers: aiHeaders(pv), body: JSON.stringify({ model: AI.model, max_tokens: 32000, system: dxSys(), messages: [{ role: 'user', content: content }] }) })
@@ -7235,6 +7240,7 @@ function aiMapDocs(docs, long, onProg) {
   return Promise.all([worker(), worker(), worker()]).then(function () { return { docs: out.filter(Boolean), fails: fails }; });
 }
 function dxCallMany(docs, schema, extra, sysO, promptO) {
+  dxBudget(docs);
   var pv = AI.prov, inline = function (d) { return d.kind === 'image' || (d.kind === 'pdf' && (d.scanned || !d.text || d.text.replace(/\s/g, '').length < 400)); };
   var body = docs.map(function (d, i) { return '=== ДОКУМЕНТ ' + (i + 1) + ' из ' + docs.length + ': «' + d.name + '» ===\n' + (inline(d) ? '(см. приложенный файл ' + (i + 1) + ')' : String(d.text || '').slice(0, Math.floor(150000 / docs.length))); }).join('\n\n');
   var prompt = promptO ? promptO.replace('{DOCS}', body) : DX_BATCH + '\n\nСХЕМА КАРТОЧКИ (id | название | тип | варианты):\n' + schema + '\n\n' + body + (extra ? '\n\n' + extra : '') + '\n\nВерни один JSON по формату для всего пакета.', SYS = sysO || dxSys();
@@ -7242,7 +7248,7 @@ function dxCallMany(docs, schema, extra, sysO, promptO) {
   var fail = function (r) { return r.json().then(function (j) { throw new Error(aiErrMsg(j, 'HTTP ' + r.status)); }, function () { throw new Error('HTTP ' + r.status); }); };
   if (pv === 'gemini') {
     var parts = [];
-    docs.forEach(function (d) { if (!inline(d)) return; if (d.kind === 'pdf') parts.push({ inline_data: { mime_type: 'application/pdf', data: d.b64 } }); else parts.push({ inline_data: { mime_type: d.imgType, data: d.images[0] } }); });
+    docs.forEach(function (d) { if (!inline(d)) return; if (d.kind === 'pdf' && !d.big) parts.push({ inline_data: { mime_type: 'application/pdf', data: d.b64 } }); else if (d.kind === 'pdf') d.images.forEach(function (b) { parts.push({ inline_data: { mime_type: 'image/jpeg', data: b } }); }); else parts.push({ inline_data: { mime_type: d.imgType, data: d.images[0] } }); });
     parts.push({ text: prompt });
     return fetch(AI_BASE + '/models/' + AI.model + ':generateContent?key=' + encodeURIComponent(AI.key), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ systemInstruction: { parts: [{ text: SYS }] }, contents: [{ role: 'user', parts: parts }], generationConfig: { temperature: 0.1, maxOutputTokens: 32768, responseMimeType: 'application/json' } }) })
       .then(function (r) { if (!r.ok) return fail(r); return r.json(); })
@@ -7250,7 +7256,7 @@ function dxCallMany(docs, schema, extra, sysO, promptO) {
   }
   if (pv === 'anthropic') {
     var content = [];
-    docs.forEach(function (d, i) { if (!inline(d)) return; if (d.kind === 'pdf') content.push({ type: 'document', title: d.name, source: { type: 'base64', media_type: 'application/pdf', data: d.b64 } }); else content.push({ type: 'image', source: { type: 'base64', media_type: d.imgType, data: d.images[0] } }); });
+    docs.forEach(function (d, i) { if (!inline(d)) return; if (d.kind === 'pdf' && !d.big) content.push({ type: 'document', title: d.name, source: { type: 'base64', media_type: 'application/pdf', data: d.b64 } }); else if (d.kind === 'pdf') d.images.forEach(function (b) { content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b } }); }); else content.push({ type: 'image', source: { type: 'base64', media_type: d.imgType, data: d.images[0] } }); });
     content.push({ type: 'text', text: prompt });
     return aiSSE(AI_URL.anthropic + '/messages', aiHeaders(pv), { model: AI.model, max_tokens: 32000, system: SYS, messages: [{ role: 'user', content: content }], stream: true }, fail);
   }
