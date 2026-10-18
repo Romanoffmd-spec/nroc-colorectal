@@ -1423,7 +1423,7 @@ function wmList(v) { if (!v) return ''; if (!Array.isArray(v)) return '<div clas
 function wardMonitor() {
   var reps = ((DB.cols || {}).ward || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)) || String(b.at || '').localeCompare(String(a.at || '')); }), r = reps[0];
   var td = isoOf(new Date()), early = new Date().getHours() < 9;
-  var h = '<section class="wm' + (early ? ' wm-hot' : '') + '"><div class="wm-h"><div><b>' + LL('Монитор отделения', 'Ward monitor') + '</b><span>' + LL('анализы и назначения', 'labs and orders') + (r ? ' · ' + fmtDate(r.date) + (r.at ? ', ' + String(r.at).slice(11, 16) : '') : '') + '</span></div>' + (early ? '<span class="wm-badge"><i></i>' + LL('до операций, обход', 'before surgery, rounds') + '</span>' : '') + '</div>';
+  var h = '<section class="wm' + (early ? ' wm-hot' : '') + '"><div class="wm-h"><div><b>' + LL('Монитор отделения', 'Ward monitor') + '</b><span>' + LL('анализы и назначения', 'labs and orders') + (r ? ' · <b class="wm-last">' + LL('ПОСЛЕДНИЙ АПДЕЙТ:', 'LAST UPDATE:') + '</b> ' + fmtDate(r.date) + (r.at ? ', ' + String(r.at).slice(11, 16) : '') : '') + '</span></div>' + (early ? '<span class="wm-badge"><i></i>' + LL('до операций, обход', 'before surgery, rounds') + '</span>' : '') + '</div>';
   if (!r) return h + '<p class="wm-empty">' + LL('Сводки пока нет. Обновляется по запросу.', 'No summary yet.') + '</p></section>';
   if (r.date !== td) h += '<p class="wm-old">' + LL('Сводка за ', 'Summary for ') + fmtDate(r.date) + LL(', на сегодня ещё не обновлена', ', not updated today') + '</p>';
   h += '<div class="wm-grid">' + (r.items || []).map(function (it) {
