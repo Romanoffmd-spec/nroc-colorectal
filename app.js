@@ -791,7 +791,8 @@ var COLS = {
     ]}
 };
 /* ответственный резидент M&M: список из «Ротаций» плюс базовый RESIDENTS */
-Object.defineProperty(COLS.mm.fields.filter(function (x) { return x.id === 'resp'; })[0], 'options', { get: function () { var s = {}, o = []; ((typeof DB !== 'undefined' && DB && DB.cols && DB.cols.rot) || []).map(function (r) { return r.name; }).concat(RESIDENTS).forEach(function (n) { n = String(n || '').trim(); if (n && !s[n]) { s[n] = 1; o.push(n); } }); return o; } });
+function resNames() { var s = {}, o = []; ((typeof DB !== 'undefined' && DB && DB.cols && DB.cols.rot) || []).map(function (r) { return r.name; }).concat(RESIDENTS).forEach(function (n) { n = String(n || '').trim(); if (n && !s[n]) { s[n] = 1; o.push(n); } }); return o; }
+Object.defineProperty(COLS.mm.fields.filter(function (x) { return x.id === 'resp'; })[0], 'options', { get: resNames });
 COLS.pubs = { icon: 'book', title: ['Публикации', 'Publications'], sub: ['Статьи и доклады сектора: DOI, авторы, журнал, связь с исследованием, отчёт за период', 'Papers and talks: DOI, authors, journal, linked study, report for a period'],
   titleField: 'title', subField: 'venue', dateField: 'date', statusField: 'status', views: ['table', 'board'],
   colorBy: { 'Подготовка': 'plan', 'Подана': 'prog', 'Принята': 'prog', 'Опубликована': 'done', 'Представлен': 'done' },
@@ -1422,6 +1423,12 @@ function renderRegistry() {
 var WM_FLAG = { 'гемоглобин': [[80, 'c', '<'], [100, 'w', '<']], 'лейкоциты': [[12, 'c', '>'], [10, 'w', '>'], [4, 'w', '<']], 'тромбоциты': [[100, 'c', '<'], [150, 'w', '<']], 'СРБ': [[150, 'c', '>'], [50, 'w', '>']], 'прокальцитонин': [[2, 'c', '>'], [0.5, 'w', '>']], 'альбумин': [[25, 'c', '<'], [30, 'w', '<']], 'К': [[3.5, 'w', '<'], [5.5, 'w', '>']], 'Na': [[135, 'w', '<'], [145, 'w', '>']], 'фибриноген': [[6, 'w', '>'], [2, 'w', '<']], 'креатинин крови': [[115, 'w', '>']], 'глюкоза': [[11, 'c', '>'], [7.8, 'w', '>']], 'билирубин общий': [[21, 'w', '>']], 'МНО': [[1.5, 'w', '>']] };
 function wmChip(x) { var k = String(x[0]), v = String(x[1]), n = parseFloat(v.replace(',', '.')), cls = ''; var key = /дренаж/i.test(k) ? null : Object.keys(WM_FLAG).filter(function (f) { return k === f || k.indexOf(f + ' ') === 0; })[0]; (WM_FLAG[key] || []).some(function (r) { if (isNaN(n)) return false; if (r[2] === '<' ? n < r[0] : n > r[0]) { cls = r[1]; return true; } return false; }); return '<span class="wm-chip' + (cls ? ' ' + cls : '') + '">' + esc(k) + ' <b>' + esc(v) + '</b></span>'; }
 function wmList(v) { if (!v) return ''; if (!Array.isArray(v)) return '<div class="wm-meds">' + esc(v) + '</div>'; return '<ul class="wm-ul">' + v.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>'; }
+/* ответственный резидент лежащего: хранится в карточке (p.wardRes), выбирается прямо в мониторе */
+function wmRes(pid) {
+  var p = DB.patients.filter(function (x) { return x.id === pid; })[0]; if (!p) return '';
+  var cur = p.wardRes || '', names = resNames(); if (cur && names.indexOf(cur) < 0) names = names.concat([cur]);
+  return '<label class="wm-res' + (cur ? ' on' : '') + '">' + LL('Резидент', 'Resident') + '<select data-act="wmres" data-id="' + esc(pid) + '"' + (can('edit') ? '' : ' disabled') + '><option value="">' + LL('не указан', 'not set') + '</option>' + names.map(function (n) { return '<option' + (n === cur ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></label>';
+}
 function wardMonitor() {
   var reps = ((DB.cols || {}).ward || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)) || String(b.at || '').localeCompare(String(a.at || '')); }), r = reps[0];
   var td = isoOf(new Date()), early = new Date().getHours() < 9;
@@ -1430,7 +1437,7 @@ function wardMonitor() {
   if (r.date !== td) h += '<p class="wm-old">' + LL('Сводка за ', 'Summary for ') + fmtDate(r.date) + LL(', на сегодня ещё не обновлена', ', not updated today') + '</p>';
   h += '<div class="wm-grid">' + (r.items || []).map(function (it) {
     var row = function (lab, body) { return body ? '<div class="wm-r"><div class="wm-l">' + lab + '</div>' + body + '</div>' : ''; };
-    return '<article class="wm-c' + (it.icu ? ' icu' : '') + '"><div class="wm-top"><button type="button" class="wm-n" data-act="openp" data-id="' + esc(it.pid || '') + '">' + esc(it.name) + '</button><span class="muted">' + esc(it.age || '') + '</span>' + (it.icu ? '<span class="wm-icu">' + esc(it.icu) + '</span>' : '') + '</div>'
+    return '<article class="wm-c' + (it.icu ? ' icu' : '') + '"><div class="wm-top"><button type="button" class="wm-n" data-act="openp" data-id="' + esc(it.pid || '') + '">' + esc(it.name) + '</button><span class="muted">' + esc(it.age || '') + '</span>' + (it.icu ? '<span class="wm-icu">' + esc(it.icu) + '</span>' : '') + wmRes(it.pid) + '</div>'
       + row(LL('Анализы сегодня', 'Labs today') + (it.todayLabel ? ' (' + esc(it.todayLabel) + ')' : ''), (it.today || []).map(wmChip).join(''))
       + (it.prev ? row(LL('Контрольные анализы за ', 'Control labs on ') + esc(it.prev.date), (it.prev.vals || []).map(wmChip).join('')) : '')
       + row(LL('Контрольные анализы назначены на завтра', 'Control labs ordered for tomorrow'), it.tomorrow ? '<div class="wm-meds">' + esc(it.tomorrow) + '</div>' : '')
@@ -6266,6 +6273,7 @@ document.addEventListener('change', function (ev) {
     return;
   }
   if (tg.id === 'dxfile' && S.dx) { var kp0 = root.querySelector('#dxkeep'), ag0 = root.querySelector('#dxagree'); if (kp0) S.dx.keep = kp0.checked; if (ag0) S.dx.agree = ag0.checked; S.dx.files = filesAcc(S.dx.files, tg.files ? Array.prototype.slice.call(tg.files) : []); try { tg.value = ''; } catch (e) {} S.dx.file = S.dx.files[0] || null; render(); return; }
+  if (tg.getAttribute('data-act') === 'wmres') { var wp = DB.patients.filter(function (x) { return x.id === tg.getAttribute('data-id'); })[0]; if (wp && can('edit')) { var wv = tg.value; if (wv) wp.wardRes = wv; else delete wp.wardRes; wp.log = (wp.log || []).concat([{ ts: nowIso(), by: me(), act: 'edit', note: LL('Ответственный резидент в отделении: ', 'Ward resident: ') + (wv || LL('не указан', 'not set')), ch: [] }]); if (save()) toast(pName(wp) + ': ' + LL('резидент ', 'resident ') + (wv || LL('не указан', 'not set'))); render(); } return; }
   if (tg.getAttribute('data-act') === 'dflt') { if (tg.value) dfltOf()[tg.getAttribute('data-id')] = tg.value; else delete dfltOf()[tg.getAttribute('data-id')]; saveUI(); render(); return; }
   if (tg.getAttribute('data-act') === 'admsort') { if (tg.value) UI.admSort = tg.value; else delete UI.admSort; saveUI(); render(); return; }
   if (tg.getAttribute('data-act') === 'flt') { if (tg.value) fltOf()[tg.getAttribute('data-id')] = tg.value; else delete fltOf()[tg.getAttribute('data-id')]; saveUI(); render(); return; }
