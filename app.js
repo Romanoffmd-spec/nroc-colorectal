@@ -1434,7 +1434,7 @@ function wmPod(it) {
   var p = DB.patients.filter(function (x) { return x.id === it.pid; })[0], d = p ? p.d : {};
   var ops = Array.isArray(it.op) ? it.op : (it.op ? [it.op] : (d.date ? [{ name: d.opName || d.proc || '', date: d.date }] : []));
   return ops.filter(function (o) { return o && o.date; }).map(function (o) {
-    var n = -daysTo(o.date), s = n === 0 ? LL('день операции', 'day of surgery') : n > 0 ? n + (n % 10 === 3 && n % 100 !== 13 ? '-и' : '-е') + LL(' сутки после операции', ' POD') : LL('операция через ', 'surgery in ') + (-n) + LL(' дн', ' d');
+    var n = -daysTo(o.date), s = n === 0 ? LL('Операция сегодня', 'Surgery today') : n > 0 ? n + (n % 10 === 3 && n % 100 !== 13 ? '-и' : '-е') + LL(' сутки после операции', ' POD') : LL('операция через ', 'surgery in ') + (-n) + LL(' дн', ' d');
     return '<div class="wm-pod"><b>' + s + '</b>' + (o.name ? ': ' + esc(o.name) : '') + ' (' + fmtDate(o.date) + ')</div>';
   }).join('');
 }
