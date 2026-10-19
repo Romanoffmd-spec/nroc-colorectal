@@ -1478,7 +1478,7 @@ function rotList() { DB.cols.rot = DB.cols.rot || []; return DB.cols.rot.slice()
 function rotOf(id) { return (DB.cols.rot || []).filter(function (r) { return r.id === id; })[0]; }
 function rotEnd(it) { var d = new Date(it.start + 'T00:00:00'), n = +it.dur || 1; if (it.unit === 'w') d.setDate(d.getDate() + n * 7 - 1); else { d.setMonth(d.getMonth() + n); d.setDate(d.getDate() - 1); } return isoOf(d); }
 function rotDurTxt(it) { var n = +it.dur || 1; return it.unit === 'w' ? n + ' ' + LL(n === 1 ? 'неделя' : n < 5 ? 'недели' : 'недель', n === 1 ? 'week' : 'weeks') : n + ' ' + LL(n === 1 ? 'месяц' : n < 5 ? 'месяца' : 'месяцев', n === 1 ? 'month' : 'months'); }
-var ROT_MIN = 4; /* меньше стольких резидентов в месяц: столбец подсвечивается */
+var ROT_MIN = 3; /* меньше стольких резидентов в месяц: столбец подсвечивается */
 function rotWin() {
   var f = UI.rotFrom || rotDefFrom(), y = +f.slice(0, 4), m = +f.slice(5, 7) - 1, n = UI.rotSpan || 12, keys = [];
   for (var i = 0; i < n; i++) { var d = new Date(y, m + i, 1); keys.push(isoOf(d)); }
