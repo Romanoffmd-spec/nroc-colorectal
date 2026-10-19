@@ -1429,6 +1429,15 @@ function wmRes(pid) {
   var cur = p.wardRes || '', names = resNames(); if (cur && names.indexOf(cur) < 0) names = names.concat([cur]);
   return '<label class="wm-res' + (cur ? ' on' : '') + '">' + LL('Резидент', 'Resident') + '<select data-act="wmres" data-id="' + esc(pid) + '"' + (can('edit') ? '' : ' disabled') + '><option value="">' + LL('не указан', 'not set') + '</option>' + names.map(function (n) { return '<option' + (n === cur ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></label>';
 }
+/* сутки после операции: из сводки (it.op: [{name,date}]) или из карточки (date + opName/proc) */
+function wmPod(it) {
+  var p = DB.patients.filter(function (x) { return x.id === it.pid; })[0], d = p ? p.d : {};
+  var ops = Array.isArray(it.op) ? it.op : (it.op ? [it.op] : (d.date ? [{ name: d.opName || d.proc || '', date: d.date }] : []));
+  return ops.filter(function (o) { return o && o.date; }).map(function (o) {
+    var n = -daysTo(o.date), s = n === 0 ? LL('день операции', 'day of surgery') : n > 0 ? n + (n % 10 === 3 && n % 100 !== 13 ? '-и' : '-е') + LL(' сутки после операции', ' POD') : LL('операция через ', 'surgery in ') + (-n) + LL(' дн', ' d');
+    return '<div class="wm-pod"><b>' + s + '</b>' + (o.name ? ': ' + esc(o.name) : '') + ' (' + fmtDate(o.date) + ')</div>';
+  }).join('');
+}
 function wardMonitor() {
   var reps = ((DB.cols || {}).ward || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)) || String(b.at || '').localeCompare(String(a.at || '')); }), r = reps[0];
   var td = isoOf(new Date()), early = new Date().getHours() < 9;
@@ -1437,7 +1446,7 @@ function wardMonitor() {
   if (r.date !== td) h += '<p class="wm-old">' + LL('Сводка за ', 'Summary for ') + fmtDate(r.date) + LL(', на сегодня ещё не обновлена', ', not updated today') + '</p>';
   h += '<div class="wm-grid">' + (r.items || []).map(function (it) {
     var row = function (lab, body) { return body ? '<div class="wm-r"><div class="wm-l">' + lab + '</div>' + body + '</div>' : ''; };
-    return '<article class="wm-c' + (it.icu ? ' icu' : '') + '"><div class="wm-top"><button type="button" class="wm-n" data-act="openp" data-id="' + esc(it.pid || '') + '">' + esc(it.name) + '</button><span class="muted">' + esc(it.age || '') + '</span>' + (it.icu ? '<span class="wm-icu">' + esc(it.icu) + '</span>' : '') + wmRes(it.pid) + '</div>'
+    return '<article class="wm-c' + (it.icu ? ' icu' : '') + '"><div class="wm-top"><button type="button" class="wm-n" data-act="openp" data-id="' + esc(it.pid || '') + '">' + esc(it.name) + '</button><span class="muted">' + esc(it.age || '') + '</span>' + (it.icu ? '<span class="wm-icu">' + esc(it.icu) + '</span>' : '') + wmRes(it.pid) + '</div>' + wmPod(it)
       + row(LL('Анализы сегодня', 'Labs today') + (it.todayLabel ? ' (' + esc(it.todayLabel) + ')' : ''), (it.today || []).map(wmChip).join(''))
       + (it.prev ? row(LL('Контрольные анализы за ', 'Control labs on ') + esc(it.prev.date), (it.prev.vals || []).map(wmChip).join('')) : '')
       + row(LL('Контрольные анализы назначены на завтра', 'Control labs ordered for tomorrow'), it.tomorrow ? '<div class="wm-meds">' + esc(it.tomorrow) + '</div>' : '')
