@@ -766,9 +766,9 @@ var COLS = {
   mm: { icon: 'alert', title: ['M&M', 'M&M'], sub: ['Разборы осложнений и летальности', 'Morbidity and mortality reviews'],
     titleField: 'title', subField: 'reason', dateField: 'date', statusField: 'status', views: ['table', 'board', 'cal'],
     colorBy: { 'Запланирован': 'plan', 'Разобран': 'done' },
-    list: ['date', 'title', 'reason', 'status', 'summary', 'files'],
+    list: ['date', 'title', 'reason', 'resp', 'status', 'summary', 'files'],
     fields: [
-      f('title', 'Пациент / тема', 'Patient / topic', 'text'), f('date', 'Дата', 'Date', 'date'), f('status', 'Статус', 'Status', 'sel', { options: ['Запланирован', 'Разобран'] }), f('reason', 'Причина разбора', 'Reason for review', 'text'), f('category', 'Тип случая', 'Case type', 'sel', { options: ['Осложнение', 'Летальный исход', 'Near miss', 'Нежелательное событие'] }), f('cdg', 'Clavien-Dindo', 'Clavien-Dindo', 'sel', { options: ['I', 'II', 'IIIa', 'IIIb', 'IVa', 'IVb', 'V'] }), f('preventable', 'Предотвратимость', 'Preventability', 'seg', { options: ['Да', 'Возможно', 'Нет'] }), f('factors', 'Факторы', 'Contributing factors', 'multi', { options: ['Пациент', 'Хирургическая техника', 'Решение и суждение', 'Коммуникация', 'Система и организация', 'Оборудование', 'Анестезия'] }),
+      f('title', 'Пациент / тема', 'Patient / topic', 'text'), f('date', 'Дата', 'Date', 'date'), f('status', 'Статус', 'Status', 'sel', { options: ['Запланирован', 'Разобран'] }), f('reason', 'Причина разбора', 'Reason for review', 'text'), f('resp', 'Ответственный резидент', 'Responsible resident', 'sel', { options: [] }), f('category', 'Тип случая', 'Case type', 'sel', { options: ['Осложнение', 'Летальный исход', 'Near miss', 'Нежелательное событие'] }), f('cdg', 'Clavien-Dindo', 'Clavien-Dindo', 'sel', { options: ['I', 'II', 'IIIa', 'IIIb', 'IVa', 'IVb', 'V'] }), f('preventable', 'Предотвратимость', 'Preventability', 'seg', { options: ['Да', 'Возможно', 'Нет'] }), f('factors', 'Факторы', 'Contributing factors', 'multi', { options: ['Пациент', 'Хирургическая техника', 'Решение и суждение', 'Коммуникация', 'Система и организация', 'Оборудование', 'Анестезия'] }),
       f('summary', 'Итоги разбора (инициативы)', 'Review outcome (initiatives)', 'long', { wide: true, rows: 5 }), f('files', 'Вложения', 'Attachments', 'files', { wide: true }), f('dx', 'Диагноз', 'Diagnosis', 'long', { wide: true })
     ]},
   redcap: { icon: 'flask', title: ['RedCap', 'RedCap'], sub: ['Пациенты, внесённые в RedCap: контакт через 30 дней после операции', 'Patients entered in RedCap: contact 30 days after surgery'],
@@ -790,6 +790,8 @@ var COLS = {
       f('due', 'Срок', 'Due date', 'date'), f('notes', 'Заметки', 'Notes', 'long', { wide: true })
     ]}
 };
+/* ответственный резидент M&M: список из «Ротаций» плюс базовый RESIDENTS */
+Object.defineProperty(COLS.mm.fields.filter(function (x) { return x.id === 'resp'; })[0], 'options', { get: function () { var s = {}, o = []; ((typeof DB !== 'undefined' && DB && DB.cols && DB.cols.rot) || []).map(function (r) { return r.name; }).concat(RESIDENTS).forEach(function (n) { n = String(n || '').trim(); if (n && !s[n]) { s[n] = 1; o.push(n); } }); return o; } });
 COLS.pubs = { icon: 'book', title: ['Публикации', 'Publications'], sub: ['Статьи и доклады сектора: DOI, авторы, журнал, связь с исследованием, отчёт за период', 'Papers and talks: DOI, authors, journal, linked study, report for a period'],
   titleField: 'title', subField: 'venue', dateField: 'date', statusField: 'status', views: ['table', 'board'],
   colorBy: { 'Подготовка': 'plan', 'Подана': 'prog', 'Принята': 'prog', 'Опубликована': 'done', 'Представлен': 'done' },
@@ -1476,6 +1478,7 @@ function rotList() { DB.cols.rot = DB.cols.rot || []; return DB.cols.rot.slice()
 function rotOf(id) { return (DB.cols.rot || []).filter(function (r) { return r.id === id; })[0]; }
 function rotEnd(it) { var d = new Date(it.start + 'T00:00:00'), n = +it.dur || 1; if (it.unit === 'w') d.setDate(d.getDate() + n * 7 - 1); else { d.setMonth(d.getMonth() + n); d.setDate(d.getDate() - 1); } return isoOf(d); }
 function rotDurTxt(it) { var n = +it.dur || 1; return it.unit === 'w' ? n + ' ' + LL(n === 1 ? 'неделя' : n < 5 ? 'недели' : 'недель', n === 1 ? 'week' : 'weeks') : n + ' ' + LL(n === 1 ? 'месяц' : n < 5 ? 'месяца' : 'месяцев', n === 1 ? 'month' : 'months'); }
+var ROT_MIN = 4; /* меньше стольких резидентов в месяц: столбец подсвечивается */
 function rotWin() {
   var f = UI.rotFrom || rotDefFrom(), y = +f.slice(0, 4), m = +f.slice(5, 7) - 1, n = UI.rotSpan || 12, keys = [];
   for (var i = 0; i < n; i++) { var d = new Date(y, m + i, 1); keys.push(isoOf(d)); }
@@ -1496,14 +1499,15 @@ function renderRot() {
   var nextIt = null; list.forEach(function (r) { (r.items || []).forEach(function (it) { if (!it.tent && it.start > td && (!nextIt || it.start < nextIt.it.start)) nextIt = { r: r, it: it }; }); });
   h += '<div class="stats rot-stats">' + tile(list.length, LL('резидентов в списке', 'residents listed')) + tile(now.length, LL('сейчас на ротации', 'on rotation now')) + tile(all, LL('ротаций в периоде', 'rotations in period')) + tile(tent || '0', LL('под вопросом', 'tentative')) + (nextIt ? tile(fmtDate(nextIt.it.start), LL('следующий заезд: ', 'next start: ') + nextIt.r.name) : '') + '</div>';
   if (now.length) h += '<div class="rot-now">' + ico('cap', 15) + '<b>' + LL('Сейчас в секторе:', 'In the unit now:') + '</b>' + now.map(function (r) { return '<span class="rot-chip" style="--h:' + rotHue(r) + '">' + esc(r.name) + '</span>'; }).join('') + '</div>';
-  h += '<section class="rot-board" style="--n:' + W.n + '"><div class="rot-row rot-hd"><div class="rot-name">' + LL('Резидент', 'Resident') + '</div><div class="rot-track">' + W.keys.map(function (k) { var cur = td.slice(0, 7) === k.slice(0, 7); return '<div class="rot-mh' + (cur ? ' cur' : '') + '"><b>' + esc(rotMonLab(k)) + '</b><span>' + k.slice(0, 4) + '</span></div>'; }).join('') + '</div></div>';
+  var mCnt = W.keys.map(function (k) { var e = isoOf(addDays(isoOf(new Date(+k.slice(0, 4), +k.slice(5, 7), 1)), -1)); return list.filter(function (r) { return (r.items || []).some(function (it) { return !it.tent && it.start <= e && rotEnd(it) >= k; }); }).length; }), low = function (i) { return list.length && mCnt[i] < ROT_MIN; };
+  h += '<section class="rot-board" style="--n:' + W.n + '"><div class="rot-row rot-hd"><div class="rot-name">' + LL('Резидент', 'Resident') + '</div><div class="rot-track">' + W.keys.map(function (k, i) { var cur = td.slice(0, 7) === k.slice(0, 7); return '<div class="rot-mh' + (cur ? ' cur' : '') + (low(i) ? ' low' : '') + '"' + (low(i) ? ' title="' + esc(LL('Меньше ' + ROT_MIN + ' резидентов: ', 'Fewer than ' + ROT_MIN + ' residents: ') + mCnt[i]) + '"' : '') + '><b>' + esc(rotMonLab(k)) + '</b><span>' + k.slice(0, 4) + '</span></div>'; }).join('') + '</div></div>';
   if (!list.length) h += '<div class="empty">' + LL('Резидентов пока нет. Добавьте первого кнопкой «Резидент».', 'No residents yet. Add one with the «Resident» button.') + '</div>';
   var tdIn = td >= W.from && td < W.to, tdP = rotPct(td, W);
   list.forEach(function (r) {
     var its = (r.items || []).filter(function (it) { return rotEnd(it) >= W.from && it.start < W.to; }).sort(function (a, b) { return a.start.localeCompare(b.start); });
     var mon = 0; its.forEach(function (it) { if (!it.tent) mon += Math.max(0, rotDays(it.start < W.from ? W.from : it.start, rotEnd(it) >= W.to ? W.to : isoOf(addDays(rotEnd(it), 1)))) / 30.44; });
     h += '<div class="rot-row" style="--h:' + rotHue(r) + '"><div class="rot-name">' + (ed ? '<button type="button" class="rot-nb" data-act="rotres" data-id="' + r.id + '" title="' + esc(LL('Переименовать или удалить', 'Rename or remove')) + '">' : '<span class="rot-nb">') + '<i class="rot-dot"></i><span>' + esc(r.name) + '</span><em>' + (mon ? (Math.round(mon * 2) / 2).toString().replace('.', ',') + LL(' мес', ' mo') : '') + '</em>' + (ed ? '</button>' : '</span>') + '</div><div class="rot-track">';
-    W.keys.forEach(function (k) { h += ed ? '<button type="button" class="rot-cell" data-act="rotadd" data-id="' + r.id + '" data-v="' + k + '" aria-label="' + esc(LL('Добавить ротацию: ', 'Add rotation: ') + r.name + ', ' + rotMonLab(k, true)) + '"></button>' : '<span class="rot-cell"></span>'; });
+    W.keys.forEach(function (k, i) { h += ed ? '<button type="button" class="rot-cell' + (low(i) ? ' low' : '') + '" data-act="rotadd" data-id="' + r.id + '" data-v="' + k + '" aria-label="' + esc(LL('Добавить ротацию: ', 'Add rotation: ') + r.name + ', ' + rotMonLab(k, true)) + '"></button>' : '<span class="rot-cell' + (low(i) ? ' low' : '') + '"></span>'; });
     its.forEach(function (it) {
       var a = rotPct(it.start, W), b = rotPct(isoOf(addDays(rotEnd(it), 1)), W), lab = rotDurTxt(it) + (it.note ? ' · ' + it.note : '');
       h += '<button type="button" class="rot-bar' + (it.tent ? ' tent' : '') + (it.start < W.from ? ' cutl' : '') + (rotEnd(it) >= W.to ? ' cutr' : '') + '" style="left:' + a + '%;width:' + Math.max(b - a, 1.2) + '%" data-act="rotedit" data-id="' + r.id + '" data-v="' + it.id + '" title="' + esc(r.name + ': ' + fmtDate(it.start) + ' – ' + fmtDate(rotEnd(it)) + ' (' + rotDurTxt(it) + ')' + (it.tent ? LL(', под вопросом', ', tentative') : '') + (it.note ? '. ' + it.note : '')) + '"' + (ed ? '' : ' disabled') + '><span>' + (it.tent ? '? ' : '') + esc(lab) + '</span></button>';
@@ -1514,7 +1518,7 @@ function renderRot() {
   if (list.length) {
     h += '<div class="rot-row rot-ft"><div class="rot-name">' + LL('В секторе', 'In the unit') + '</div><div class="rot-track">' + W.keys.map(function (k) {
       var e = isoOf(addDays(isoOf(new Date(+k.slice(0, 4), +k.slice(5, 7), 1)), -1)), c = list.filter(function (r) { return (r.items || []).some(function (it) { return !it.tent && it.start <= e && rotEnd(it) >= k; }); }).length, q = list.filter(function (r) { return (r.items || []).some(function (it) { return it.tent && it.start <= e && rotEnd(it) >= k; }); }).length;
-      return '<div class="rot-cnt' + (c ? '' : ' z') + '" title="' + esc(c + LL(' резидентов', ' residents') + (q ? LL(', под вопросом ещё ', ', tentative ') + q : '')) + '"><b>' + c + '</b>' + (q ? '<span>+' + q + '?</span>' : '') + '</div>';
+      return '<div class="rot-cnt' + (c ? '' : ' z') + (c < ROT_MIN ? ' low' : '') + '" title="' + esc(c + LL(' резидентов', ' residents') + (q ? LL(', под вопросом ещё ', ', tentative ') + q : '')) + '"><b>' + c + '</b>' + (q ? '<span>+' + q + '?</span>' : '') + '</div>';
     }).join('') + '</div></div>';
   }
   h += '</section>';
