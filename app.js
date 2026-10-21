@@ -1211,7 +1211,7 @@ function apprAct(kind, id) {
     DB.pending = DB.pending.filter(function (x) { return x.id !== id; }); save(); render();
   }
 }
-function regName(r) { if (r.kind === 'track' && LANG === 'en') { var tk = TRACKS.filter(function (x) { return x.key === r.track; })[0]; if (tk) return tk.en; } return r.nameKey ? t(r.nameKey) : r.name; }
+function regName(r) { if (LANG === 'en' && r.nameEn) return r.nameEn; if (r.kind === 'track' && LANG === 'en') { var tk = TRACKS.filter(function (x) { return x.key === r.track; })[0]; if (tk) return tk.en; } return r.nameKey ? t(r.nameKey) : r.name; }
 function ruleText(reg) {
   if (reg.kind === 'study' && reg.desc) return reg.desc;
   if (reg.mode === 'manual') return t('rule.manual');
@@ -9077,7 +9077,7 @@ function navGroups() {
   sci.push({ sep: LL('Материалы', 'Materials') });
   sci.push({ v: 'q', icon: 'clipboard', label: LL('Анкеты', 'Questionnaires'), badge: qDueAll(0).length || null });
   ['mm', 'pubs', 'goals'].forEach(function (k) { sci.push({ v: 'col:' + k, icon: COLS[k].icon, label: L(COLS[k].title), cnt: DB.cols[k].length }); });
-  g.push({ id: 'sci', label: LL('Наука', 'Research'), icon: 'flask', items: sci, wide: true });
+  g.push({ id: 'sci', label: LL('Наука', 'Research'), icon: 'flask', items: sci, wide: true, fly: true });
   if (isAdmin()) g.push({ id: 'adm', label: LL('Администрирование', 'Admin'), v: 'users', icon: 'shield' });
   return g;
 }
