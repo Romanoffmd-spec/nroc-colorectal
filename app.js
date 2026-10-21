@@ -2109,46 +2109,60 @@ function ovStatus(p) {
   if (d.date && hasProc(d)) return ['fu', LL('После операции, наблюдение', 'Post-op follow-up')];
   return ['dx', LL('Диагностика и подготовка', 'Work-up')];
 }
+/* путь пациента: все госпитализации этого пациента (по ИИН) и связанные МДГ, от первого события до последнего */
+function ovEps(p) { return typeof episodesOf === 'function' ? episodesOf(p) : [p]; }
 function ovPath(p) {
-  var d = p.d, ev = [];
-  function add(dt, l, s, k) { if (dt) ev.push({ d: String(dt).slice(0, 10), l: l, s: s || '', k: k || '' }); }
-  add(d.admDate, LL('Поступление', 'Admission'), d.ib ? 'ИБ ' + d.ib : '');
-  (typeof linkedRecs === 'function' ? linkedRecs(p.id) : []).forEach(function (x) { if ((x.k === 'mdt' || x.k === 'smdt') && x.r.date) add(x.r.date, LL('МДГ', 'MDT'), x.r.rec ? String(x.r.rec).slice(0, 40) : '', 'mdt'); });
-  add(d.rtStart, LL('Начало ЛТ', 'RT start'), d.sod ? d.sod + ' Гр' : '');
-  add(d.date, LL('Операция', 'Surgery'), opLabel(d), 'op');
-  add(d.disDate, LL('Выписка', 'Discharge'), '');
-  add(d.adjStart, LL('Адъювант', 'Adjuvant'), d.adjRegimen || '');
-  var nx = fuList(p).filter(function (x) { return x.st !== 'done'; })[0]; if (nx) add(nx.due, LL('Контроль ', 'Follow-up ') + nx.label, x2(nx), 'next');
-  function x2(x) { return x.st === 'overdue' ? LL('просрочен', 'overdue') : LL('план', 'planned'); }
-  add(d.deathDate, LL('Смерть', 'Death'), '');
+  var eps = ovEps(p), ev = [], seen = {};
+  function add(dt, l, s, k, pid) { if (!dt) return; var key = String(dt).slice(0, 10) + '|' + l + '|' + s; if (seen[key]) return; seen[key] = 1; ev.push({ d: String(dt).slice(0, 10), l: l, s: s || '', k: k || '', pid: pid }); }
+  eps.forEach(function (x) {
+    var d = x.d, mine = x.id === p.id ? null : x.id;
+    (typeof linkedRecs === 'function' ? linkedRecs(x.id) : []).forEach(function (r) { if ((r.k === 'mdt' || r.k === 'smdt') && r.r.date) add(r.r.date, LL('МДГ', 'MDT'), r.r.rec ? String(r.r.rec).slice(0, 60) : '', 'mdt', mine); });
+    add(d.admDate, LL('Поступление', 'Admission'), d.ib ? 'ИБ ' + d.ib : '', 'adm', mine);
+    add(d.rtStart, LL('Начало ЛТ', 'RT start'), d.sod ? d.sod + ' Гр' : '', '', mine);
+    if (d.date && (d.proc || d.opName)) add(d.date, LL('Операция', 'Surgery'), opLabel(d), 'op', mine);
+    if (d.reopDate) add(d.reopDate, LL('Повторная операция', 'Reoperation'), '', 'op', mine);
+    add(d.disDate, LL('Выписка', 'Discharge'), '', '', mine);
+    add(d.adjStart, LL('Адъювант', 'Adjuvant'), d.adjRegimen || '', '', mine);
+    var byDay = {}; (x.q || []).forEach(function (e) { if (!e.date) return; var q0 = qTpl(e.tid); (byDay[e.date] = byDay[e.date] || []).push(q0 ? qShort(q0) : e.tid); });
+    Object.keys(byDay).forEach(function (dt) { add(dt, LL('Анкеты', 'Questionnaires'), byDay[dt].join(', '), 'q', mine); });
+    fuList(x).forEach(function (f) { if (f.st === 'done') add(f.due, LL('Контроль ', 'Follow-up ') + f.label, LL('выполнен', 'done'), 'fu', mine); });
+    add(d.deathDate, LL('Смерть', 'Death'), d.deathCause || '', 'death', mine);
+  });
+  var last = eps[eps.length - 1], nx = fuList(last).filter(function (x) { return x.st !== 'done'; })[0];
+  if (nx) add(nx.due, LL('Контроль ', 'Follow-up ') + nx.label, nx.st === 'overdue' ? LL('просрочен', 'overdue') : LL('план', 'planned'), 'next', last.id === p.id ? null : last.id);
   ev.sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
-  if (!ev.length) return '<p class="hint">' + LL('Дат пока нет: путь пациента появится, когда будут заполнены поступление, МДГ, операция или выписка.', 'No dates yet.') + '</p>';
+  if (!ev.length) return '<p class="hint">' + LL('Дат пока нет: путь появится, когда будут заполнены МДГ, поступление, операция или выписка.', 'No dates yet.') + '</p>';
   var td = isoOf(new Date());
-  return '<div class="ov-path">' + ev.map(function (e) { var fut = e.d > td; return '<div class="ov-pe' + (fut ? ' fut' : '') + (e.k ? ' k-' + e.k : '') + '"><span class="ov-pd"></span><span class="ov-pt">' + fmtDate(e.d) + '</span><b>' + esc(e.l) + '</b>' + (e.s ? '<em>' + esc(e.s) + '</em>' : '') + '</div>'; }).join('') + '</div>';
+  return '<div class="ov-path">' + ev.map(function (e) { var fut = e.d > td, tag = e.pid ? 'button type="button" data-act="openp" data-id="' + esc(e.pid) + '" title="' + LL('Открыть госпитализацию ', 'Open episode ') + esc(e.pid) + '"' : 'div'; return '<' + tag + ' class="ov-pe' + (fut ? ' fut' : '') + (e.k ? ' k-' + e.k : '') + (e.pid ? ' other' : '') + '"><span class="ov-pd"></span><span class="ov-pt">' + fmtDate(e.d) + '</span><b>' + esc(e.l) + '</b>' + (e.s ? '<em>' + esc(e.s) + '</em>' : '') + '</' + tag.split(' ')[0] + '>'; }).join('') + '</div>';
 }
+/* значение по пациенту: из самой поздней госпитализации, где поле заполнено */
+function ovLast(eps, f) { for (var i = eps.length - 1; i >= 0; i--) { var v = eps[i].d[f]; if (has(v) && !isNA(v)) return v; } return ''; }
 function ovBody(dr) {
-  var p = dr.p, d = p.d, st = ovStatus(p), h = '';
-  var tnm = [d.cT, d.cN, d.cM].filter(Boolean).join(' '), ptnm = [d.pT, d.pN].filter(Boolean).join(' ');
+  var p = dr.p, eps = ovEps(p).map(function (x) { return x.id === p.id ? p : x; }), last = eps[eps.length - 1], d = p.d, h = '';
+  var g = function (f) { return ovLast(eps, f); }, st = ovStatus(last);
+  var tnm = [g('cT'), g('cN'), g('cM')].filter(Boolean).join(' '), ptnm = [g('pT'), g('pN')].filter(Boolean).join(' ');
   h += '<section class="ov-hero">';
-  h += '<div class="ov-who"><span class="ov-ava">' + esc(d.fio ? initials(d.fio) : '?') + '</span><div class="ov-wn"><b>' + esc(d.fio || LL('Без имени', 'No name')) + '</b><span>' + esc([p.id, [ov(d.sex), d.age ? d.age + ' ' + t('u.years') : ''].filter(Boolean).join(', ')].filter(Boolean).join(' · ')) + '</span><span class="ov-stat s-' + st[0] + '">' + esc(st[1]) + '</span></div>';
-  h += '<div class="ov-tags">' + [ov(d.loc), tnm ? 'c' + tnm.replace(/^c/, '') : '', ptnm ? ptnm : ''].filter(Boolean).map(function (s) { return '<span>' + esc(s) + '</span>'; }).join('') + '</div></div>';
-  h += '<div class="ov-stats"><div class="ov-h">' + LL('Показатели', 'Attributes') + '</div>' + ovStat('ECOG', d.ecog, ovPips(d.ecog, ['0', '1', '2', '3', '4'], true)) + ovStat('ASA', d.asa, ovPips(d.asa, ['I', 'II', 'III', 'IV', 'V'], true)) + ovStat(LL('ИМТ', 'BMI'), d.bmi) + ovStat('CCI', d.cci) + '</div>';
-  var cd = ovCdMax(d), fl = fuList(p), fd = fl.filter(function (x) { return x.st === 'done'; }).length, fo = fl.filter(function (x) { return x.st === 'overdue'; }).length;
+  h += '<div class="ov-who"><span class="ov-ava">' + esc(d.fio ? initials(d.fio) : '?') + '</span><div class="ov-wn"><b>' + esc(d.fio || LL('Без имени', 'No name')) + '</b><span>' + esc([eps.map(function (x) { return x.id; }).join(', '), [ov(g('sex')), g('age') ? g('age') + ' ' + t('u.years') : ''].filter(Boolean).join(', ')].filter(Boolean).join(' · ')) + '</span><span class="ov-stat s-' + st[0] + '">' + esc(st[1]) + '</span></div>';
+  h += '<div class="ov-tags">' + [ov(g('loc')), tnm ? 'c' + tnm.replace(/^c/, '') : '', ptnm, eps.length > 1 ? plural(eps.length, 'pl.hosp') : ''].filter(Boolean).map(function (s) { return '<span>' + esc(s) + '</span>'; }).join('') + '</div></div>';
+  h += '<div class="ov-stats"><div class="ov-h">' + LL('Показатели', 'Attributes') + '</div>' + ovStat('ECOG', g('ecog'), ovPips(g('ecog'), ['0', '1', '2', '3', '4'], true)) + ovStat('ASA', g('asa'), ovPips(g('asa'), ['I', 'II', 'III', 'IV', 'V'], true)) + ovStat(LL('ИМТ', 'BMI'), g('bmi')) + ovStat('CCI', g('cci')) + '</div>';
+  var cd = 0, cdT = '', anyCd = false; eps.forEach(function (x) { var m = ovCdMax(x.d); if (has(x.d.cd1)) anyCd = true; if (m >= cd && m) { cd = m; cdT = String(x.d['cd' + m]); } });
+  var ops = eps.filter(function (x) { return x.d.date && (x.d.proc || x.d.opName); }).map(function (x) { return opLabel(x.d) + ' (' + fmtDate(x.d.date) + ')'; });
+  var fl = fuList(last), fd = fl.filter(function (x) { return x.st === 'done'; }).length, fo = fl.filter(function (x) { return x.st === 'overdue'; }).length;
   h += '<div class="ov-slots"><div class="ov-h">' + LL('Этапы лечения', 'Treatment') + '</div>';
-  h += ovSlot('flask', LL('Неоадъювант', 'Neoadjuvant'), d.neoCrt === 'Нет' ? LL('не было', 'none') : ov(d.neoCrt), d.crtRegimen || '');
-  h += ovSlot('knife', LL('Операция', 'Surgery'), d.proc || d.opName || d.date ? opLabel(d) : '', d.date ? fmtDate(d.date) : '');
-  h += ovSlot('alert', LL('Осложнения', 'Complications'), has(d.cd1) || cd ? (cd ? 'Clavien-Dindo ' + ['', 'I', 'II', 'III', 'IV', 'V'][cd] : LL('нет', 'none')) : '', cd ? String(d['cd' + cd]).slice(0, 70) : '', cd >= 3 ? 'warn' : '');
-  h += ovSlot('file', LL('Гистология', 'Pathology'), ptnm, d.crmDist ? 'CRM ' + d.crmDist + ' см' : '');
-  h += ovSlot('flask', LL('Адъювант', 'Adjuvant'), ov(d.adj), d.adjRegimen || '');
+  h += ovSlot('flask', LL('Неоадъювант', 'Neoadjuvant'), g('neoCrt') === 'Нет' ? LL('не было', 'none') : ov(g('neoCrt')), g('crtRegimen') || '');
+  h += ovSlot('knife', ops.length > 1 ? LL('Операции', 'Surgeries') : LL('Операция', 'Surgery'), ops.join('; '), '');
+  h += ovSlot('alert', LL('Осложнения', 'Complications'), anyCd || cd ? (cd ? 'Clavien-Dindo ' + ['', 'I', 'II', 'III', 'IV', 'V'][cd] : LL('нет', 'none')) : '', cd ? cdT.slice(0, 70) : '', cd >= 3 ? 'warn' : '');
+  h += ovSlot('file', LL('Гистология', 'Pathology'), ptnm, g('crmDist') ? 'CRM ' + g('crmDist') + ' см' : '');
+  h += ovSlot('flask', LL('Адъювант', 'Adjuvant'), ov(g('adj')), g('adjRegimen') || '');
   h += ovSlot('clock', LL('Наблюдение', 'Follow-up'), fl.length ? fd + LL(' из ', ' of ') + fl.length : '', fo ? LL('просрочено: ', 'overdue: ') + fo : '', fo ? 'warn' : '');
   h += '</div></section>';
-  h += '<section class="card ov-card"><h3>' + ico('clock', 17) + LL('Путь пациента', 'Patient pathway') + '</h3>' + ovPath(p) + '</section>';
+  h += '<section class="card ov-card"><h3>' + ico('clock', 17) + LL('Путь пациента', 'Patient pathway') + (eps.length > 1 ? '<span class="h3-note">' + LL('все госпитализации; события других карточек открываются по нажатию', 'all episodes; click to open') + '</span>' : '') + '</h3>' + ovPath(p) + '</section>';
   var sm = p.summary && p.summary.text, nf = typeof pfNew === 'function' ? pfNew(p).length : 0;
   h += '<div class="ov-2">';
   h += '<section class="card ov-card"><h3>' + ico('sparkle', 17) + LL('Кратко о случае', 'Case summary') + '<span class="h3-r"><button type="button" class="btn small" data-act="ctab" data-v="more">' + LL('Открыть резюме', 'Open summary') + '</button></span></h3>' + (sm ? '<p class="ov-sum">' + esc(String(sm).slice(0, 700)) + (String(sm).length > 700 ? '…' : '') + '</p>' : '<p class="hint">' + LL('Резюме ещё не составлено. Его можно написать вручную или с ИИ во вкладке «Прочее».', 'No summary yet.') + '</p>') + (can('edit') && !isStudent() ? '<div class="actions"><button type="button" class="btn small ai" data-act="pfdxnew">' + ico('sparkle', 14) + LL('Апдейт из документов', 'Update from documents') + (nf ? ' (' + nf + ')' : '') + '</button></div>' : '') + '</section>';
-  h += '<section class="card ov-card"><h3>' + ico('check', 17) + LL('Заполненность', 'Completeness') + '</h3>' + CARD_TABS.filter(function (c) { return c[0] !== 'more'; }).map(function (c) { var f = phaseFill(c[0], d, dr), pc = f[1] ? Math.round(f[0] / f[1] * 100) : 0; return '<button type="button" class="ov-fill ph-' + c[0] + '" data-act="ctab" data-v="' + c[0] + '"><span class="ov-fl">' + t(c[1]) + '</span><span class="ov-fb"><i style="width:' + pc + '%"></i></span><em>' + f[0] + ' / ' + f[1] + '</em>' + ico('right', 14) + '</button>'; }).join('') + '<p class="hint">' + LL('Нажмите на этап, чтобы открыть его поля.', 'Click a stage to open its fields.') + '</p></section>';
+  h += '<section class="card ov-card"><h3>' + ico('check', 17) + LL('Заполненность этой госпитализации', 'Completeness of this episode') + '</h3>' + CARD_TABS.filter(function (c) { return c[0] !== 'more'; }).map(function (c) { var f = phaseFill(c[0], d, dr), pc = f[1] ? Math.round(f[0] / f[1] * 100) : 0; return '<button type="button" class="ov-fill ph-' + c[0] + '" data-act="ctab" data-v="' + c[0] + '"><span class="ov-fl">' + t(c[1]) + '</span><span class="ov-fb"><i style="width:' + pc + '%"></i></span><em>' + f[0] + ' / ' + f[1] + '</em>' + ico('right', 14) + '</button>'; }).join('') + '<p class="hint">' + LL('Нажмите на этап, чтобы открыть его поля.', 'Click a stage to open its fields.') + '</p></section>';
   h += '</div>';
-  var lb = linkedBlock(p.id, false); if (lb) h += '<section class="card ov-card"><h3>' + ico('folder', 17) + LL('Связанные записи', 'Linked records') + '</h3>' + lb + '</section>';
+  var lb = eps.map(function (x) { return linkedBlock(x.id, false); }).join(''); if (lb) h += '<section class="card ov-card"><h3>' + ico('folder', 17) + LL('Связанные записи', 'Linked records') + '</h3>' + lb + '</section>';
   return h;
 }
 function cardTabBody(dr, tab, tags) {
