@@ -763,6 +763,19 @@ var COLS = {
       f('date', 'Дата МДГ', 'MDT date', 'date'), f('mrn', 'Номер МДГ', 'MDT no.', 'text'),
       f('rec', 'Решение МДГ', 'MDT decision', 'long', { wide: true })
     ]},
+  smdt: { icon: 'mdt', title: ['Колоректальное МДГ', 'Colorectal MDT'], sub: ['Результаты колоректальной МДГ (перенесены из Notion «Colorectal MDT Results»)', 'Colorectal MDT results (imported from Notion "Colorectal MDT Results")'],
+    titleField: 'fio', subField: 'rec', dateField: 'date', statusField: 'status', views: ['table', 'board', 'cal'],
+    colorBy: { 'Ожидает обсуждения': 'plan', 'Обсуждён': 'prog', 'Лечение начато': 'prog', 'Лечение завершено': 'done', 'Наблюдение': 'done' },
+    list: ['date', 'fio', 'dx', 'stage', 'plan', 'rec', 'status', 'chg', 'lead'],
+    fields: [
+      f('fio', 'Пациент', 'Patient', 'text'), f('mrn', 'MRN', 'MRN', 'text'), f('date', 'Дата МДГ', 'MDT date', 'date'),
+      f('status', 'Статус', 'Status', 'sel', { options: ['Ожидает обсуждения', 'Обсуждён', 'Лечение начато', 'Лечение завершено', 'Наблюдение'] }),
+      f('stage', 'Стадия', 'Stage', 'sel', { options: ['I', 'II', 'III', 'IV', 'Не применимо'] }),
+      f('plan', 'План лечения', 'Treatment plan', 'multi', { options: ['Операция', 'ТНТ', 'Протонная терапия', 'Химиотерапия', 'Лучевая терапия', 'Иммунотерапия', 'Паллиативная помощь', 'Watch & Wait', 'Термоаблация', 'Переоценка'], wide: true }),
+      f('dx', 'Диагноз', 'Diagnosis', 'long', { wide: true }), f('rec', 'Рекомендация МДГ', 'MDT recommendation', 'long', { wide: true }),
+      f('chg', 'Изменение решения', 'Decision change', 'sel', { options: ['Да', 'Нет'] }), f('lead', 'Ведущий врач', 'Lead clinician', 'text'),
+      f('note', 'Примечание', 'Note', 'long', { wide: true })
+    ]},
   mm: { icon: 'alert', title: ['M&M', 'M&M'], sub: ['Разборы осложнений и летальности', 'Morbidity and mortality reviews'],
     titleField: 'title', subField: 'reason', dateField: 'date', statusField: 'status', views: ['table', 'board', 'cal'],
     colorBy: { 'Запланирован': 'plan', 'Разобран': 'done' },
@@ -848,7 +861,7 @@ function dbFromImport(I) {
   ['planner', 'mdt', 'mm', 'redcap'].forEach(function (k) { (I[k] || []).forEach(function (r, i) { var x = clone(r); x.id = k + '_' + (i + 1); if (k === 'redcap' && !x.done) x.done = 'Ожидает'; cols[k].push(x); }); });
   return { v: 3, seq: (I.patients || []).length + 1, registries: defaultRegistries(), patients: clone(I.patients || []), cols: cols, importedAt: isoOf(new Date()) };
 }
-function emptyDB() { return { v: 3, seq: 1, registries: defaultRegistries(), patients: [], cols: { planner: [], mdt: [], mm: [], redcap: [], goals: [], pubs: [] }, importedAt: isoOf(new Date()) }; }
+function emptyDB() { return { v: 3, seq: 1, registries: defaultRegistries(), patients: [], cols: { planner: [], mdt: [], smdt: [], mm: [], redcap: [], goals: [], pubs: [] }, importedAt: isoOf(new Date()) }; }
 /* ======================= Маршруты лечения по решению МДГ ======================= */
 var PAT_CORE = ['fio', 'iin', 'ib', 'dob', 'age', 'sex', 'phone', 'height', 'weight', 'bmi'];
 var TUM_CORE = ['loc', 'hist', 'cT', 'cN', 'cM', 'mets', 'asa', 'comorb', 'comorbOther'];
@@ -1015,7 +1028,7 @@ function migrate(db) {
   plannerAuto(db);
   return db;
 }
-var LINKED = ['planner', 'mdt', 'mm'];
+var LINKED = ['planner', 'mdt', 'mm', 'smdt'];
 function recName(k, r) { return k === 'mm' ? r.title : r.fio; }
 function nameTokens(s) { return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-яәіңғүұқөһ\s-]/g, ' ').split(/[\s-]+/).filter(Boolean); }
 function guessPatient(list, name, exact) {
@@ -4576,7 +4589,7 @@ function cloudPush() {
   }, 400);
 }
 function dbFromDocs(map) {
-  var db = { v: 3, seq: 1, registries: [], pending: [], patients: [], cols: { planner: [], mdt: [], mm: [], redcap: [], goals: [], pubs: [] }, mig: {} };
+  var db = { v: 3, seq: 1, registries: [], pending: [], patients: [], cols: { planner: [], mdt: [], smdt: [], mm: [], redcap: [], goals: [], pubs: [] }, mig: {} };
   Object.keys(map).forEach(function (k) {
     var v; try { v = JSON.parse(map[k]); } catch (e) { return; }
     if (k === 'meta') { Object.keys(v).forEach(function (x) { if (x === 'profiles') { db.profiles = Object.assign({}, v.profiles || {}, db.profiles || {}); return; } db[x] = v[x]; }); return; }
@@ -4744,7 +4757,7 @@ function demoDB() {
   var seed = 7; function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; } function pick(a) { return a[Math.floor(rnd() * a.length)]; }
   var FN = ['Айдаров', 'Бекова', 'Сериков', 'Жумабаева', 'Омаров', 'Касымова', 'Тулегенов', 'Нуртаева', 'Иванов', 'Смирнова', 'Абдрахманов', 'Есенова', 'Мукашев', 'Садыкова', 'Ким', 'Ахметов', 'Байжанова', 'Калиев', 'Петрова', 'Жаксылыков', 'Утепова', 'Рахимов', 'Сейтказина', 'Орлов'];
   var NM = ['Тест', 'Демо', 'Пример'];
-  var td = isoOf(new Date()), db = { v: 3, seq: 1, registries: defaultRegistries(), patients: [], cols: { planner: [], mdt: [], mm: [], redcap: [], goals: [], pubs: [] }, importedAt: td, demo: true };
+  var td = isoOf(new Date()), db = { v: 3, seq: 1, registries: defaultRegistries(), patients: [], cols: { planner: [], mdt: [], smdt: [], mm: [], redcap: [], goals: [], pubs: [] }, importedAt: td, demo: true };
   for (var i = 0; i < 28; i++) {
     var male = i % 2 === 0, fio = FN[i % FN.length] + (male ? '' : '') + ' ' + pick(NM) + ' ' + (i + 1), loc = pick(['Прямая кишка', 'Прямая кишка', 'Сигмовидная кишка', 'Ректосигмоидный отдел', 'Восходящая ободочная', 'Поперечная ободочная']);
     var opd = rnd() < 0.7 ? isoOf(addDays(td, -Math.floor(rnd() * 400) - 3)) : null;
@@ -9071,6 +9084,7 @@ function navGroups() {
   (function walk(list, d) { list.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'dot', label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, true), d + 1); }); })(kids(null, true), 1);
   sci.push({ v: 'write', icon: 'doc', label: LL('Рукописи и литература', 'Manuscripts and library') });
   var sreg = kids(null, false, true);
+  sci.push({ v: 'col:smdt', icon: COLS.smdt.icon, label: L(COLS.smdt.title), cnt: (DB.cols.smdt || []).length });
   sreg.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'users', label: regName(r), cnt: regCount(r) }); });
   if ((DB.pending || []).length) sci.push({ v: 'appr', icon: 'check', label: LL('На одобрении', 'Awaiting approval'), badge: apprMine().length || null });
   if (can('edit')) sci.push({ act: 'newstudy', icon: 'plus', label: t('nav.newStudy') });
