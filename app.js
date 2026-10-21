@@ -9181,14 +9181,16 @@ function navGroups() {
   var sci = [{ v: 'studies', icon: 'flask', label: t('nav.studies') }];
   (function walk(list, d) { list.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'dot', label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, true), d + 1); }); })(kids(null, true), 1);
   sci.push({ v: 'col:smdt', icon: COLS.smdt.icon, label: L(COLS.smdt.title), cnt: (DB.cols.smdt || []).length });
-  sci.push({ v: 'write', icon: 'doc', label: LL('Рукописи и литература', 'Manuscripts and library') });
+  sci.push({ v: 'col:mm', icon: COLS.mm.icon, label: L(COLS.mm.title), cnt: DB.cols.mm.length });
   var sreg = kids(null, false, true);
   sreg.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'users', label: regName(r), cnt: regCount(r) }); });
   if ((DB.pending || []).length) sci.push({ v: 'appr', icon: 'check', label: LL('На одобрении', 'Awaiting approval'), badge: apprMine().length || null });
   if (can('edit')) sci.push({ act: 'newstudy', icon: 'plus', label: t('nav.newStudy') });
   sci.push({ sep: LL('Материалы', 'Materials') });
   sci.push({ v: 'q', icon: 'clipboard', label: LL('Анкеты', 'Questionnaires'), badge: qDueAll(0).length || null });
-  ['mm', 'pubs', 'goals'].forEach(function (k) { sci.push({ v: 'col:' + k, icon: COLS[k].icon, label: L(COLS[k].title), cnt: DB.cols[k].length }); });
+  sci.push({ v: 'col:pubs', icon: COLS.pubs.icon, label: L(COLS.pubs.title), cnt: DB.cols.pubs.length });
+  sci.push({ v: 'write', icon: 'doc', label: LL('Рукописи и литература', 'Manuscripts and library') });
+  sci.push({ v: 'col:goals', icon: COLS.goals.icon, label: L(COLS.goals.title), cnt: DB.cols.goals.length });
   g.push({ id: 'sci', label: LL('Наука', 'Research'), icon: 'flask', items: sci, wide: true, fly: true });
   if (isAdmin()) g.push({ id: 'adm', label: LL('Администрирование', 'Admin'), v: 'users', icon: 'shield' });
   return g;
