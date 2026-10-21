@@ -2070,6 +2070,7 @@ function secIsOpen(dr, s) { var o = dr.open || {}; if (o[s.id] !== undefined) re
 function cardTabs(dr, tab) {
   var d = dr.p.d;
   var h = '<div class="ctabs" role="tablist" aria-label="' + t('a11y.cardSections') + '">';
+  if (!dr.isNew) h += '<button type="button" role="tab" aria-selected="' + (tab === 'ov') + '" class="ctab ov' + (tab === 'ov' ? ' on' : '') + '" data-act="ctab" data-v="ov">' + ico('users', 15) + '<span class="ct-l">' + LL('Обзор', 'Overview') + '</span></button>';
   CARD_TABS.forEach(function (c, i) {
     if (ctxOn(dr) && c[0] !== 'more' && tab !== c[0] && phaseFill(c[0], d, dr)[1] === 0) return;
     var on = tab === c[0], cnt = c[0] === 'more' ? '' : (function () { var f = phaseFill(c[0], d, dr); return '<em>' + f[0] + ' / ' + f[1] + '</em>'; })();
@@ -2085,13 +2086,76 @@ function secCardTab(dr, s) {
   if (open) h += secFieldsHTML(s, d, dr);
   return h + '</section>';
 }
+/* ---------- обзор карточки: портрет, показатели, этапы лечения, путь пациента, сводка и пробелы ---------- */
+function ovPips(v, opts, rev) {
+  var i = opts.indexOf(String(v)), lvl = i < 0 ? -1 : i, n = opts.length;
+  return '<span class="ov-pips">' + opts.map(function (o, k) { var on = k <= lvl, bad = rev ? k >= Math.ceil(n / 2) : false; return '<i class="' + (on ? 'on' + (bad && k === lvl ? ' hi' : '') : '') + '"></i>'; }).join('') + '</span>';
+}
+function ovStat(lbl, v, extra) {
+  var e = !has(v);
+  return '<div class="ov-st' + (e ? ' empty' : '') + '"><span class="ov-sl">' + lbl + '</span><b>' + (e ? LL('нет данных', 'no data') : esc(String(v))) + '</b>' + (e ? '' : extra || '') + '</div>';
+}
+function ovCdMax(d) { var m = 0; [1, 2, 3, 4, 5].forEach(function (i) { var v = d['cd' + i]; if (has(v) && v !== 'Нет' && !isNA(v)) m = i; }); return m; }
+function ovSlot(icon, lbl, val, sub, st) {
+  var e = !has(val);
+  return '<div class="ov-slot' + (e ? ' empty' : '') + (st ? ' ' + st : '') + '"><span class="ov-si">' + ico(icon, 16) + '</span><span class="ov-sb"><span class="ov-sl">' + lbl + '</span><b>' + (e ? LL('пусто', 'empty') : esc(String(val))) + '</b>' + (sub && !e ? '<em>' + esc(sub) + '</em>' : '') + '</span></div>';
+}
+function ovStatus(p) {
+  var d = p.d;
+  if (d.vital === 'Умер' || has(d.deathDate)) return ['dead', LL('Умер', 'Deceased') + (d.deathDate ? ' ' + fmtDate(d.deathDate) : '')];
+  if (d.admDate && !d.disDate) { var pod = d.date ? -daysTo(d.date) : null; return ['in', LL('В отделении', 'Inpatient') + (pod !== null && pod >= 0 ? ', ' + (pod === 0 ? LL('день операции', 'day of surgery') : pod + LL('-е сутки после операции', ' POD')) : '')]; }
+  if (d.date && hasProc(d)) return ['fu', LL('После операции, наблюдение', 'Post-op follow-up')];
+  return ['dx', LL('Диагностика и подготовка', 'Work-up')];
+}
+function ovPath(p) {
+  var d = p.d, ev = [];
+  function add(dt, l, s, k) { if (dt) ev.push({ d: String(dt).slice(0, 10), l: l, s: s || '', k: k || '' }); }
+  add(d.admDate, LL('Поступление', 'Admission'), d.ib ? 'ИБ ' + d.ib : '');
+  (typeof linkedRecs === 'function' ? linkedRecs(p.id) : []).forEach(function (x) { if ((x.k === 'mdt' || x.k === 'smdt') && x.r.date) add(x.r.date, LL('МДГ', 'MDT'), x.r.rec ? String(x.r.rec).slice(0, 40) : '', 'mdt'); });
+  add(d.rtStart, LL('Начало ЛТ', 'RT start'), d.sod ? d.sod + ' Гр' : '');
+  add(d.date, LL('Операция', 'Surgery'), ov(d.proc), 'op');
+  add(d.disDate, LL('Выписка', 'Discharge'), '');
+  add(d.adjStart, LL('Адъювант', 'Adjuvant'), d.adjRegimen || '');
+  var nx = fuList(p).filter(function (x) { return x.st !== 'done'; })[0]; if (nx) add(nx.due, LL('Контроль ', 'Follow-up ') + nx.label, x2(nx), 'next');
+  function x2(x) { return x.st === 'overdue' ? LL('просрочен', 'overdue') : LL('план', 'planned'); }
+  add(d.deathDate, LL('Смерть', 'Death'), '');
+  ev.sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
+  if (!ev.length) return '<p class="hint">' + LL('Дат пока нет: путь пациента появится, когда будут заполнены поступление, МДГ, операция или выписка.', 'No dates yet.') + '</p>';
+  var td = isoOf(new Date());
+  return '<div class="ov-path">' + ev.map(function (e) { var fut = e.d > td; return '<div class="ov-pe' + (fut ? ' fut' : '') + (e.k ? ' k-' + e.k : '') + '"><span class="ov-pd"></span><span class="ov-pt">' + fmtDate(e.d) + '</span><b>' + esc(e.l) + '</b>' + (e.s ? '<em>' + esc(e.s) + '</em>' : '') + '</div>'; }).join('') + '</div>';
+}
+function ovBody(dr) {
+  var p = dr.p, d = p.d, st = ovStatus(p), h = '';
+  var tnm = [d.cT, d.cN, d.cM].filter(Boolean).join(' '), ptnm = [d.pT, d.pN].filter(Boolean).join(' ');
+  h += '<section class="ov-hero">';
+  h += '<div class="ov-who"><span class="ov-ava">' + esc(d.fio ? initials(d.fio) : '?') + '</span><div class="ov-wn"><b>' + esc(d.fio || LL('Без имени', 'No name')) + '</b><span>' + esc([p.id, [ov(d.sex), d.age ? d.age + ' ' + t('u.years') : ''].filter(Boolean).join(', ')].filter(Boolean).join(' · ')) + '</span><span class="ov-stat s-' + st[0] + '">' + esc(st[1]) + '</span></div>';
+  h += '<div class="ov-tags">' + [ov(d.loc), tnm ? 'c' + tnm.replace(/^c/, '') : '', ptnm ? ptnm : ''].filter(Boolean).map(function (s) { return '<span>' + esc(s) + '</span>'; }).join('') + '</div></div>';
+  h += '<div class="ov-stats"><div class="ov-h">' + LL('Показатели', 'Attributes') + '</div>' + ovStat('ECOG', d.ecog, ovPips(d.ecog, ['0', '1', '2', '3', '4'], true)) + ovStat('ASA', d.asa, ovPips(d.asa, ['I', 'II', 'III', 'IV', 'V'], true)) + ovStat(LL('ИМТ', 'BMI'), d.bmi) + ovStat('CCI', d.cci) + '</div>';
+  var cd = ovCdMax(d), fl = fuList(p), fd = fl.filter(function (x) { return x.st === 'done'; }).length, fo = fl.filter(function (x) { return x.st === 'overdue'; }).length;
+  h += '<div class="ov-slots"><div class="ov-h">' + LL('Этапы лечения', 'Treatment') + '</div>';
+  h += ovSlot('flask', LL('Неоадъювант', 'Neoadjuvant'), d.neoCrt === 'Нет' ? LL('не было', 'none') : ov(d.neoCrt), d.crtRegimen || '');
+  h += ovSlot('knife', LL('Операция', 'Surgery'), ov(d.proc), d.date ? fmtDate(d.date) : '');
+  h += ovSlot('alert', LL('Осложнения', 'Complications'), has(d.cd1) || cd ? (cd ? 'Clavien-Dindo ' + ['', 'I', 'II', 'III', 'IV', 'V'][cd] : LL('нет', 'none')) : '', '', cd >= 3 ? 'warn' : '');
+  h += ovSlot('file', LL('Гистология', 'Pathology'), ptnm, d.crmDist ? 'CRM ' + d.crmDist + ' см' : '');
+  h += ovSlot('flask', LL('Адъювант', 'Adjuvant'), ov(d.adj), d.adjRegimen || '');
+  h += ovSlot('clock', LL('Наблюдение', 'Follow-up'), fl.length ? fd + LL(' из ', ' of ') + fl.length : '', fo ? LL('просрочено: ', 'overdue: ') + fo : '', fo ? 'warn' : '');
+  h += '</div></section>';
+  h += '<section class="card ov-card"><h3>' + ico('clock', 17) + LL('Путь пациента', 'Patient pathway') + '</h3>' + ovPath(p) + '</section>';
+  var sm = p.summary && p.summary.text, nf = typeof pfNew === 'function' ? pfNew(p).length : 0;
+  h += '<div class="ov-2">';
+  h += '<section class="card ov-card"><h3>' + ico('sparkle', 17) + LL('Кратко о случае', 'Case summary') + '<span class="h3-r"><button type="button" class="btn small" data-act="ctab" data-v="more">' + LL('Открыть резюме', 'Open summary') + '</button></span></h3>' + (sm ? '<p class="ov-sum">' + esc(String(sm).slice(0, 700)) + (String(sm).length > 700 ? '…' : '') + '</p>' : '<p class="hint">' + LL('Резюме ещё не составлено. Его можно написать вручную или с ИИ во вкладке «Прочее».', 'No summary yet.') + '</p>') + (can('edit') && !isStudent() ? '<div class="actions"><button type="button" class="btn small ai" data-act="pfdxnew">' + ico('sparkle', 14) + LL('Апдейт из документов', 'Update from documents') + (nf ? ' (' + nf + ')' : '') + '</button></div>' : '') + '</section>';
+  h += '<section class="card ov-card"><h3>' + ico('check', 17) + LL('Заполненность', 'Completeness') + '</h3>' + CARD_TABS.filter(function (c) { return c[0] !== 'more'; }).map(function (c) { var f = phaseFill(c[0], d, dr), pc = f[1] ? Math.round(f[0] / f[1] * 100) : 0; return '<button type="button" class="ov-fill ph-' + c[0] + '" data-act="ctab" data-v="' + c[0] + '"><span class="ov-fl">' + t(c[1]) + '</span><span class="ov-fb"><i style="width:' + pc + '%"></i></span><em>' + f[0] + ' / ' + f[1] + '</em>' + ico('right', 14) + '</button>'; }).join('') + '<p class="hint">' + LL('Нажмите на этап, чтобы открыть его поля.', 'Click a stage to open its fields.') + '</p></section>';
+  h += '</div>';
+  var lb = linkedBlock(p.id, false); if (lb) h += '<section class="card ov-card"><h3>' + ico('folder', 17) + LL('Связанные записи', 'Linked records') + '</h3>' + lb + '</section>';
+  return h;
+}
 function cardTabBody(dr, tab, tags) {
   var p = dr.p, d = p.d, h = '<div class="pbody tabbed"><div class="dbody">';
   if (isStudent()) h += '<div class="lockbox">' + ico('lock', 15) + LL('Режим студента: данные обезличены, изменения не сохраняются.', 'Student mode: anonymised, changes are not saved.') + '</div>';
   if (dr.errs) h += '<div class="errbox"><b>' + ico('alert', 16) + LL('Карточку нельзя сохранить', 'Cannot save the record') + '</b><ul>' + dr.errs.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></div>';
   if (!dr.isNew) h += sdvBanner(p) + dqBox(p);
   h += ctxBanner(dr);
-  if (tab !== 'more') {
+  if (tab === 'ov') { h += ovBody(dr); } else if (tab !== 'more') {
     var ss = viewSecs(dr).filter(function (s) { return s.phase === tab; });
     var shut = ss.filter(function (s) { return !secIsOpen(dr, s); }).length;
     h += ctxCustomCard(dr, tab);
@@ -2137,7 +2201,7 @@ function renderPatient() {
   h += '<div class="facts">' + [['cTNM', [d.cT, d.cN, d.cM].filter(Boolean).join(' ')], [t('col.proc'), ov(d.proc)], [LL('Дата операции', 'Surgery date'), fmtDate(d.date)], [LL('Врач', 'Surgeon'), ov(d.surgeon)], [LL('Поступление', 'Admission'), fmtDate(d.admDate)]].filter(function (x) { return x[1]; }).map(function (x) { return '<span class="fact"><em>' + esc(x[0]) + '</em>' + esc(x[1]) + '</span>'; }).join('') + '</div></div>';
   h += '<div class="dh-r">' + (can('edit') && !isStudent() ? '<button type="button" class="btn small dxbtn" data-act="dxopen" title="' + LL('Загрузить PDF выписки, осмотра или протокола: ИИ сам заполнит поля и покажет сводку', 'Upload a PDF: AI fills the fields and shows a summary') + '">' + ico('upload', 14) + LL('Из документа', 'From document') + '</button>' + (function () { var k9 = pfNew(p).length; return '<button type="button" class="btn small dxbtn" data-act="pfdxnew" title="' + LL('Обновить карточку из новых документов в «Файлах пациента»: ИИ разберёт только ещё не разобранные файлы', 'Update the record from new documents in Patient files') + '">' + ico('sparkle', 14) + LL('Апдейт из документов', 'Update from documents') + (k9 ? ' <b class="badge">' + k9 + '</b>' : '') + '</button>'; })() : '') + (p.notion ? '<a class="btn small" href="' + esc(p.notion) + '" target="_blank" rel="noopener">' + ico('ext', 15) + 'Notion</a>' : '') + '<button type="button" class="btn small ai' + (UI.aip ? ' on' : '') + '" data-act="aitoggle">' + ico('sparkle', 14) + LL('Ассистент', 'Assistant') + '</button>' + '<button type="button" class="iconbtn" aria-label="' + t('a11y.close') + '" data-act="close">' + ico('x', 20) + '</button></div></div>';
   h += epStrip(dr);
-  var tab = dr.tab || (dr.isNew ? 'pre' : UI.ctab) || 'pre'; if (['pre', 'op', 'post', 'more', 'view'].indexOf(tab) < 0) tab = 'pre';
+  var tab = dr.tab || (dr.isNew ? 'pre' : 'ov'); if (['ov', 'pre', 'op', 'post', 'more', 'view'].indexOf(tab) < 0 || (tab === 'ov' && dr.isNew)) tab = 'pre';
   h += cardTabs(dr, tab);
   if (tab === 'view') {
   var nav = [['', [{ id: 'links', title: t('lk.title') }]]];
