@@ -836,6 +836,8 @@ html[data-theme="dark"] .rot-bar.tent{background:repeating-linear-gradient(-45de
 .wm-icu{font-size:11px;font-weight:700;color:var(--due);background:var(--due-soft);padding:1px 7px;border-radius:999px}
 .wm-g{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px;border:1px solid var(--line);border-radius:10px;padding:3px 6px;margin:2px 5px 3px 0}.wm-gh{font-size:11.5px;font-weight:600;color:var(--ink2)}.wm-gh .wm-d{font-style:normal;font-weight:400;font-size:10.5px;opacity:.65}
 .ctab.ov .ct-n{background:var(--accent);color:#fff}
+/* карточка пациента прокручивается целиком: шапка и хронология уезжают, вкладки и низ закреплены */
+.drawer.wide-drawer{overflow-y:auto;overscroll-behavior:contain}.drawer.wide-drawer>*{flex-shrink:0}.drawer.wide-drawer>.pbody{flex:1 0 auto;min-height:auto}.drawer.wide-drawer .dbody{overflow:visible}.drawer.wide-drawer>.ctabs{position:sticky;top:0;z-index:6}.drawer.wide-drawer>.dfoot{position:sticky;bottom:0;z-index:6;margin-top:auto}.drawer.wide-drawer .pnav{position:sticky;top:52px;align-self:flex-start;max-height:calc(100vh - 170px)}
 .lvbox{position:fixed;left:50%;top:22vh;transform:translateX(-50%);z-index:72;width:min(460px,calc(100% - 24px));background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--sh3)}.lvbox h3{margin:0 0 8px;font-size:16px}.lvbox p{margin:0 0 16px;color:var(--ink2);font-size:13.5px;line-height:1.5}.lvact{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 body.ovl .top2 .mnav-in{overflow:visible!important}
 .ov-hero{display:grid;grid-template-columns:minmax(220px,1.1fr) minmax(200px,.9fr) minmax(260px,1.3fr);gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
@@ -2417,6 +2419,6 @@ html[data-theme="dark"]{--aa-a:#95A3FF;--aa-b:#C9D0FF}
 <script src="firebase-config.js?v=4033212415"></script>
 <script src="i18n.js?v=4033212418"></script>
 <script src="ai-corpus.js?v=4033212415"></script>
-<script src="app.js?v=218791341"></script>
+<script src="app.js?v=218791342"></script>
 </body>
 </html>

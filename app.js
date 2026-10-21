@@ -5799,7 +5799,7 @@ function render() {
   document.documentElement.lang = LANG;
   document.title = (SESSION ? viewTitle() + ' · ' : '') + 'AddAll · ' + LL('Колоректальный регистр ННОЦ', 'NROC colorectal registry');
   var keep = {};
-  ['.dbody', '.content', '.tablewrap', '.side-in', '.fill-body', '.aip-body', '.cmd-l', '.ns-b'].forEach(function (s) { keep[s] = [].map.call(root.querySelectorAll(s), function (el) { return el.scrollTop; }); });
+  ['.drawer.wide-drawer', '.dbody', '.content', '.tablewrap', '.side-in', '.fill-body', '.aip-body', '.cmd-l', '.ns-b'].forEach(function (s) { keep[s] = [].map.call(root.querySelectorAll(s), function (el) { return el.scrollTop; }); });
   var fa = document.activeElement, faId = fa && fa.id && (fa.id === 'ai-in' || fa.id === 'cmd-in') ? fa.id : null, faPos = faId ? fa.selectionStart : 0, rtc = fa && fa.id === 'msed' && fa.isContentEditable ? rtCaretGet(fa) : null;
   if (typeof selPopHide === 'function') selPopHide();
   document.body.classList.toggle('ai-open', !!(SESSION && UI.aip));
@@ -5996,7 +5996,7 @@ document.addEventListener('click', function (ev) {
     case 'openp': if (ev.target.closest('button') && ev.target.closest('button') !== tg) return; openPatient(g('id')); break;
     case 'newp': openPatient(null); break;
     case 'close': S.drawer = null; render(); break;
-    case 'ctab': if (S.drawer) { S.drawer.tab = g('v'); if (g('v') !== 'view') { UI.ctab = g('v'); saveUI(); } render(); var bb = root.querySelector('.dbody'); if (bb) bb.scrollTop = 0; } break;
+    case 'ctab': if (S.drawer) { S.drawer.tab = g('v'); if (g('v') !== 'view') { UI.ctab = g('v'); saveUI(); } render(); var bb = root.querySelector('.dbody'); if (bb) bb.scrollTop = 0; var wd = root.querySelector('.drawer.wide-drawer'), ct = wd && wd.querySelector('.ctabs'); if (wd && ct && wd.scrollTop > ct.offsetTop) wd.scrollTop = ct.offsetTop; } break;
     case 'sectog': if (S.drawer) { var sx = SECTIONS.filter(function (z) { return z.id === g('id'); })[0]; if (sx) { S.drawer.open = S.drawer.open || {}; S.drawer.open[sx.id] = !secIsOpen(S.drawer, sx); render(); } } break;
     case 'secall': if (S.drawer) { S.drawer.open = S.drawer.open || {}; SECTIONS.forEach(function (z) { if (z.phase === g('ph')) S.drawer.open[z.id] = g('v') === '1'; }); render(); } break;
     case 'jump': { var el = root.querySelector('#sec-' + g('id')); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); break; }
