@@ -9071,7 +9071,7 @@ function navGroups() {
   (function walk(list, d) { list.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'dot', label: regName(r), cnt: regCount(r), depth: d }); walk(kids(r.id, true), d + 1); }); })(kids(null, true), 1);
   sci.push({ v: 'write', icon: 'doc', label: LL('Рукописи и литература', 'Manuscripts and library') });
   var sreg = kids(null, false, true);
-  if (sreg.length) { sci.push({ sep: LL('Научные регистры', 'Research registries') }); sreg.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'dot', label: regName(r), cnt: regCount(r), depth: 1 }); }); }
+  sreg.forEach(function (r) { sci.push({ v: 'reg:' + r.id, icon: 'users', label: regName(r), cnt: regCount(r) }); });
   if ((DB.pending || []).length) sci.push({ v: 'appr', icon: 'check', label: LL('На одобрении', 'Awaiting approval'), badge: apprMine().length || null });
   if (can('edit')) sci.push({ act: 'newstudy', icon: 'plus', label: t('nav.newStudy') });
   sci.push({ sep: LL('Материалы', 'Materials') });
