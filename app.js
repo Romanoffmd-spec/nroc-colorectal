@@ -1448,7 +1448,7 @@ function wardMonitor() {
     var row = function (lab, body) { return body ? '<div class="wm-r"><div class="wm-l">' + lab + '</div>' + body + '</div>' : ''; };
     return '<article class="wm-c' + (it.icu ? ' icu' : '') + '"><div class="wm-top"><button type="button" class="wm-n" data-act="openp" data-id="' + esc(it.pid || '') + '">' + esc(it.name) + '</button><span class="muted">' + esc(it.age || '') + '</span>' + (it.icu ? '<span class="wm-icu">' + esc(it.icu) + '</span>' : '') + wmRes(it.pid) + '</div>' + wmPod(it)
       + row(LL('Анализы сегодня', 'Labs today') + (it.todayLabel ? ' (' + esc(it.todayLabel) + ')' : ''), (it.today || []).map(wmChip).join(''))
-      + (it.prev ? row(LL('Контрольные анализы за ', 'Control labs on ') + esc(it.prev.date), (it.prev.vals || []).map(wmChip).join('')) : '')
+      + (it.last && it.last.length ? row(LL('Последние контрольные анализы', 'Latest control labs'), it.last.map(function (x) { var c = wmChip([x[0], x[1]]); return x[2] ? c.replace(/<\/span>$/, ' <i class="wm-d">' + esc(x[2]) + '</i></span>') : c; }).join('')) : (it.prev ? row(LL('Контрольные анализы за ', 'Control labs on ') + esc(it.prev.date), (it.prev.vals || []).map(wmChip).join('')) : ''))
       + row(LL('Контрольные анализы назначены на завтра', 'Control labs ordered for tomorrow'), it.tomorrow ? '<div class="wm-meds">' + esc(it.tomorrow) + '</div>' : '')
       + row(LL('Назначения', 'Orders'), wmList(it.meds))
       + (it.note ? '<div class="wm-note">' + esc(it.note) + '</div>' : '')
