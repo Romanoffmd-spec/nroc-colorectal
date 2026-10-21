@@ -2194,6 +2194,15 @@ function cardTabBody(dr, tab, tags) {
   }
   return h + '</div></div>';
 }
+/* несохранённые изменения в карточке: снимок при первом показе, сравнение при уходе */
+var LEAVE_ACTS = { view: 1, allcards: 1, close: 1, openp: 1, newp: 1 };
+function drSnap(dr) { return JSON.stringify(dr.p) + '|' + JSON.stringify(dr.members || {}); }
+function drDirty(dr) { return !!dr && dr._snap !== undefined && drSnap(dr) !== dr._snap; }
+function leaveAsk(el) { S.leave = { el: el.cloneNode(false) }; S.menu = null; render(); }
+function leaveGo() { var lv = S.leave; S.leave = null; if (!lv) { render(); return; } if (S.drawer) S.drawer.leaveOk = true; render(); var box = document.createElement('div'); box.style.display = 'none'; box.appendChild(lv.el); document.body.appendChild(box); lv.el.click(); box.remove(); }
+function renderLeave() {
+  return '<div class="dim top" data-act="lvcancel"></div><div class="lvbox" role="alertdialog" aria-modal="true" aria-labelledby="lvh"><h3 id="lvh">' + LL('Есть несохранённые изменения', 'You have unsaved changes') + '</h3><p>' + LL('В карточке ', 'The record ') + '<b>' + esc(pName(S.drawer.p)) + '</b>' + LL(' есть изменения, которые ещё не сохранены. Что сделать перед переходом?', ' has changes that are not saved yet. What should happen before you leave?') + '</p><div class="lvact"><button type="button" class="btn" data-act="lvcancel">' + LL('Отмена, остаться', 'Cancel, stay') + '</button><button type="button" class="btn danger" data-act="lvdrop">' + LL('Не сохранять', 'Discard') + '</button><button type="button" class="btn primary" data-act="lvsave">' + LL('Сохранить и перейти', 'Save and continue') + '</button></div></div>';
+}
 function renderPatient() {
   var dr = S.drawer, p = dr.p, d = p.d;
   var tags = tagsOf(DB.registries.filter(function (r) { return draftIn(dr, r); }));
@@ -5800,7 +5809,7 @@ function render() {
   h = '<div class="app v12 side-closed' + (UI.aip ? ' aip-open' : '') + '">' + '<div class="main">' + renderTop2() + '<main class="content" id="main">' + renderMain() + '<footer class="foot">' + aaMark(24) + '<b class="aa-foot">AddAll</b><span>' + aaTag() + '</span><span class="muted">' + LL('Пилот: колоректальный сектор ННОЦ, Астана', 'Pilot: NROC colorectal unit, Astana') + '</span><img src="media/nroc-logo.png" alt="NROC" class="aa-inst"><span class="muted">' + '' + '</span></footer></main></div>' + renderTabbar() + '</div>';
   if (S.sideMob) h += renderNavSheet();
   if (S.qid && !S.drawer) h += renderQiDrill();
-  if (S.drawer) h += renderPatient();
+  if (S.drawer) { h += renderPatient(); if (S.drawer._snap === undefined) S.drawer._snap = drSnap(S.drawer); if (S.leave) h += renderLeave(); }
   if (S.msCite) h += renderCite();
   if (S.libImp) h += renderLibImport();
   if (S.zot) h += renderZotero();
@@ -5956,6 +5965,10 @@ document.addEventListener('click', function (ev) {
   var a = tg.getAttribute('data-act');
   if (a === 'search' || (tg.tagName === 'INPUT' && a !== 'segset' && a !== 'waopt' && a !== 'meoff')) return;
   var g = function (x) { return tg.getAttribute('data-' + x); };
+  if (a === 'lvcancel') { S.leave = null; render(); return; }
+  if (a === 'lvdrop') { S.drawer = null; leaveGo(); return; }
+  if (a === 'lvsave') { savePatient(); if (S.drawer) { S.leave = null; render(); return; } leaveGo(); return; }
+  if (S.drawer && !S.drawer.leaveOk && LEAVE_ACTS[a] && !(a === 'openp' && g('id') === S.drawer.p.id) && drDirty(S.drawer)) { leaveAsk(tg); return; }
   var NEED = { qlnew: 'edit', qllink: 'edit', qldel: 'edit', savep: 'edit', saverec: 'edit', delp: 'delete', delrec: 'delete', esave: 'edit', edelete: 'delete', enrgo: 'edit', enroll: 'edit', rand: 'rand', unlockf: 'unlock', impgo: 'edit', imp: 'edit', newp: 'edit', newrec: 'edit', newreg: 'edit', newstudy: 'edit', qbsave: 'edit', qbnew: 'edit', fillsave: 'edit', cmtadd: 'edit', labsdone: 'edit', reset: 'admin', restore: 'admin', tplsave: 'edit', qsched: 'edit', qnow: 'edit', toreg: 'edit', addlinked: 'edit' };
   if (msAct(a, g)) return;
   if (rotAct(a, g)) return;
@@ -6338,7 +6351,7 @@ document.addEventListener('keydown', function (ev) {
     if (ev.key === 'Escape') { S.inline = null; render(); }
     return;
   }
-  if (ev.key === 'Escape') { if (S.lpop) S.lpop = null; else if (S.pick) S.pick = null; else if (S.menu) S.menu = null; else if (S.edit) S.edit = null; else if (S.rec) S.rec = null; else if (S.qhelp) S.qhelp = null; else if (S.drawer) S.drawer = null; else if (S.qid) { S.qid = null; S.qbk = null; } else if (S.inline) S.inline = null; render(); return; }
+  if (ev.key === 'Escape') { if (S.lpop) S.lpop = null; else if (S.pick) S.pick = null; else if (S.menu) S.menu = null; else if (S.edit) S.edit = null; else if (S.rec) S.rec = null; else if (S.qhelp) S.qhelp = null; else if (S.leave) S.leave = null; else if (S.drawer) { if (drDirty(S.drawer)) { var lvx = document.createElement('button'); lvx.setAttribute('data-act', 'close'); S.leave = { el: lvx }; } else S.drawer = null; } else if (S.qid) { S.qid = null; S.qbk = null; } else if (S.inline) S.inline = null; render(); return; }
   if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('tr[data-act]')) { ev.preventDefault(); ev.target.click(); }
 });
 document.addEventListener('input', function (ev) {
