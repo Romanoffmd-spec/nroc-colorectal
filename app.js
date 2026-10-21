@@ -2093,12 +2093,12 @@ function ovPips(v, opts, rev) {
 }
 function ovStat(lbl, v, extra) {
   var e = !has(v);
-  return '<div class="ov-st' + (e ? ' empty' : '') + '"><span class="ov-sl">' + lbl + '</span><b>' + (e ? LL('нет данных', 'no data') : esc(String(v))) + '</b>' + (e ? '' : extra || '') + '</div>';
+  return '<div class="ov-st' + (e ? ' ov-x' : '') + '"><span class="ov-sl">' + lbl + '</span><b>' + (e ? LL('нет данных', 'no data') : esc(String(v))) + '</b>' + (e ? '' : extra || '') + '</div>';
 }
 function ovCdMax(d) { var m = 0; [1, 2, 3, 4, 5].forEach(function (i) { var v = d['cd' + i]; if (has(v) && v !== 'Нет' && !isNA(v)) m = i; }); return m; }
 function ovSlot(icon, lbl, val, sub, st) {
   var e = !has(val);
-  return '<div class="ov-slot' + (e ? ' empty' : '') + (st ? ' ' + st : '') + '"><span class="ov-si">' + ico(icon, 16) + '</span><span class="ov-sb"><span class="ov-sl">' + lbl + '</span><b>' + (e ? LL('пусто', 'empty') : esc(String(val))) + '</b>' + (sub && !e ? '<em>' + esc(sub) + '</em>' : '') + '</span></div>';
+  return '<div class="ov-slot' + (e ? ' ov-x' : '') + (st ? ' ' + st : '') + '"><span class="ov-si">' + ico(icon, 16) + '</span><span class="ov-sb"><span class="ov-sl">' + lbl + '</span><b>' + (e ? LL('пусто', 'empty') : esc(String(val))) + '</b>' + (sub && !e ? '<em>' + esc(sub) + '</em>' : '') + '</span></div>';
 }
 function ovStatus(p) {
   var d = p.d;
@@ -2135,7 +2135,7 @@ function ovBody(dr) {
   h += '<div class="ov-slots"><div class="ov-h">' + LL('Этапы лечения', 'Treatment') + '</div>';
   h += ovSlot('flask', LL('Неоадъювант', 'Neoadjuvant'), d.neoCrt === 'Нет' ? LL('не было', 'none') : ov(d.neoCrt), d.crtRegimen || '');
   h += ovSlot('knife', LL('Операция', 'Surgery'), ov(d.proc), d.date ? fmtDate(d.date) : '');
-  h += ovSlot('alert', LL('Осложнения', 'Complications'), has(d.cd1) || cd ? (cd ? 'Clavien-Dindo ' + ['', 'I', 'II', 'III', 'IV', 'V'][cd] : LL('нет', 'none')) : '', '', cd >= 3 ? 'warn' : '');
+  h += ovSlot('alert', LL('Осложнения', 'Complications'), has(d.cd1) || cd ? (cd ? 'Clavien-Dindo ' + ['', 'I', 'II', 'III', 'IV', 'V'][cd] : LL('нет', 'none')) : '', cd ? String(d['cd' + cd]).slice(0, 70) : '', cd >= 3 ? 'warn' : '');
   h += ovSlot('file', LL('Гистология', 'Pathology'), ptnm, d.crmDist ? 'CRM ' + d.crmDist + ' см' : '');
   h += ovSlot('flask', LL('Адъювант', 'Adjuvant'), ov(d.adj), d.adjRegimen || '');
   h += ovSlot('clock', LL('Наблюдение', 'Follow-up'), fl.length ? fd + LL(' из ', ' of ') + fl.length : '', fo ? LL('просрочено: ', 'overdue: ') + fo : '', fo ? 'warn' : '');
