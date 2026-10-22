@@ -154,7 +154,7 @@ var APPROACH = ['TNT', 'Оппортунистическая TNT', 'Оппорт
 function f(id, ru, en, type, o) { var x = { id: id, label: [ru, en], type: type }; if (o) Object.keys(o).forEach(function (k) { x[k] = o[k]; }); return x; }
 
 var SURGEONS = ['Мамлин', 'Хамзина', 'Кожахметов', 'Батырбеков', 'Ускенбаев', 'Адылханов', 'Усипбеков', 'Дигай', 'Арингазина', 'Родионов', 'Ермешев', 'Айсин', 'Керимкулов', 'Кенжин'];
-var RESIDENTS = ['Ахрор', 'Шамшырак', 'Жанна', 'Ануар'];
+var RESIDENTS = ['Ахрор', 'Шамшырак', 'Жанна', 'Ануар', 'Темирлан'];
 var STOMAS = ['Нет', 'Петлевая илеостома', 'Концевая илеостома', 'Петлевая трансверзостома', 'Петлевая сигмостома', 'Петлевая колостома', 'Концевая колостома', 'Раздельная двуствольная колостома'];
 var INCISIONS = ['Срединная лапаротомия', 'Нижнесрединная лапаротомия', 'Верхнесрединная лапаротомия', 'Поперечная лапаротомия', 'Лапаротомия по Пфанненштилю'];
 var EXTRACT = ['Поперечная минилапаротомия в левой подвздошной области', 'Поперечная минилапаротомия в правой подвздошной области', 'Поперечная минилапаротомия над лоном (Пфанненштиль)', 'Срединная минилапаротомия', 'Через место стомы', 'Через троакарную рану', 'Трансанально', 'Трансвагинально', 'Через промежностную рану'];
@@ -745,7 +745,7 @@ var COLS = {
   planner: { icon: 'cal', title: ['Планировщик', 'Planner'], sub: ['Госпитализации и операции. Отдельно от регистра, ничего в нём не меняет.', 'Admissions and surgeries. Kept apart from the registry and never changes it.'],
     titleField: 'fio', subField: 'dx', dateField: 'date', statusField: 'status', views: ['cal', 'table', 'board'],
     colorBy: { 'Планируется': 'plan', 'В отделении': 'prog', 'Завершено': 'done', 'Отменено': 'cancel' },
-    list: ['date', 'fio', 'dx', 'surgeryDate', 'surgeon', 'status', 'mdg'],
+    list: ['date', 'fio', 'dx', 'surgeryDate', 'surgeon', 'resident', 'status', 'mdg'],
     fields: [
       f('fio', 'ФИО', 'Full name', 'text'), f('dx', 'Диагноз / операция', 'Diagnosis / procedure', 'text'),
       f('date', 'Дата поступления', 'Admission date', 'date'), f('surgeryDate', 'Дата операции', 'Surgery date', 'date'), f('postRoute', 'Перевод после операции', 'Transfer after surgery', 'seg', { options: ['Палата пробуждения', 'Реанимация (ОАРИТ)'] }), f('labsDone', 'Контрольные анализы взяты', 'Control labs taken', 'date'), f('discharge', 'Дата выписки', 'Discharge date', 'date'),
@@ -806,6 +806,8 @@ var COLS = {
 /* ответственный резидент M&M: список из «Ротаций» плюс базовый RESIDENTS */
 function resNames() { var s = {}, o = []; ((typeof DB !== 'undefined' && DB && DB.cols && DB.cols.rot) || []).map(function (r) { return r.name; }).concat(RESIDENTS).forEach(function (n) { n = String(n || '').trim(); if (n && !s[n]) { s[n] = 1; o.push(n); } }); return o; }
 Object.defineProperty(COLS.mm.fields.filter(function (x) { return x.id === 'resp'; })[0], 'options', { get: resNames });
+/* резидент в планировщике: тот же список (Ротации + базовый) */
+Object.defineProperty(COLS.planner.fields.filter(function (x) { return x.id === 'resident'; })[0], 'options', { get: resNames });
 COLS.pubs = { icon: 'book', title: ['Публикации', 'Publications'], sub: ['Статьи и доклады сектора: DOI, авторы, журнал, связь с исследованием, отчёт за период', 'Papers and talks: DOI, authors, journal, linked study, report for a period'],
   titleField: 'title', subField: 'venue', dateField: 'date', statusField: 'status', views: ['table', 'board'],
   colorBy: { 'Подготовка': 'plan', 'Подана': 'prog', 'Принята': 'prog', 'Опубликована': 'done', 'Представлен': 'done' },
