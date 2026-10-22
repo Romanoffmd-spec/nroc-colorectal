@@ -2457,11 +2457,37 @@ function renderGd() {
   var f = S.gdView;
   return '<div class="dim top" data-act="gdclose"></div><section class="gdview" role="dialog" aria-modal="true" aria-label="' + esc(f.name || '') + '"><div class="gdvh"><b>' + esc(f.name || '') + '</b><span class="actions"><a class="btn small" href="' + esc(gdUrl(f)) + '" target="_blank" rel="noopener">' + ico('ext', 14) + LL('В новой вкладке', 'Open in new tab') + '</a><button type="button" class="iconbtn" data-act="gdclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></span></div><iframe src="' + esc(gdUrl(f, true)) + '" title="' + esc(f.name || '') + '" allow="clipboard-read; clipboard-write; fullscreen" allowfullscreen></iframe><p class="hint">' + LL('Если внутри окна Google просит войти или не показывает файл (так бывает в Safari), откройте его в новой вкладке.', 'If Google asks to sign in or shows nothing here (common in Safari), open it in a new tab.') + '</p></section>';
 }
+/* профиль пациента в записи планировщика: шапка (ФИО, диагноз, статус, даты, хирург, резидент), поля трекера по блокам */
+function plannerProfile(c, r) {
+  var F = function (id) { return c.fields.filter(function (x) { return x.id === id; })[0]; };
+  var fh = function (ids) { return '<div class="fgrid">' + ids.map(function (id) { var x = F(id); return x ? fieldHTML(x, r[id], 'r.' + id, r) : ''; }).join('') + '</div>'; };
+  var td = isoOf(new Date()), st = r.status || '', cls = (c.colorBy || {})[st] || 'plan';
+  var dd = function (a, b) { return Math.round((new Date(b) - new Date(a)) / 864e5); };
+  var pod = r.surgeryDate && r.surgeryDate <= td && st !== 'Завершено' && st !== 'Отменено' ? dd(r.surgeryDate, td) : null;
+  var lp = r.pid ? patOf(r.pid) : null;
+  var h = '<section class="card pf-hero' + (r.alert ? ' pf-alert' : '') + '">';
+  h += '<div class="pf-top"><span class="pf-av" aria-hidden="true">' + esc(initials(r.fio || '?')) + '</span><div class="pf-id"><h2>' + esc(r.fio || LL('Новый пациент', 'New patient')) + '</h2>' + (r.dx ? '<p>' + esc(r.dx) + '</p>' : '') + '<div class="pf-tags">' + (st ? '<span class="st st-' + cls + '">' + esc(ov(st)) + '</span>' : '') + (r.mdg ? '<span class="tag">' + LL('МДГ: ', 'MDT: ') + esc(ov(r.mdg)) + '</span>' : '') + (r.referral ? '<span class="tag">' + LL('Направление: ', 'Referral: ') + esc(ov(r.referral)) + '</span>' : '') + (lp ? '<button type="button" class="tag pf-pat" data-act="gopat" data-id="' + lp.id + '">' + ico('user', 12) + lp.id + '</button>' : '') + '</div></div></div>';
+  if (r.alert) h += '<div class="pf-al">' + ico('alert', 16) + '<b>' + esc(ov(r.alert)) + '</b>' + (r.alertComment ? '<span>' + esc(r.alertComment) + '</span>' : '') + '</div>';
+  var fact = function (lbl, val, sub) { return '<div class="pf-f"><span>' + lbl + '</span><b>' + (val ? esc(val) : '<i>' + LL('не указано', 'not set') + '</i>') + '</b>' + (sub ? '<em>' + esc(sub) + '</em>' : '') + '</div>'; };
+  h += '<div class="pf-facts">';
+  h += fact(LL('Поступление', 'Admission'), r.date ? fmtDate(r.date) : '', r.date && r.date > td ? LL('через ', 'in ') + dd(td, r.date) + LL(' дн.', ' d') : (r.date === td ? LL('сегодня', 'today') : ''));
+  h += fact(LL('Операция', 'Surgery'), r.surgeryDate ? fmtDate(r.surgeryDate) : '', pod !== null ? (pod === 0 ? LL('сегодня', 'today') : pod + LL('-е сутки после операции', ' POD')) : '');
+  h += fact(LL('Выписка', 'Discharge'), r.discharge ? fmtDate(r.discharge) : '');
+  h += fact(LL('Хирург', 'Surgeon'), r.surgeon ? ov(r.surgeon) : '');
+  var ro = F('resident').options || [];
+  h += '<div class="pf-f pf-res"><label for="pf-res">' + LL('Резидент', 'Resident') + '</label><select id="pf-res" data-bind="r.resident"' + (can('edit') ? '' : ' disabled') + '><option value="">' + LL('не указан', 'not set') + '</option>' + ro.map(function (v) { return '<option value="' + esc(v) + '"' + (v === r.resident ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('') + (r.resident && ro.indexOf(r.resident) < 0 ? '<option value="' + esc(r.resident) + '" selected>' + esc(r.resident) + '</option>' : '') + '</select></div>';
+  h += '</div></section>';
+  h += '<section class="card"><h3>' + LL('Пациент и госпитализация', 'Patient and admission') + '</h3>' + fh(['fio', 'dx', 'date', 'surgeryDate', 'postRoute', 'labsDone', 'discharge']) + '</section>';
+  h += '<section class="card"><h3>' + LL('Хирург, статус, МДГ', 'Surgeon, status, MDT') + '</h3>' + fh(['surgeon', 'status', 'mdg', 'referral', 'alert', 'alertComment']) + '</section>';
+  var rest = c.fields.filter(function (x) { return ['fio', 'dx', 'date', 'surgeryDate', 'postRoute', 'labsDone', 'discharge', 'surgeon', 'status', 'mdg', 'referral', 'alert', 'alertComment', 'resident'].indexOf(x.id) < 0; }).map(function (x) { return x.id; });
+  h += '<section class="card"><h3>' + LL('Заметки', 'Notes') + '</h3>' + fh(rest) + '</section>';
+  return h;
+}
 function renderRecord() {
   var o = S.rec, c = COLS[o.k], r = o.r;
   var h = '<div class="dim" data-act="closerec"></div><section class="drawer full rec" role="dialog" aria-modal="true" aria-label="' + esc(L(c.title)) + '">';
   h += '<div class="dhead"><div class="dh-main"><div class="dh-kicker">' + esc(L(c.title)) + '</div><div class="dh-title">' + esc(o.isNew ? t('rec.new') : recTitle(c, r)) + '</div></div><div class="dh-r">' + (r.notion ? '<a class="btn small" href="' + esc(r.notion) + '" target="_blank" rel="noopener">' + ico('ext', 15) + 'Notion</a>' : '') + '<button type="button" class="btn small ai' + (UI.aip ? ' on' : '') + '" data-act="aitoggle">' + ico('sparkle', 14) + LL('Ассистент', 'Assistant') + '</button><button type="button" class="iconbtn" aria-label="' + t('a11y.close') + '" data-act="closerec">' + ico('x', 20) + '</button></div></div>';
-  h += '<div class="dbody">' + (!o.isNew && ['mdt', 'mm', 'planner', 'pubs'].indexOf(o.k) >= 0 ? aiInline('rec-' + o.k + '-' + r.id, aiCtx(), { mdt: 'Суть случая в 2-3 строках и чего не хватает для решения МДГ.', mm: 'Кратко: что произошло, тяжесть по Clavien-Dindo, ключевые факторы, предотвратимость, 1-2 вывода.', planner: 'Кратко: что важно по этой госпитализации сегодня (сутки, контрольные анализы, что проверить).', pubs: 'Кратко: статус публикации и чего не хватает в карточке.' }[o.k], LL('ИИ: кратко', 'AI: in brief'), true) : '') + '<section class="card"><div class="fgrid">' + c.fields.map(function (x) { return fieldHTML(x, r[x.id], 'r.' + x.id, r); }).join('') + '</div></section>';
+  h += '<div class="dbody">' + (!o.isNew && ['mdt', 'mm', 'planner', 'pubs'].indexOf(o.k) >= 0 ? aiInline('rec-' + o.k + '-' + r.id, aiCtx(), { mdt: 'Суть случая в 2-3 строках и чего не хватает для решения МДГ.', mm: 'Кратко: что произошло, тяжесть по Clavien-Dindo, ключевые факторы, предотвратимость, 1-2 вывода.', planner: 'Кратко: что важно по этой госпитализации сегодня (сутки, контрольные анализы, что проверить).', pubs: 'Кратко: статус публикации и чего не хватает в карточке.' }[o.k], LL('ИИ: кратко', 'AI: in brief'), true) : '') + (o.k === 'planner' ? plannerProfile(c, r) : '<section class="card"><div class="fgrid">' + c.fields.map(function (x) { return fieldHTML(x, r[x.id], 'r.' + x.id, r); }).join('') + '</div></section>');
   if (o.k === 'mdt') h += mpCard(r);
   if (o.k === 'pubs') h += pubTools(r);
   if (o.k === 'smdt') h += presCard(r);
