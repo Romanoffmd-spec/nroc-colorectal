@@ -3632,7 +3632,7 @@ function renderQPage() {
   var h = '<div class="head"><div><div class="kicker">' + LL('Наука', 'Research') + '</div><h1>' + LL('Анкеты пациентов', 'Patient questionnaires') + '</h1></div><div class="actions"><button type="button" class="btn primary" data-act="qbnew">' + ico('plus', 16) + LL('Новая анкета', 'New questionnaire') + '</button></div></div>';
   h += '<div class="tabs pad">' + [['due', LL('К заполнению', 'Due'), due.length], ['tpl', LL('Шаблоны анкет', 'Templates'), qTpls().length], ['res', LL('Результаты', 'Results'), null]].concat(CLOUD.on ? [['inbox', LL('Входящие', 'Inbox'), QL.resp.length || null]] : []).map(function (x) { return '<button type="button" class="tab' + (tab === x[0] ? ' on' : '') + '" data-act="qtab" data-v="' + x[0] + '">' + x[1] + (x[2] !== null ? '<span class="cnt">' + x[2] + '</span>' : '') + '</button>'; }).join('') + '</div>';
   if (tab === 'tpl') {
-    h += '<div class="pad"><section class="card tntq"><h3>' + ico('flask', 18) + LL('Шкалы для исследования TNT при раке прямой кишки', 'Scales for the rectal cancer TNT study') + '</h3><p class="hint">' + LL('Ядро: CTCAE v5.0 (врач) + PRO-CTCAE + EORTC QLQ-C30 + QLQ-CR29. Дополнительно: QLQ-CIPN20 при оксалиплатине, LARS после сфинктеросохраняющей операции, IIEF/FSFI если сексуальная функция отдельная конечная точка, HADS, EQ-5D-5L. Ответ опухоли: RECIST 1.1 и mrTRG в карточке пациента. Назначить весь набор пациенту: карточка → Анкеты пациента → «Набор для исследования TNT».', 'Core: CTCAE v5.0 + PRO-CTCAE + QLQ-C30 + QLQ-CR29; optional: CIPN20, LARS, IIEF/FSFI, HADS, EQ-5D-5L.') + '</p><table class="grid tntt"><thead><tr><th>' + LL('Шкала', 'Scale') + '</th><th>' + LL('Кто заполняет', 'Who') + '</th><th>' + LL('Подсчёт', 'Scoring') + '</th><th>' + LL('Текст', 'Text') + '</th><th></th></tr></thead><tbody>' + Q_TNT.map(function (q) { var ready = qTextReady(q), ov = (DB.qtext || {})[q.id]; return '<tr><td><b>' + esc(q.short) + '</b><div class="muted small">' + esc(qName(q)) + '</div></td><td>' + (q.clin ? LL('врач', 'clinician') : LL('пациент', 'patient')) + '</td><td class="small">' + (q.scalesFromManual && !(ov && ov.scales && ov.scales.length) ? LL('подшкалы задаются из руководства EORTC', 'subscales from EORTC manual') : (q.scales || []).length + LL(' шкал', ' scales')) + '</td><td>' + (ov ? '<span class="tag ok">' + LL('официальный вставлен', 'official pasted') + '</span>' : q.working ? '<span class="tag">' + LL('рабочий перевод', 'working translation') + '</span>' : '<span class="tag due">' + LL('нужен лицензионный текст', 'licensed text needed') + '</span>') + '</td><td class="nowrap">' + (can('edit') ? '<button type="button" class="btn small' + (ready ? '' : ' primary') + '" data-act="qtxopen" data-id="' + q.id + '">' + (ov ? LL('Изменить текст', 'Edit text') : LL('Вставить официальный текст', 'Paste official text')) + '</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></section></div>';
+    h += '<div class="pad"><section class="card tntq"><h3>' + ico('flask', 18) + LL('Шкалы для исследования TNT при раке прямой кишки', 'Scales for the rectal cancer TNT study') + '</h3><p class="hint">' + LL('Ядро: CTCAE v5.0 (врач) + PRO-CTCAE + EORTC QLQ-C30 + QLQ-CR29. Дополнительно: QLQ-CIPN20 при оксалиплатине, LARS после сфинктеросохраняющей операции, IIEF/FSFI если сексуальная функция отдельная конечная точка, HADS, EQ-5D-5L. Ответ опухоли: RECIST 1.1 и mrTRG в карточке пациента. Назначить весь набор пациенту: карточка → Анкеты пациента → «Набор для исследования TNT».', 'Core: CTCAE v5.0 + PRO-CTCAE + QLQ-C30 + QLQ-CR29; optional: CIPN20, LARS, IIEF/FSFI, HADS, EQ-5D-5L.') + '</p><table class="grid tntt"><thead><tr><th>' + LL('Шкала', 'Scale') + '</th><th>' + LL('Кто заполняет', 'Who') + '</th><th>' + LL('Подсчёт', 'Scoring') + '</th><th>' + LL('Текст', 'Text') + '</th><th></th></tr></thead><tbody>' + Q_TNT.map(function (q) { var ready = qTextReady(q), ov = (DB.qtext || {})[q.id]; return '<tr><td><b>' + esc(q.short) + '</b><div class="muted small">' + esc(qName(q)) + '</div></td><td>' + (q.clin ? LL('врач', 'clinician') : LL('пациент', 'patient')) + '</td><td class="small">' + (q.scalesFromManual && !(ov && ov.scales && ov.scales.length) ? LL('подшкалы задаются из руководства EORTC', 'subscales from EORTC manual') : (q.scales || []).length + LL(' шкал', ' scales')) + '</td><td>' + (ov && !ready ? '<span class="tag due">' + LL('текст вставлен, не задан подсчёт', 'text pasted, scoring missing') + '</span>' : ov ? '<span class="tag ok">' + LL('официальный вставлен', 'official pasted') + '</span>' : q.working ? '<span class="tag">' + LL('рабочий перевод', 'working translation') + '</span>' : '<span class="tag due">' + LL('нужен лицензионный текст', 'licensed text needed') + '</span>') + '</td><td class="nowrap">' + (can('edit') ? '<button type="button" class="btn small' + (ready ? '' : ' primary') + '" data-act="qtxopen" data-id="' + q.id + '">' + (ov ? LL('Изменить текст', 'Edit text') : LL('Вставить официальный текст', 'Paste official text')) + '</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></section></div>';
     h += '<div class="scards pad">' + qTpls().filter(function (q) { return !q.tnt; }).map(function (q) { return '<div class="scard qt"><span class="sc-ic">' + ico('clipboard', 20) + '</span><b>' + esc(qName(q)) + '</b><span class="muted">' + esc(L(q.desc || ['', ''])) + '</span><div class="sc-meta"><span>' + plural(q.items.length, 'pl.question') + '</span>' + (q.max ? '<span>0..' + q.max + LL(' баллов', ' points') + '</span>' : '') + (q.builtin ? '<span class="tag">' + LL('встроенная', 'built-in') + '</span>' : '') + '</div><div class="sc-act">' + (q.builtin ? '<button type="button" class="btn small" data-act="qbcopy" data-id="' + q.id + '">' + LL('Сделать копию', 'Duplicate') + '</button>' : '<button type="button" class="btn small" data-act="qbedit" data-id="' + q.id + '">' + LL('Изменить', 'Edit') + '</button>') + (can('edit') ? '<button type="button" class="btn small primary" data-act="qlnew" data-id="' + q.id + '">' + ico('ext', 14) + LL('Сформировать ссылку', 'Create link') + '</button>' : '') + '</div></div>'; }).join('') + '<button type="button" class="scard new" data-act="qbnew"><span class="sc-ic">' + ico('plus', 20) + '</span><b>' + LL('Новая анкета', 'New questionnaire') + '</b></button></div>';
     return h;
   }
@@ -5136,11 +5136,28 @@ function briefText() {
   return out.join('\n\n');
 }
 function pubName(fio, pid) { return AI.deid ? (pid || LL('пациент', 'patient')) : (fio || pid || ''); }
+/* исходные документы, из которых собран протокол МДГ: текст для ИИ-разбора (при обезличивании ФИО, ИИН, ИБ, адрес и дата рождения заменяются) */
+function mdtSrcText(r, lp) {
+  var seen = {}, list = [];
+  (r.mpDocs || []).forEach(function (x) { if (x && x.text && !seen[x.name]) { seen[x.name] = 1; list.push(x); } });
+  if (lp) (lp.docArch || []).forEach(function (x) { if (x && x.text && !seen[x.name]) { seen[x.name] = 1; list.push(x); } });
+  var head = '\n\nВАЖНО: Word-документ «по форме» формируется из этих же полей протокола; если пользователь ссылается на Word, отвечай по полям протокола и исходным документам ниже.';
+  if (!list.length) return head + '\nИсходные документы: в записи не сохранены (протокол заполнен вручную или собран до обновления).';
+  var mp = r.mp || {}, pii = [r.fio, mp.fam, mp.nam, mp.otc, r.iin, mp.iin, mp.ib, mp.addr, lp && lp.d.fio, lp && lp.d.iin, lp && lp.d.ib, lp && lp.d.address].concat(mp.dob ? [fmtDate(mp.dob)] : []).filter(function (s) { return s && String(s).trim().length >= 3; });
+  var words = []; pii.forEach(function (s) { String(s).split(/\s+/).forEach(function (w) { if (w.length >= 3) words.push(w); }); words.push(String(s)); });
+  words.sort(function (a, b) { return b.length - a.length; });
+  var rx = words.length ? new RegExp(words.map(function (w) { return String(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|'), 'gi') : null;
+  var scrub = function (t) { if (!AI.deid) return t; if (rx) t = t.replace(rx, '[скрыто]'); return t.replace(/\b\d{12}\b/g, '[ИИН скрыт]'); };
+  var tot = 0, out = [];
+  list.forEach(function (x, i) { if (tot > 150000) return; var tx = scrub(String(x.text)).slice(0, 150000 - tot); tot += tx.length; out.push('=== ИСХОДНЫЙ ДОКУМЕНТ ' + (i + 1) + ': «' + (AI.deid ? 'документ ' + (i + 1) : x.name) + '» ===\n' + tx); });
+  return head + '\n\nИСХОДНЫЕ ДОКУМЕНТЫ, ИЗ КОТОРЫХ СОБРАН ПРОТОКОЛ (' + list.length + '):\n' + out.join('\n\n');
+}
 function aiCtx() {
   var ctx;
   if (S.rec) {
     var o = S.rec, c = COLS[o.k], lp = patOf(o.r.pid);
     ctx = { key: 'r:' + o.k + ':' + (o.r.id || 'new'), title: L(c.title) + ': ' + (AI.deid ? (o.r.pid || LL('запись', 'record')) : recTitle(c, o.r)), data: 'Раздел: ' + L(c.title) + '\nЗапись:\n' + recText(o.k, o.r) + (lp ? '\n\nКарточка связанного пациента:\n' + patText(lp, false) : '') };
+    if (o.k === 'mdt') ctx.data += mdtSrcText(o.r, lp);
     if (o.k === 'mdt') { ctx.greet = 'Коротко: суть случая для МДГ в 3-4 строках, затем чего не хватает в обследовании для решения МДГ (по стандарту стадирования колоректального рака), затем 2-3 ключевых вопроса к обсуждению. Если протокол МДГ почти пуст, скажи, какие разделы заполнить в первую очередь.'; ctx.chips = [[LL('Недостающие обследования', 'Missing work-up'), 'Сверь проведённые обследования с минимальным стандартом стадирования для этой локализации (NCCN/ESMO/протоколы МЗ РК): что не выполнено и почему это важно для решения.'], [LL('Варианты лечения', 'Treatment options'), 'Перечисли доступные варианты дальнейшего лечения с доводами за и против, уровнем доказательности и ссылками на рекомендации и ключевые исследования.'], [LL('Подходящие исследования', 'Eligible trials'), 'Подходит ли пациент под исследования сектора (см. КОНТЕКСТ) или известные международные исследования? Проверь по критериям.'], [LL('Черновик заключения', 'Draft conclusion'), 'Составь черновик раздела «Заключение МДГ» в официальном стиле на основе данных. Отметь места, требующие решения комиссии, квадратными скобками.']]; }
     else if (o.k === 'mm') { ctx.greet = 'Разбери случай M&M по структуре: что произошло (хронология), тяжесть (Clavien-Dindo), факторы пациента, хирургии, решений и системы, был ли случай предотвратим. Затем 3 конкретные инициативы с опорой на доказательства.'; ctx.chips = [[LL('Корневые причины', 'Root causes'), 'Проведи анализ корневых причин (fishbone или 5 почему) по этому случаю.'], [LL('Доказательства', 'Evidence'), 'Какие доказательные меры снижают риск такого осложнения? Дай ссылки (PMID/DOI).'], [LL('Слайды для разбора', 'Review slides'), 'Составь план презентации для M&M конференции: 6-8 слайдов с тезисами.']]; }
     else if (o.k === 'pubs') { ctx.greet = 'Кратко оцени публикацию: тема, тип, статус, чего не хватает в карточке (DOI, индексация, связь с исследованием). Предложи следующий шаг.'; ctx.chips = [[LL('Подобрать журналы', 'Suggest journals'), 'Подбери 5 подходящих журналов с импакт-фактором/квартилем и сроками рецензирования.'], [LL('Чек-лист', 'Checklist'), 'Какой чек-лист отчётности нужен (STROBE, CONSORT, STROCSS и т.д.) и на что обратить внимание?']]; }
@@ -5612,12 +5629,64 @@ function mpFromDocs(files) {
       MP.forEach(function (sec) { sec[2].forEach(function (x) { var v = res[x.id]; if (!has(v)) return; if (x.type === 'date') { var nv = dxNorm(x, v); if (nv.err) return; v = nv.v; } else if (x.type === 'num') v = String(v); else if (x.type === 'sel' || x.type === 'seg') { if (x.options.indexOf(String(v)) < 0) return; v = String(v); } else v = String(v).trim(); mp[x.id] = v; n++; }); });
       if (!r.fio && (res.fam || res.nam)) r.fio = [res.fam, res.nam, res.otc].filter(Boolean).join(' ');
       if (!r.iin && res.iin && iinValid(String(res.iin).replace(/\D/g, ''))) r.iin = String(res.iin).replace(/\D/g, '');
+      var mdTot = 0; r.mpDocs = docs.map(function (d) { var tx = String(d.text || '').slice(0, 40000); if (mdTot + tx.length > 160000) tx = tx.slice(0, Math.max(0, 160000 - mdTot)); mdTot += tx.length; return { name: d.name, at: nowIso(), text: tx }; });
       var pt = r.pid ? DB.patients.filter(function (x) { return x.id === r.pid; })[0] : null; if (pt) { docs.forEach(function (d) { docArchive(pt, d.name, d.text || '', ''); }); pfStoreTo(pt, files, LL('протокол МДГ', 'MDT protocol')); }
       var miss = unread.concat(fails);
       S.mpBusy = false; S.mpProg = ''; S.mpShow = true; S.mpErr = miss.length ? LL('Протокол собран, но не учтены документы (', 'Built, but these documents were skipped (') + miss.length + '): ' + miss.join('; ') : ''; S.mpWarnOnly = !!miss.length; render();
       toast(LL('Протокол МДГ сформирован: заполнено полей ', 'MDT protocol built: fields ') + n + LL('. Проверьте и скачайте Word.', '. Check and download Word.'));
     });
   }).catch(function (e) { S.mpBusy = false; S.mpProg = ''; S.mpWarnOnly = false; S.mpErr = LL('Не получилось: ', 'Failed: ') + ((e && e.message) || e); render(); });
+}
+/* настоящий .docx (узкие поля 1,27 см, Times New Roman 10,5) из простого HTML (абзацы, жирный, перенос строки, выравнивание, таблица): открывается в Word, на iPhone и iPad */
+function docxXmlEsc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function docxRuns(node, bold) {
+  var out = '';
+  [].forEach.call(node.childNodes, function (n) {
+    if (n.nodeType === 3) { var tx = n.nodeValue.replace(/ /g, ' '); if (tx) out += '<w:r>' + (bold ? '<w:rPr><w:b/></w:rPr>' : '') + '<w:t xml:space="preserve">' + docxXmlEsc(tx) + '</w:t></w:r>'; }
+    else if (n.nodeType === 1) { var tg = n.tagName.toLowerCase(); if (tg === 'br') out += '<w:r><w:br/></w:r>'; else out += docxRuns(n, bold || tg === 'b' || tg === 'strong'); }
+  });
+  return out;
+}
+function docxPara(el) { var c = (el.getAttribute && el.getAttribute('class')) || '', jc = /(^|\s)c(\s|$)/.test(c) ? 'center' : /(^|\s)r(\s|$)/.test(c) ? 'right' : 'both'; return '<w:p><w:pPr><w:spacing w:after="80"/><w:jc w:val="' + jc + '"/></w:pPr>' + docxRuns(el, false) + '</w:p>'; }
+function docxBody(html) {
+  var doc = new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html'), root = doc.body.firstChild, out = '';
+  [].forEach.call(root.childNodes, function (n) {
+    if (n.nodeType !== 1) return; var tg = n.tagName.toLowerCase();
+    if (tg === 'table') {
+      var rows = [].slice.call(n.querySelectorAll('tr')), cols = rows.length ? rows[0].children.length : 1, w = Math.floor(10466 / cols);
+      out += '<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders><w:insideH w:val="nil"/></w:tblBorders></w:tblPr><w:tblGrid>' + new Array(cols + 1).join('<w:gridCol w:w="' + w + '"/>') + '</w:tblGrid>';
+      rows.forEach(function (tr) { out += '<w:tr>' + [].map.call(tr.children, function (td) { return '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:spacing w:before="120" w:after="120"/></w:pPr>' + docxRuns(td, false) + '</w:p></w:tc>'; }).join('') + '</w:tr>'; });
+      out += '</w:tbl><w:p/>';
+    } else out += docxPara(n);
+  });
+  return out;
+}
+function docxCrc(buf) { var t = docxCrc.t; if (!t) { t = docxCrc.t = []; for (var i = 0; i < 256; i++) { var c = i; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[i] = c >>> 0; } } var crc = 0xFFFFFFFF; for (var j = 0; j < buf.length; j++) crc = t[(crc ^ buf[j]) & 255] ^ (crc >>> 8); return (crc ^ 0xFFFFFFFF) >>> 0; }
+function docxZip(files) {
+  var enc = new TextEncoder(), parts = [], cen = [], off = 0;
+  function u16(v) { return [v & 255, (v >>> 8) & 255]; } function u32(v) { return [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]; }
+  files.forEach(function (f) {
+    var name = enc.encode(f[0]), data = enc.encode(f[1]), crc = docxCrc(data);
+    var lh = [].concat(u32(0x04034b50), u16(20), u16(0x0800), u16(0), u16(0), u16(0x21), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0));
+    parts.push(new Uint8Array(lh), name, data);
+    cen.push([].concat(u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0), u16(0), u16(0x21), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(off)), name);
+    off += lh.length + name.length + data.length;
+  });
+  var cs = 0; cen.forEach(function (c, i) { if (i % 2 === 0) { parts.push(new Uint8Array(c)); cs += c.length; } else { parts.push(c); cs += c.length; } });
+  parts.push(new Uint8Array([].concat(u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length), u32(cs), u32(off), u16(0))));
+  return new Blob(parts, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
+function docxFromHtml(html, opt) {
+  opt = opt || {}; var font = opt.font || 'Times New Roman', sz = opt.sz || 21;
+  var W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  var docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ' + W + '><w:body>' + docxBody(html) + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr></w:body></w:document>';
+  var styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles ' + W + '><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="' + font + '" w:hAnsi="' + font + '" w:cs="' + font + '" w:eastAsia="' + font + '"/><w:sz w:val="' + sz + '"/><w:szCs w:val="' + sz + '"/><w:lang w:val="ru-RU"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="80" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>';
+  return docxZip([
+    ['[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>'],
+    ['_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
+    ['word/_rels/document.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+    ['word/document.xml', docXml], ['word/styles.xml', styles]
+  ]);
 }
 function mpWord(r) {
   var mp = r.mp || {}, E = function (v) { return esc(String(v || '')).replace(/\n/g, '<br>'); }, fio = [mp.fam, mp.nam, mp.otc].filter(Boolean).join(' ').toUpperCase() || String(r.fio || '').toUpperCase();
@@ -5650,8 +5719,7 @@ function mpWord(r) {
   h += '<table class="com">' + COM.map(function (c) { return '<tr><td>' + c[0] + '<br>' + c[1] + '</td><td>' + c[2] + '<br>________________________________</td></tr>'; }).join('') + '</table>';
   h += '<p>МДТ қорытындысын жасайтын дәрігердің қолы<br>(Подпись врача, составляющего заключение МДГ) ________________________________</p>';
   h += '<p>Хаттаманың толтырылған күнi (Дата составления заключения): ' + fmtDate(r.date || isoOf(new Date())) + 'г.</p>';
-  var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>@page{size:A4;margin:2cm 1.5cm 2cm 2cm}body{font-family:"Times New Roman";font-size:12pt;line-height:1.25}p{margin:0 0 4pt;text-align:justify}.c{text-align:center}.r{text-align:right}table.com{width:100%;border-collapse:collapse;margin:12pt 0}table.com td{vertical-align:top;padding:4pt 6pt;font-size:11pt}</style></head><body>' + h + '</body></html>';
-  download(('Заключение МДГ ' + fio + ' ' + fmtDate(r.date || isoOf(new Date()))).replace(/[\\\/:*?"<>|]+/g, ' ').slice(0, 90) + '.doc', '﻿' + html, 'application/msword');
+  downloadBlob(('Заключение МДГ ' + fio + ' ' + fmtDate(r.date || isoOf(new Date()))).replace(/[\\\/:*?"<>|]+/g, ' ').slice(0, 90) + '.docx', docxFromHtml(h));
 }
 function mdtProtoText(r, deid) {
   var mp = r.mp || {}, out = ['ПРОТОКОЛ МУЛЬТИДИСЦИПЛИНАРНОЙ ГРУППЫ', 'Дата МДГ: ' + (r.date ? fmtDate(r.date) : '[__.__.____]') + (r.mrn ? '   № МДГ: ' + r.mrn : '')];
