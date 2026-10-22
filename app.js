@@ -681,7 +681,7 @@ function renderDQ() {
 /* ---------- страница «Словарь данных» ---------- */
 function renderDict() {
   var q = String(S.dictQ || '').toLowerCase().trim();
-  var h = '<div class="pad"><div class="ph"><div><div class="kicker">' + LL('Регистр', 'Registry') + '</div><h1>' + LL('Словарь данных', 'Data dictionary') + '</h1><p class="sub">' + LL('Определение каждого поля, единицы, допустимые значения и стандарт, по которому оно кодируется. Одно определение для всех, кто заполняет регистр.', 'Definition, units, allowed values and coding standard for every field, one definition for everyone who fills the registry.') + '</p></div><div class="actions"><button type="button" class="btn" data-act="dictxl">' + ico('sheet', 16) + 'Excel</button><button type="button" class="btn" data-act="view" data-v="dq">' + ico('check', 16) + LL('Качество данных', 'Data quality') + '</button></div></div>';
+  var h = '<div class="pad"><div class="ph"><div><div class="kicker">' + LL('Материалы', 'Materials') + '</div><h1>' + LL('Словарь данных', 'Data dictionary') + '</h1><p class="sub">' + LL('Определение каждого поля, единицы, допустимые значения и стандарт, по которому оно кодируется. Одно определение для всех, кто заполняет регистр.', 'Definition, units, allowed values and coding standard for every field, one definition for everyone who fills the registry.') + '</p></div><div class="actions"><button type="button" class="btn" data-act="dictxl">' + ico('sheet', 16) + 'Excel</button><button type="button" class="btn" data-act="view" data-v="dq">' + ico('check', 16) + LL('Качество данных', 'Data quality') + '</button></div></div>';
   h += '<div class="dict-s"><input type="search" data-sb="dictQ" value="' + esc(S.dictQ || '') + '" placeholder="' + LL('Поиск поля', 'Search field') + '"></div>';
   h += '<p class="hint">' + LL('Стандарты: ', 'Standards: ') + 'UICC/AJCC TNM 8, ICD-10, ICD-O-3, Clavien-Dindo, ISREC, ASA, ECOG, MERCURY, ICHOM Colorectal Cancer. ' + LL('Экспорт: CSV/Excel с кодбуком и CDISC ODM 1.3.2.', 'Export: CSV/Excel with codebook and CDISC ODM 1.3.2.') + '</p>';
   SECTIONS.forEach(function (s) {
@@ -9311,7 +9311,7 @@ function navGroups() {
   g.push({ id: 'work', label: LL('Работа', 'Work'), icon: 'cal', items: wk, fly: true });
   var pts = [{ v: 'reg:all', icon: 'users', label: t('nav.allPatients'), cnt: DB.patients.length }];
   pts.push({ sep: LL('Ещё', 'More') }); pts.push({ v: 'fu', icon: 'clock', label: t('nav.followup'), badge: fuDueAll().length || null });
-  pts.push({ v: 'dq', icon: 'check', label: LL('Качество данных', 'Data quality'), badge: DB.patients.filter(function (p) { return dqCheck(p).some(function (x) { return x.sev === 'e'; }); }).length || null }); pts.push({ v: 'dict', icon: 'book', label: LL('Словарь данных', 'Data dictionary') });
+  pts.push({ v: 'dq', icon: 'check', label: LL('Качество данных', 'Data quality'), badge: DB.patients.filter(function (p) { return dqCheck(p).some(function (x) { return x.sev === 'e'; }); }).length || null });
   if (can('edit') && !isStudent()) pts.push({ v: 'retro', icon: 'upload', label: LL('Ретро-загрузка документов', 'Retrospective import'), cnt: RETRO.items.length || undefined });
   g.push({ id: 'pts', label: t('nav.allPatients'), icon: 'users', items: pts, split: 'reg:all', cnt: DB.patients.length });
   var regs = [];
@@ -9330,6 +9330,7 @@ function navGroups() {
   sci.push({ v: 'q', icon: 'clipboard', label: LL('Анкеты', 'Questionnaires'), badge: qDueAll(0).length || null });
   sci.push({ v: 'col:pubs', icon: COLS.pubs.icon, label: L(COLS.pubs.title), cnt: DB.cols.pubs.length });
   sci.push({ v: 'write', icon: 'doc', label: LL('Рукописи и литература', 'Manuscripts and library') });
+  sci.push({ v: 'dict', icon: 'book', label: LL('Словарь данных', 'Data dictionary') });
   sci.push({ v: 'col:goals', icon: COLS.goals.icon, label: L(COLS.goals.title), cnt: DB.cols.goals.length });
   g.push({ id: 'sci', label: LL('Наука', 'Research'), icon: 'flask', items: sci, wide: true, fly: true });
   if (isAdmin()) g.push({ id: 'adm', label: LL('Администрирование', 'Admin'), v: 'users', icon: 'shield' });
