@@ -5869,11 +5869,11 @@ function renderHome() {
   // week with clickable legend filters
   var days = []; for (var i = 0; i < 7; i++) { var dd = new Date(ws); dd.setDate(ws.getDate() + i); days.push(isoOf(dd)); }
   var off = UI.wkOff || {}, ev = {}; days.forEach(function (d) { ev[d] = []; });
-  DB.cols.planner.forEach(function (r) { if (ev[r.surgeryDate] && r.status !== 'Отменено') ev[r.surgeryDate].push({ c: 'op', t: r.fio, s: r.dx, a: ['r', 'planner', r.id] }); });
-  DB.cols.mdt.forEach(function (r) { if (ev[r.date]) ev[r.date].push({ c: 'mdt', t: LL('МДГ: ', 'MDT: ') + (r.fio || ''), s: r.mrn ? '№ ' + r.mrn : '', a: ['r', 'mdt', r.id] }); });
+  /* неделя из Планировщика: поступления (дата госпитализации) и операции; МДГ сюда не выводится */
+  DB.cols.planner.forEach(function (r) { if (r.status === 'Отменено') return; var sub = [r.dx, r.surgeon, r.resident ? LL('рез. ', 'res. ') + r.resident : ''].filter(Boolean).join(' · '); if (ev[r.date]) ev[r.date].push({ c: 'adm', t: r.fio, s: sub, a: ['r', 'planner', r.id] }); if (ev[r.surgeryDate] && r.surgeryDate !== r.date) ev[r.surgeryDate].push({ c: 'op', t: r.fio, s: sub, a: ['r', 'planner', r.id] }); else if (ev[r.surgeryDate]) ev[r.surgeryDate][ev[r.surgeryDate].length - 1].c = 'op'; });
   DB.cols.mm.forEach(function (r) { if (ev[r.date]) ev[r.date].push({ c: 'mm', t: 'M&M: ' + (r.title || ''), s: r.reason, a: ['r', 'mm', r.id] }); });
   studies().forEach(function (r) { (stProto(r).cps || []).forEach(function (c) { if (!c.done && ev[c.date]) ev[c.date].push({ c: 'st', t: c.title, s: regName(r), a: ['s', r.id] }); }); });
-  var cats = [['op', LL('операции', 'surgery')], ['mdt', LL('МДГ', 'MDT')], ['mm', 'M&M'], ['st', LL('наука', 'research')]];
+  var cats = [['adm', LL('поступления', 'admissions')], ['op', LL('операции', 'surgery')], ['mm', 'M&M'], ['st', LL('наука', 'research')]];
   h += '<section class="panel week wide"><div class="ph"><h2>' + LL('Эта неделя', 'This week') + '</h2><span class="muted">' + fmtDate(wsI) + ' · ' + fmtDate(weI) + '</span><div class="legend" role="group" aria-label="' + LL('Фильтр календаря', 'Calendar filter') + '">' + cats.map(function (c) { var n = days.reduce(function (a, d) { return a + ev[d].filter(function (e) { return e.c === c[0]; }).length; }, 0); return '<button type="button" class="lgb we-' + c[0] + (off[c[0]] ? ' off' : '') + '" data-act="wkf" data-v="' + c[0] + '" aria-pressed="' + !off[c[0]] + '" title="' + LL('Показать или скрыть', 'Show or hide') + '"><i></i>' + c[1] + '<span>' + n + '</span></button>'; }).join('') + '</div></div><div class="wk">';
   var wd = wdNames();
   days.forEach(function (d, i) {
