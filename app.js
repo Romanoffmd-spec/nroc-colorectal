@@ -1060,7 +1060,7 @@ function linkedBlock(pid, canAdd, skip) {
     if (!mine.length && !canAdd) return;
     var c = COLS[k]; mine.sort(function (a, b) { return String(b[c.dateField] || '').localeCompare(String(a[c.dateField] || '')); });
     h += '<div class="lblock"><div class="lhead">' + ico(c.icon, 16) + '<b>' + esc(L(c.title)) + '</b><span class="cnt">' + mine.length + '</span>' + (canAdd ? '<button type="button" class="btn small" data-act="addlinked" data-k="' + k + '">' + ico('plus', 14) + t('lk.add.' + k) + '</button>' : '') + '</div>';
-    h += mine.length ? mine.map(function (r) { return recLine(k, r); }).join('') : '<p class="muted small">' + t('lk.none') + '</p>';
+    h += mine.length ? mine.map(function (r) { return recLine(k, r) + (k === 'smdt' ? presLinks(r) : ''); }).join('') : '<p class="muted small">' + t('lk.none') + '</p>';
     h += '</div>';
   });
   return h;
@@ -2417,6 +2417,44 @@ function renderCal(k, list) {
   h += '<div class="undated" data-drop="date" data-k="' + k + '" data-v=""><div class="uhead"><h3>' + t('cal.undated') + ' <span class="cnt">' + undated.length + '</span></h3><button type="button" class="btn small" data-act="inline" data-k="' + k + '" data-d="">' + ico('plus', 14) + t('cal.undatedAdd') + '</button></div><p class="hint">' + t('cal.undatedHint') + '</p><div class="uchips">' + undated.map(function (r) { return '<button type="button" class="ev ev-plan" draggable="true" data-drag="' + r.id + '" data-act="openrec" data-k="' + k + '" data-id="' + r.id + '"><b>' + esc(recTitle(c, r)) + '</b>' + (r[c.subField] ? ' <span>' + esc(r[c.subField]) + '</span>' : '') + '</button>'; }).join('') + '</div>' + (uin ? '<div class="inline"><input type="text" data-inline="1" data-autofocus placeholder="' + t('cal.inlinePh.' + k) + '" aria-label="' + t('cal.inlinePh.' + k) + '"><span>' + t('cal.inlineHint') + '</span></div>' : '') + '</div>';
   return h + '</div>';
 }
+/* ---------- презентации и файлы МДГ в Google Drive: сам файл лежит в папке Colorectal MDT, правка идёт в нём (Google Slides) ---------- */
+var MDT_DRIVE = '16mDTIPVz8RZiR6MKtWjcWjKHMxXAqa-L';
+function gdMob() { return /iP(ad|hone|od)|Android/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function gdId(s) { s = String(s || '').trim(); var m = /\/d\/([\w-]{20,})/.exec(s) || /[?&]id=([\w-]{20,})/.exec(s) || /folders\/([\w-]{20,})/.exec(s); if (m) return m[1]; return /^[\w-]{20,}$/.test(s) ? s : ''; }
+function gdKind(f) { var n = String(f.name || '').toLowerCase(); if (f.kind === 'folder') return 'folder'; if (/\.pptx?$/.test(n) || f.kind === 'pres') return 'pres'; if (/\.pdf$/.test(n)) return 'pdf'; if (/\.docx?$/.test(n)) return 'doc'; if (/\.xlsx?$/.test(n)) return 'sheet'; if (/\.(jpe?g|png|heic)$/.test(n)) return 'img'; if (/\.(mp4|avi|mov)$/.test(n)) return 'video'; return f.kind || 'file'; }
+function gdKindName(k) { return { pres: LL('Презентация', 'Slides'), pdf: 'PDF', doc: 'Word', sheet: LL('Таблица', 'Sheet'), folder: LL('Папка', 'Folder'), img: LL('Фото', 'Image'), video: LL('Видео', 'Video') }[k] || LL('Файл', 'File'); }
+function gdUrl(f, embed) {
+  var k = gdKind(f), q = embed ? 'rm=minimal&' : '';
+  if (k === 'folder') return 'https://drive.google.com/drive/folders/' + f.id;
+  if (k === 'pres') return 'https://docs.google.com/presentation/d/' + f.id + '/edit?' + q + 'rtpof=true&sd=true';
+  if (k === 'doc') return 'https://docs.google.com/document/d/' + f.id + '/edit?' + q + 'rtpof=true&sd=true';
+  if (k === 'sheet') return 'https://docs.google.com/spreadsheets/d/' + f.id + '/edit?' + q + 'rtpof=true&sd=true';
+  return 'https://drive.google.com/file/d/' + f.id + (embed ? '/preview' : '/view');
+}
+function gdCanEdit(f) { var k = gdKind(f); return k === 'pres' || k === 'doc' || k === 'sheet'; }
+function presLinks(r) {
+  var fs = (r.pres || []).filter(function (f) { return gdKind(f) === 'pres' || gdKind(f) === 'pdf' || gdKind(f) === 'doc'; });
+  if (!fs.length) return '';
+  return '<div class="gdlinks">' + fs.map(function (f) { return '<a href="' + esc(gdUrl(f)) + '" target="_blank" rel="noopener">' + ico('ext', 13) + esc(f.name || gdKindName(gdKind(f))) + '</a>'; }).join('') + '</div>';
+}
+function presCard(r) {
+  var fs = r.pres || [], h = '<section class="card soft gdcard"><h3>' + ico('ext', 16) + LL('Презентация и файлы МДГ (Google Drive)', 'MDT slides and files (Google Drive)') + '</h3>';
+  h += fs.length ? '<div class="gdlist">' + fs.map(function (f, i) {
+    var k = gdKind(f);
+    return '<div class="gdrow"><span class="gdk ' + k + '">' + esc(gdKindName(k)) + '</span><span class="gdn"><b>' + esc(f.name || f.id) + '</b>' + (f.mod ? '<em>' + LL('изменён ', 'modified ') + esc(fmtDate(String(f.mod).slice(0, 10))) + '</em>' : '') + '</span><span class="actions">'
+      + '<button type="button" class="btn small' + (gdCanEdit(f) ? ' primary' : '') + '" data-act="gdopen" data-i="' + i + '">' + (gdCanEdit(f) ? LL('Открыть и править', 'Open and edit') : LL('Открыть', 'Open')) + '</button>'
+      + '<a class="btn small" href="' + esc(gdUrl(f)) + '" target="_blank" rel="noopener" title="' + LL('В новой вкладке', 'New tab') + '">' + ico('ext', 14) + '</a>'
+      + '<button type="button" class="iconbtn" data-act="gddel" data-i="' + i + '" aria-label="' + LL('Отвязать файл', 'Unlink file') + '" title="' + LL('Отвязать (файл на Drive останется)', 'Unlink (file stays on Drive)') + '">' + ico('x', 16) + '</button></span></div>';
+  }).join('') + '</div>' : '<p class="muted small">' + LL('Файлы не привязаны. Подготовьте презентацию в папке Colorectal MDT и вставьте ссылку ниже.', 'No files linked yet. Prepare the slides in the Colorectal MDT folder and paste the link below.') + '</p>';
+  h += '<div class="gdadd"><input id="gdlink" type="url" inputmode="url" placeholder="' + LL('Ссылка на файл или папку Google Drive', 'Google Drive file or folder link') + '" aria-label="' + LL('Ссылка Google Drive', 'Google Drive link') + '"><input id="gdname" type="text" placeholder="' + LL('Название (необязательно)', 'Name (optional)') + '" aria-label="' + LL('Название', 'Name') + '"><button type="button" class="btn small" data-act="gdadd">' + ico('plus', 14) + LL('Привязать', 'Link') + '</button></div>';
+  h += '<div class="gdfoot"><a href="https://drive.google.com/drive/folders/' + MDT_DRIVE + '" target="_blank" rel="noopener">' + ico('ext', 13) + LL('Папка Colorectal MDT', 'Colorectal MDT folder') + '</a><a href="https://docs.google.com/presentation/create?folder=' + MDT_DRIVE + '" target="_blank" rel="noopener">' + ico('plus', 13) + LL('Новая презентация в папке', 'New slides in the folder') + '</a></div>';
+  h += '<p class="hint">' + LL('Правка идёт в самом файле на Google Drive: изменения сохраняются там сразу и видны всем, у кого есть доступ к папке. Нужен вход в Google-аккаунт с доступом к папке.', 'Edits go into the file on Google Drive itself and are saved there instantly for everyone with access to the folder. Requires a Google account with access.') + '</p></section>';
+  return h;
+}
+function renderGd() {
+  var f = S.gdView;
+  return '<div class="dim top" data-act="gdclose"></div><section class="gdview" role="dialog" aria-modal="true" aria-label="' + esc(f.name || '') + '"><div class="gdvh"><b>' + esc(f.name || '') + '</b><span class="actions"><a class="btn small" href="' + esc(gdUrl(f)) + '" target="_blank" rel="noopener">' + ico('ext', 14) + LL('В новой вкладке', 'Open in new tab') + '</a><button type="button" class="iconbtn" data-act="gdclose" aria-label="' + t('a11y.close') + '">' + ico('x', 20) + '</button></span></div><iframe src="' + esc(gdUrl(f, true)) + '" title="' + esc(f.name || '') + '" allow="clipboard-read; clipboard-write; fullscreen" allowfullscreen></iframe><p class="hint">' + LL('Если внутри окна Google просит войти или не показывает файл (так бывает в Safari), откройте его в новой вкладке.', 'If Google asks to sign in or shows nothing here (common in Safari), open it in a new tab.') + '</p></section>';
+}
 function renderRecord() {
   var o = S.rec, c = COLS[o.k], r = o.r;
   var h = '<div class="dim" data-act="closerec"></div><section class="drawer full rec" role="dialog" aria-modal="true" aria-label="' + esc(L(c.title)) + '">';
@@ -2424,6 +2462,7 @@ function renderRecord() {
   h += '<div class="dbody">' + (!o.isNew && ['mdt', 'mm', 'planner', 'pubs'].indexOf(o.k) >= 0 ? aiInline('rec-' + o.k + '-' + r.id, aiCtx(), { mdt: 'Суть случая в 2-3 строках и чего не хватает для решения МДГ.', mm: 'Кратко: что произошло, тяжесть по Clavien-Dindo, ключевые факторы, предотвратимость, 1-2 вывода.', planner: 'Кратко: что важно по этой госпитализации сегодня (сутки, контрольные анализы, что проверить).', pubs: 'Кратко: статус публикации и чего не хватает в карточке.' }[o.k], LL('ИИ: кратко', 'AI: in brief'), true) : '') + '<section class="card"><div class="fgrid">' + c.fields.map(function (x) { return fieldHTML(x, r[x.id], 'r.' + x.id, r); }).join('') + '</div></section>';
   if (o.k === 'mdt') h += mpCard(r);
   if (o.k === 'pubs') h += pubTools(r);
+  if (o.k === 'smdt') h += presCard(r);
   if (LINKED.indexOf(o.k) >= 0) {
     var lp = patOf(r.pid);
     h += '<section class="card soft"><h3>' + t('lk.patient') + '</h3>';
@@ -5899,6 +5938,7 @@ function render() {
   if (S.tnt) h += renderTntSet();
   if (!S.drawer && S.wipeAsk !== false && needWipe()) h += renderWipe();
   if (S.rec) h += renderRecord();
+  if (S.gdView && S.rec) h += renderGd();
   if (S.qlink) h += renderQLink();
   if (S.asEdit) h += renderAsEdit();
   if (S.edit) h += renderEditor();
@@ -6171,7 +6211,7 @@ document.addEventListener('click', function (ev) {
     case 'cview': UI.colView[g('k')] = g('v'); saveUI(); S.inline = null; render(); break;
     case 'newrec': { var k = g('k'), pre = {}; if (COLS[k].statusField) pre[COLS[k].statusField] = COLS[k].F[COLS[k].statusField].options[0]; openRec(k, null, pre); break; }
     case 'openrec': if (tg.classList.contains('dragging')) return; openRec(g('k'), g('id')); break;
-    case 'closerec': S.rec = null; S.mpStage = null; render(); break;
+    case 'closerec': S.gdView = null; S.rec = null; S.mpStage = null; render(); break;
     case 'addlinked': {
       var ak = g('k'), ac = COLS[ak], pp = S.drawer.p, pre2 = { pid: pp.id };
       if (ac.statusField) pre2[ac.statusField] = ac.F[ac.statusField].options[0];
@@ -6181,6 +6221,10 @@ document.addEventListener('click', function (ev) {
       if (ak === 'redcap' && pp.d.date) { pre2.opDate = pp.d.date; pre2.contact = isoOf(addDays(pp.d.date, 30)); }
       openRec(ak, null, pre2); break;
     }
+    case 'gdopen': { var gf = (S.rec.r.pres || [])[+g('i')]; if (!gf) break; if (gdMob() || !gdCanEdit(gf) && gdKind(gf) !== 'pdf') window.open(gdUrl(gf), '_blank', 'noopener'); else { S.gdView = gf; render(); } break; }
+    case 'gdclose': S.gdView = null; render(); break;
+    case 'gddel': { var gl = (S.rec.r.pres || []).slice(); gl.splice(+g('i'), 1); S.rec.r.pres = gl; render(); break; }
+    case 'gdadd': { var gin = document.getElementById('gdlink'), gnm = document.getElementById('gdname'), gid = gdId(gin && gin.value); if (!gid) { toast(LL('Не вижу ссылку Google Drive', 'Not a Google Drive link')); break; } var gfo = /folders\//.test(gin.value), gpr = /presentation\//.test(gin.value); if ((S.rec.r.pres || []).some(function (x) { return x.id === gid; })) { toast(LL('Этот файл уже привязан', 'Already linked')); break; } S.rec.r.pres = (S.rec.r.pres || []).concat([{ id: gid, name: (gnm && gnm.value.trim()) || (gfo ? LL('Папка', 'Folder') : LL('Презентация', 'Slides')), kind: gfo ? 'folder' : (gpr || !/\.(pdf|docx?|xlsx?|jpe?g|png|mp4|avi)$/i.test((gnm && gnm.value) || '')) ? 'pres' : '', at: nowIso(), by: me() }]); render(); break; }
     case 'unlink': delete S.rec.r.pid; render(); break;
     case 'linkpick': S.linkPick = true; render(); break;
     case 'linksug': S.rec.r.pid = g('id'); render(); break;
@@ -6433,7 +6477,7 @@ document.addEventListener('keydown', function (ev) {
     if (ev.key === 'Escape') { S.inline = null; render(); }
     return;
   }
-  if (ev.key === 'Escape') { if (S.lpop) S.lpop = null; else if (S.pick) S.pick = null; else if (S.menu) S.menu = null; else if (S.edit) S.edit = null; else if (S.rec) S.rec = null; else if (S.qhelp) S.qhelp = null; else if (S.leave) S.leave = null; else if (S.drawer) { if (drDirty(S.drawer)) { var lvx = document.createElement('button'); lvx.setAttribute('data-act', 'close'); S.leave = { el: lvx }; } else S.drawer = null; } else if (S.qid) { S.qid = null; S.qbk = null; } else if (S.inline) S.inline = null; render(); return; }
+  if (ev.key === 'Escape') { if (S.gdView) S.gdView = null; else if (S.lpop) S.lpop = null; else if (S.pick) S.pick = null; else if (S.menu) S.menu = null; else if (S.edit) S.edit = null; else if (S.rec) S.rec = null; else if (S.qhelp) S.qhelp = null; else if (S.leave) S.leave = null; else if (S.drawer) { if (drDirty(S.drawer)) { var lvx = document.createElement('button'); lvx.setAttribute('data-act', 'close'); S.leave = { el: lvx }; } else S.drawer = null; } else if (S.qid) { S.qid = null; S.qbk = null; } else if (S.inline) S.inline = null; render(); return; }
   if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('tr[data-act]')) { ev.preventDefault(); ev.target.click(); }
 });
 document.addEventListener('input', function (ev) {
