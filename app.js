@@ -1466,9 +1466,10 @@ function wardMonitor() {
   if (r.date !== td) h += '<p class="wm-old">' + LL('Сводка за ', 'Summary for ') + fmtDate(r.date) + LL(', на сегодня ещё не обновлена', ', not updated today') + '</p>';
   h += '<div class="wm-grid">' + (r.items || []).map(function (it) {
     var row = function (lab, body) { return body ? '<div class="wm-r"><div class="wm-l">' + lab + '</div>' + body + '</div>' : ''; };
-    return '<article class="wm-c' + (it.icu ? ' icu' : '') + '"><div class="wm-top"><button type="button" class="wm-n" data-act="openp" data-id="' + esc(it.pid || '') + '">' + esc(it.name) + '</button><span class="muted">' + esc(it.age || '') + '</span>' + (it.icu ? '<span class="wm-icu">' + esc(it.icu) + '</span>' : '') + wmRes(it.pid) + '</div>' + wmPod(it)
+    return '<article class="wm-c' + (it.icu ? ' icu' : '') + '"><div class="wm-top"><button type="button" class="wm-n" data-act="wmx" data-id="' + esc(it.pid || '') + '" title="' + esc(LL('Мониторная карточка: динамика назначений и анализов', 'Monitor card')) + '">' + esc(it.name) + '</button><span class="muted">' + esc(it.age || '') + '</span>' + (it.icu ? '<span class="wm-icu">' + esc(it.icu) + '</span>' : '') + wmRes(it.pid) + '</div>' + wmPod(it)
       + row(LL('Анализы сегодня', 'Labs today') + (it.todayLabel ? ' (' + esc(it.todayLabel) + ')' : ''), (it.today || []).map(wmAny).join(''))
-      + (it.last && it.last.length ? row(LL('Последние контрольные анализы', 'Latest control labs'), it.last.map(function (x) { if (Array.isArray(x[1])) return wmGrp(x); var c = wmChip([x[0], x[1]]); return x[2] ? c.replace(/<\/span>$/, ' <i class="wm-d">' + esc(x[2]) + '</i></span>') : c; }).join('')) : (it.prev ? row(LL('Контрольные анализы за ', 'Control labs on ') + esc(it.prev.date), (it.prev.vals || []).map(wmChip).join('')) : ''))
+      + (wmxOf(it.pid) ? row(LL('Последние анализы', 'Latest labs') + ' <span class="wm-src">' + LL('все показатели, рядом прошлое значение', 'all values, previous next to each') + '</span>', wmpPanels(wmxOf(it.pid)).join('')) : '')
+      + (!wmxOf(it.pid) && it.last && it.last.length ? row(LL('Последние контрольные анализы', 'Latest control labs'), it.last.map(function (x) { if (Array.isArray(x[1])) return wmGrp(x); var c = wmChip([x[0], x[1]]); return x[2] ? c.replace(/<\/span>$/, ' <i class="wm-d">' + esc(x[2]) + '</i></span>') : c; }).join('')) : (it.prev ? row(LL('Контрольные анализы за ', 'Control labs on ') + esc(it.prev.date), (it.prev.vals || []).map(wmChip).join('')) : ''))
       + row(LL('Контрольные анализы назначены на завтра', 'Control labs ordered for tomorrow'), it.tomorrow ? '<div class="wm-meds">' + esc(it.tomorrow) + '</div>' : '')
       + row(LL('Назначения', 'Orders'), wmList(it.meds))
       + (it.note ? '<div class="wm-note">' + esc(it.note) + '</div>' : '')
@@ -1476,6 +1477,168 @@ function wardMonitor() {
   }).join('') + '</div></section>';
   return h;
 }
+/* мониторная карточка лежащего: динамика назначений и анализов по DMED (документы c_wardx__CR-XXXX, обновляются вместе с монитором) */
+var WMX_LAB = [
+  [/^Гемоглобин \(HGB\)/, 'Hb', 'ОАК', 'г/л'], [/^Лейкоциты\s*\(WBC\)/, 'Лейкоциты', 'ОАК', '×10⁹/л'], [/^Тромбоциты\s*\(PLT\)/, 'Тромбоциты', 'ОАК', '×10⁹/л'],
+  [/^Палочкоядерные/, 'Палочкоядерные', 'ОАК', '%'], [/реактивного белка/i, 'СРБ', 'Воспаление', 'мг/л'], [/рокальцитонин/i, 'Прокальцитонин', 'Воспаление', 'нг/мл'],
+  [/альбумина/i, 'Альбумин', 'Биохимия', 'г/л'], [/^Определение креатинина/i, 'Креатинин', 'Биохимия', 'мкмоль/л'], [/мочевины/i, 'Мочевина', 'Биохимия', 'ммоль/л'],
+  [/калия/i, 'K', 'Электролиты', 'ммоль/л'], [/натрия/i, 'Na', 'Электролиты', 'ммоль/л'], [/глюкозы в сыворотке/i, 'Глюкоза', 'Биохимия', 'ммоль/л'],
+  [/общего белка/i, 'Общий белок', 'Биохимия', 'г/л'], [/лактат/i, 'Лактат', 'Биохимия', 'ммоль/л'],
+  [/аланин/i, 'АЛТ', 'Печень', 'Ед/л'], [/аспартат/i, 'АСТ', 'Печень', 'Ед/л'], [/общего билирубина/i, 'Билирубин общ.', 'Печень', 'мкмоль/л'], [/прямого билирубина/i, 'Билирубин прям.', 'Печень', 'мкмоль/л'], [/амилазы/i, 'Амилаза', 'Печень', 'Ед/л'],
+  [/АЧТВ/, 'АЧТВ', 'Коагулограмма', 'сек'], [/нормализованн/i, 'МНО', 'Коагулограмма', ''], [/^Протромбиновый индекс/i, 'ПТИ', 'Коагулограмма', '%'], [/^Фибриноген/i, 'Фибриноген', 'Коагулограмма', 'г/л']
+];
+var WMX_FLAGKEY = { 'Hb': 'гемоглобин', 'Лейкоциты': 'лейкоциты', 'Тромбоциты': 'тромбоциты', 'СРБ': 'СРБ', 'Прокальцитонин': 'прокальцитонин', 'Альбумин': 'альбумин', 'K': 'К', 'Na': 'Na', 'Фибриноген': 'фибриноген' };
+function wmxNum(v) { var n = parseFloat(String(v).replace(',', '.').replace(/[^\d.\-]/g, '')); return isNaN(n) ? null : n; }
+function wmxFmt(v) { return String(v).replace('.', ','); }
+function wmxFlag(lab, v) {
+  var key = WMX_FLAGKEY[lab], n = wmxNum(v), cls = ''; if (!key || n === null) return '';
+  (WM_FLAG[key] || []).some(function (r) { if (r[2] === '<' ? n < r[0] : n > r[0]) { cls = r[1]; return true; } return false; }); return cls;
+}
+/* разбор анализов: ключевые показатели по порядку WMX_LAB, остальные в таблицу; креатинин из дренажа отдельно, если источник указан в названии */
+function wmxLabs(x) {
+  var key = [], rest = [];
+  (x.labs || []).forEach(function (p) {
+    var m = WMX_LAB.filter(function (r) { return r[0].test(p.n); })[0], it = (p.it || []).slice().sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
+    if (/СКФ|скорост[ьи] клубочков/i.test(p.n)) { rest.push({ n: 'СКФ', u: p.u, it: it }); return; }
+    if (m) key.push({ k: WMX_LAB.indexOf(m), n: m[1], g: m[2], u: p.u || m[3], s: p.s, it: it }); else rest.push({ n: p.n, u: p.u, s: p.s, it: it });
+  });
+  var merged = {}; key.forEach(function (p) { if (merged[p.n]) merged[p.n].it = merged[p.n].it.concat(p.it).sort(function (a, b) { return a[0] < b[0] ? -1 : 1; }); else merged[p.n] = p; });
+  var dd = wmpSrcDays(x), crK = merged['Креатинин'];
+  if (crK) { var dr = crK.it.filter(function (i) { var d = i[0].slice(0, 10); return dd.drain[d] && !dd.blood[d]; }); if (dr.length) { crK.it = crK.it.filter(function (i) { return dr.indexOf(i) < 0; }); merged['Креатинин из дренажа'] = { k: crK.k + 0.5, n: LL('Креатинин из дренажа', 'Drain creatinine'), g: 'Биохимия', u: crK.u, s: '', it: dr }; if (!crK.it.length) delete merged['Креатинин']; } }
+  return { key: Object.keys(merged).map(function (k) { return merged[k]; }).sort(function (a, b) { return a.k - b.k; }), rest: rest };
+}
+function wmxSpark(p, from, to) {
+  var pts = p.it.map(function (i) { return { t: new Date(i[0]).getTime(), v: wmxNum(i[1]), d: i[0], raw: i[1] }; }).filter(function (q) { return q.v !== null; });
+  if (!pts.length) return '';
+  var W = 220, H = 64, px = 8, py = 10, t0 = new Date(from + 'T00:00').getTime(), t1 = new Date(to + 'T23:59').getTime();
+  pts.forEach(function (q) { if (q.t < t0) t0 = q.t; });
+  var vs = pts.map(function (q) { return q.v; }), lo = Math.min.apply(null, vs), hi = Math.max.apply(null, vs); if (hi === lo) { hi += 1; lo -= 1; }
+  var X = function (t) { return px + (W - 2 * px) * (t - t0) / Math.max(1, t1 - t0); }, Y = function (v) { return H - py - (H - 2 * py) * (v - lo) / (hi - lo); };
+  var tdX = X(new Date(isoOf(new Date()) + 'T12:00').getTime());
+  var path = pts.map(function (q, i) { return (i ? 'L' : 'M') + X(q.t).toFixed(1) + ' ' + Y(q.v).toFixed(1); }).join(' ');
+  var area = path + ' L' + X(pts[pts.length - 1].t).toFixed(1) + ' ' + (H - 2) + ' L' + X(pts[0].t).toFixed(1) + ' ' + (H - 2) + ' Z';
+  var dots = pts.map(function (q, i) { var f = wmxFlag(p.n, q.v); return '<circle cx="' + X(q.t).toFixed(1) + '" cy="' + Y(q.v).toFixed(1) + '" r="' + (i === pts.length - 1 ? 4 : 2.6) + '" class="' + (f ? 'f-' + f : '') + (i === pts.length - 1 ? ' last' : '') + '"><title>' + esc(fmtDate(q.d.slice(0, 10)) + ' ' + q.d.slice(11, 16) + ': ' + wmxFmt(q.raw)) + '</title></circle>'; }).join('');
+  return '<svg class="wmx-sp" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true"><line x1="' + tdX.toFixed(1) + '" x2="' + tdX.toFixed(1) + '" y1="0" y2="' + H + '" class="td"/><path d="' + area + '" class="ar"/><path d="' + path + '" class="ln"/>' + dots + '</svg>';
+}
+function wmxLabCard(p, from, to) {
+  var it = p.it.filter(function (i) { return wmxNum(i[1]) !== null; }); if (!it.length) return '';
+  var l = it[it.length - 1], pr = it.length > 1 ? it[it.length - 2] : null, f = wmxFlag(p.n, l[1]);
+  var dl = pr ? wmxNum(l[1]) - wmxNum(pr[1]) : null, dTxt = dl === null || dl === 0 ? '' : '<span class="wmx-dl ' + (dl > 0 ? 'up' : 'dn') + '">' + (dl > 0 ? '▲' : '▼') + ' ' + wmxFmt(Math.abs(Math.round(dl * 100) / 100)) + '</span>';
+  var fresh = l[0].slice(0, 10) === isoOf(new Date());
+  return '<div class="wmx-lc' + (f ? ' f-' + f : '') + '"><div class="wmx-lh"><b>' + esc(p.n) + '</b>' + (fresh ? '<span class="wmx-new">' + LL('сегодня', 'today') + '</span>' : '') + '</div>'
+    + '<div class="wmx-lv"><span class="v">' + esc(wmxFmt(l[1])) + '</span><span class="u">' + esc(p.u || '') + '</span>' + dTxt + '</div>'
+    + '<div class="wmx-ld">' + fmtDate(l[0].slice(0, 10)) + ' ' + l[0].slice(11, 16) + (pr ? ' · ' + LL('было ', 'was ') + wmxFmt(pr[1]) : '') + (p.s ? ' · ' + LL('норма ', 'ref ') + esc(String(p.s).slice(0, 24)) : '') + '</div>'
+    + wmxSpark(p, from, to) + '</div>';
+}
+function wmxDays(from, to) { var o = [], d = from; while (d <= to && o.length < 60) { o.push(d); d = isoOf(addDays(d, 1)); } return o; }
+var WMX_TY = [[10, LL('Анализы', 'Labs'), 'flask'], [2, LL('Исследования и процедуры', 'Studies and procedures'), 'eye'], [8, LL('Кровь и альбумин', 'Blood products'), 'alert'], [1, LL('Лекарства', 'Medications'), 'clipboard']];
+function wmxCell(recs, d, td) {
+  var r = recs.filter(function (x) { return x[0].slice(0, 10) === d; }); if (!r.length) return '<td class="' + (d === td ? 'td' : '') + '"></td>';
+  var tip = r.map(function (x) { return x[0].slice(11, 16) + ' ' + ({ 1: LL('назначено', 'planned'), 2: LL('в работе', 'in progress'), 3: LL('выполнено', 'done'), 4: LL('не выполнено', 'not done'), 9: LL('отменено', 'cancelled') }[x[1]] || ('статус ' + x[1])); }).join('\n');
+  var dots = r.slice(0, 6).map(function (x) { var c = x[1] === 3 ? 'ok' : x[1] === 4 ? 'no' : x[1] === 9 ? 'cx' : x[1] === 2 ? 'wk' : (d < td ? 'miss' : 'pl'); return '<i class="' + c + '"></i>'; }).join('') + (r.length > 6 ? '<em>+' + (r.length - 6) + '</em>' : '');
+  return '<td class="' + (d === td ? 'td' : d < td ? 'ps' : 'fu') + '" title="' + esc(tip) + '"><span class="wmx-dots">' + dots + '</span></td>';
+}
+function wmxRowName(nm) { var p = String(nm).split(' + '), a = p[0], m = /^(.*?)\s*\(([^()]*(?:\([^()]*\))?[^()]*)\)\s*$/.exec(a); return '<b>' + esc(m ? m[1] : a) + '</b>' + (m ? '<span class="ds">' + esc(m[2]) + '</span>' : '') + (p.length > 1 ? '<span class="ad">+ ' + esc(p.slice(1).join(' + ').replace(/\s*\([^()]*\)\s*$/, '')) + '</span>' : ''); }
+function wmxGrid(x, from, to, showAll) {
+  var td = isoOf(new Date()), days = wmxDays(from, to), mg = {}, asg = [];
+  (x.asg || []).filter(function (a) { return a.ty !== 4; }).forEach(function (a) { var k = a.ty + '|' + String(a.nm).toLowerCase().replace(/\s+/g, ' ').trim(); if (!mg[k]) { mg[k] = { ty: a.ty, nm: a.nm, cr: a.cr, r: [] }; asg.push(mg[k]); } mg[k].r = mg[k].r.concat(a.r || []); if (a.cr > mg[k].cr) mg[k].cr = a.cr; });
+  var diet = (x.asg || []).filter(function (a) { return a.ty === 4 && !a.cx; }).sort(function (a, b) { return a.b < b.b ? -1 : 1; });
+  var h = '<div class="wmx-tw"><table class="wmx-t"><thead><tr><th class="nm">' + LL('Назначение', 'Order') + '</th>' + days.map(function (d) { var dt = new Date(d + 'T00:00'); return '<th class="' + (d === td ? 'td' : d < td ? 'ps' : 'fu') + '"><span>' + ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'][dt.getDay()] + '</span>' + d.slice(8, 10) + '.' + d.slice(5, 7) + '</th>'; }).join('') + '</tr></thead><tbody>';
+  if (diet.length) h += '<tr class="grp"><td colspan="' + (days.length + 1) + '">' + LL('Диета', 'Diet') + '</td></tr><tr><td class="nm"><b>' + LL('Стол', 'Diet') + '</b></td>' + days.map(function (d) { var cur = diet.filter(function (a) { return a.b <= d && (!a.e || a.e >= d); }).pop(); return '<td class="' + (d === td ? 'td' : d < td ? 'ps' : 'fu') + '">' + (cur ? '<span class="wmx-diet">' + esc(String(cur.nm).replace(/^Стол\s*/i, '')) + '</span>' : '') + '</td>'; }).join('') + '</tr>';
+  WMX_TY.forEach(function (ty) {
+    var rows = asg.filter(function (a) { return ty[0] === 2 ? [1, 8, 10].indexOf(a.ty) < 0 : a.ty === ty[0]; }).map(function (a) { return { a: a, r: (a.r || []).filter(function (q) { return q[0].slice(0, 10) >= from && q[0].slice(0, 10) <= to; }) }; }).filter(function (o) { return o.r.length; });
+    var live = function (o) { return (o.a.r || []).some(function (q) { return q[0].slice(0, 10) >= td && q[1] !== 9; }); };
+    if (!showAll) rows = rows.filter(function (o) { return live(o) || o.r.some(function (q) { return q[0].slice(0, 10) >= isoOf(addDays(td, -2)); }); });
+    if (!rows.length) return;
+    rows.sort(function (p, q) { return (live(q) ? 1 : 0) - (live(p) ? 1 : 0) || String(p.a.nm).localeCompare(String(q.a.nm)); });
+    h += '<tr class="grp"><td colspan="' + (days.length + 1) + '">' + ico(ty[2], 13) + ' ' + ty[1] + ' <span>' + rows.length + '</span></td></tr>';
+    rows.forEach(function (o) {
+      var isNew = o.a.cr && o.a.cr.slice(0, 10) === td, ended = !live(o);
+      h += '<tr class="' + (ended ? 'end' : '') + '"><td class="nm" title="' + esc(o.a.nm + (o.a.cr ? '\n' + LL('назначено ', 'ordered ') + fmtDate(o.a.cr.slice(0, 10)) + ' ' + o.a.cr.slice(11, 16) : '')) + '">' + wmxRowName(o.a.nm) + (isNew ? '<span class="wmx-new">' + LL('новое', 'new') + '</span>' : '') + (ended ? '<span class="wmx-end">' + LL('закончено', 'ended') + '</span>' : '') + '</td>' + days.map(function (d) { return wmxCell(o.r, d, td); }).join('') + '</tr>';
+    });
+  });
+  return h + '</tbody></table></div>';
+}
+function wmxHist(pid) {
+  return ((DB.cols || {}).ward || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); }).map(function (r) { var it = (r.items || []).filter(function (i) { return i.pid === pid; })[0]; return it ? { date: r.date, it: it } : null; }).filter(Boolean);
+}
+function renderWmx() {
+  var pid = S.wmx, x = ((DB.cols || {}).wardx || []).filter(function (r) { return r.id === pid; })[0], p = DB.patients.filter(function (q) { return q.id === pid; })[0];
+  var hist = wmxHist(pid), cur = hist[0] ? hist[0].it : { name: p ? p.d.fio : pid }, td = isoOf(new Date());
+  var adm = (p && p.d.admDate) || (x && x.adm) || isoOf(addDays(td, -7)), from = UI.wmxAll ? adm : (adm > isoOf(addDays(td, -9)) ? adm : isoOf(addDays(td, -9))), to = isoOf(addDays(td, 3));
+  var room = ((cur.post || cur.note || '').match(/палат[аеы]\s*(\d+)/i) || [])[1];
+  var h = '<div class="dim" data-act="wmxclose"></div><section class="modal wmx" role="dialog" aria-modal="true" aria-label="' + esc(LL('Мониторная карточка', 'Monitor card')) + '">';
+  h += '<div class="wmx-h"><div class="wmx-hl"><div class="wmx-k">' + LL('Мониторная карточка', 'Monitor card') + (x && x.at ? ' · DMED ' + fmtDate(x.at.slice(0, 10)) + ' ' + x.at.slice(11, 16) : '') + '</div><div class="wmx-nm">' + esc(cur.name || '') + '<span>' + esc(cur.age || '') + '</span></div><div class="wmx-tags">'
+    + (room ? '<span class="tg">' + LL('палата ', 'room ') + esc(room) + '</span>' : '') + (cur.icu ? '<span class="tg icu">' + LL('ЦАРИТ', 'ICU') + '</span>' : '')
+    + (Array.isArray(cur.op) ? cur.op : []).filter(function (o) { return o.date; }).map(function (o) { var n = -daysTo(o.date); return '<span class="tg op" title="' + esc(o.name || '') + '"><b>' + (n === 0 ? LL('день операции', 'day 0') : n + LL('-е сут', ' POD')) + '</b> ' + esc(String(o.name || '').slice(0, 70)) + ' · ' + fmtDate(o.date) + '</span>'; }).join('')
+    + '</div></div><div class="wmx-hb"><button type="button" class="btn small" data-act="wmxp" data-id="' + esc(pid) + '">' + ico('user', 14) + LL('Карточка регистра', 'Registry card') + '</button><button type="button" class="wmx-x" data-act="wmxclose" aria-label="' + LL('Закрыть', 'Close') + '">' + ico('x', 18) + '</button></div></div>';
+  h += '<div class="wmx-b">';
+  if (!x) h += '<p class="wm-empty">' + LL('Подробной динамики по этому пациенту ещё нет. Она появится после следующего апдейта монитора.', 'No detailed data yet; it appears after the next monitor update.') + '</p>';
+  else {
+    var L = wmxLabs(x);
+    h += '<div class="wmx-sec"><div class="wmx-st">' + ico('flask', 15) + LL('Динамика анализов', 'Lab trends') + '<span class="wmx-hint">' + LL('точка = результат, линия = сегодня; наведите для даты', 'dot = result, line = today') + '</span></div><div class="wmx-lg">' + L.key.map(function (q) { return wmxLabCard(q, from, to); }).join('') + '</div>';
+    if (L.rest.length) h += '<details class="wmx-more"><summary>' + LL('Все показатели', 'All parameters') + ' (' + L.rest.length + ')</summary><div class="wmx-rt">' + L.rest.map(function (q) { return '<div class="r"><span class="n">' + esc(q.n) + '</span><span class="vs">' + q.it.slice(-6).map(function (i) { return '<i title="' + esc(fmtDate(i[0].slice(0, 10)) + ' ' + i[0].slice(11, 16)) + '">' + esc(wmxFmt(i[1])) + '<em>' + i[0].slice(8, 10) + '.' + i[0].slice(5, 7) + '</em></i>'; }).join('') + '</span><span class="u">' + esc(q.u || '') + '</span></div>'; }).join('') + '</div></details>';
+    h += '</div>';
+    h += '<div class="wmx-sec"><div class="wmx-st">' + ico('cal', 15) + LL('Лист назначений', 'Orders sheet') + '<span class="wmx-leg"><i class="ok"></i>' + LL('выполнено', 'done') + '<i class="pl"></i>' + LL('запланировано', 'planned') + '<i class="miss"></i>' + LL('без отметки', 'not marked') + '<i class="no"></i>' + LL('не выполнено', 'not done') + '</span><button type="button" class="linkbtn" data-act="wmxall">' + (UI.wmxAll ? LL('последние 10 дней', 'last 10 days') : LL('вся госпитализация', 'whole stay')) + '</button></div>' + wmxGrid(x, from, to, UI.wmxAll) + '</div>';
+  }
+  if (hist.length) h += '<div class="wmx-sec"><div class="wmx-st">' + ico('note', 15) + LL('Наблюдение и заметки по дням', 'Daily notes') + '</div><div class="wmx-tl">' + hist.slice(0, 14).map(function (o) { return '<div class="d"><div class="dd">' + fmtDate(o.date) + '</div><div class="dt">' + (o.it.post ? '<p class="ps">' + esc(o.it.post) + '</p>' : '') + (o.it.note && o.it.note !== o.it.post ? '<p>' + esc(String(o.it.note).replace(o.it.post || '\u0000', '').trim()) + '</p>' : '') + '</div></div>'; }).join('') + '</div></div>';
+  return h + '</div></section>';
+}
+function wmxAct(a, g) {
+  switch (a) {
+    case 'wmx': S.wmx = g('id'); render(); return true;
+    case 'wmxclose': S.wmx = null; render(); return true;
+    case 'wmxp': S.wmx = null; openPatient(g('id')); return true;
+    case 'wmxall': UI.wmxAll = !UI.wmxAll; saveUI(); render(); return true;
+  }
+  return false;
+}
+/* полные панели последних анализов из c_wardx: каждая панель за последний день целиком, прошлое значение рядом, давние показатели с датой */
+var WMP = [
+  ['ОАК', [[/^Гемоглобин \(HGB\)/, 'Hb', 'гемоглобин'], [/^Лейкоциты\s*\(WBC\)/, 'лейкоциты', 'лейкоциты'], [/^Тромбоциты\s*\(PLT\)/, 'тромбоциты', 'тромбоциты'], [/^Эритроциты\s*\(RBC\)/, 'эритроциты'], [/^Гематокрит/, 'гематокрит'], [/^Нейтрофилы\s*\(Neut%\)/, 'нейтрофилы %'], [/^Лимфоциты\s*\(Lymph%\)/, 'лимфоциты %'], [/^Палочкоядерные/, 'палочкоядерные %'], [/^Сегментоядерные/, 'сегментоядерные %']]],
+  ['Коагулограмма', [[/АЧТВ/, 'АЧТВ'], [/^Протромбиновый индекс/, 'ПТИ'], [/^Протромбиновое время/, 'ПВ'], [/нормализованн/i, 'МНО'], [/^Фибриноген/, 'фибриноген', 'фибриноген'], [/D - димер|D-димер/i, 'D-димер']]],
+  ['Биохимия', [[/реактивного белка/i, 'СРБ', 'СРБ'], [/^Прокальцитонин/i, 'прокальцитонин', 'прокальцитонин'], [/альбумина/i, 'альбумин', 'альбумин'], [/общего белка/i, 'общий белок'], [/^Определение креатинина/i, 'креатинин', ''], [/СКФ/, 'СКФ', ''], [/мочевины/i, 'мочевина'], [/калия/i, 'K', 'К'], [/натрия/i, 'Na', 'Na'], [/кальция/i, 'Ca'], [/глюкозы в сыворотке/i, 'глюкоза'], [/общего билирубина/i, 'билирубин общ.'], [/прямого билирубина/i, 'билирубин прям.'], [/аланин/i, 'АЛТ'], [/аспартат/i, 'АСТ'], [/амилазы/i, 'амилаза'], [/лактат/i, 'лактат']]],
+  ['ОАМ', [[/^Реакция \(Ph\) мочи/, 'pH'], [/^Относительная плотность мочи/, 'плотность'], [/^Белок в моче/, 'белок'], [/^Лейкоциты в моче/, 'лейкоциты'], [/^Глюкоза в моче/, 'глюкоза'], [/^Кетоновые тела в моче/, 'кетоны']]]
+];
+function wmpSrcDays(x) { var o = { drain: {}, blood: {} }; (x.asg || []).forEach(function (a) { if (a.ty !== 10) return; (a.r || []).forEach(function (r) { var d = r[0].slice(0, 10); if (/дренаж|брюшной полости|жидкост/i.test(a.nm)) o.drain[d] = 1; if (/БХ|биохим|Б\/х|БАК|креатинин крови/i.test(a.nm)) o.blood[d] = 1; }); }); return o; }
+function wmpDay(s) { return s.slice(8, 10) + '.' + s.slice(5, 7); }
+function wmpPanels(x) {
+  var labs = x.labs || [], out = [];
+  var sd = wmpSrcDays(x), drainDays = sd.drain, bloodDays = sd.blood;
+  WMP.forEach(function (pn) {
+    var rows = [];
+    pn[1].forEach(function (m) {
+      var it = []; labs.filter(function (p) { return m[0].test(p.n); }).forEach(function (p) { it = it.concat(p.it || []); });
+      it = it.filter(function (i) { return i[1] !== '' && i[1] !== null; }).sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
+      if (it.length) rows.push({ m: m, it: it });
+    });
+    if (!rows.length) return;
+    var isCr = function (r) { return r.m[1] === 'креатинин' || r.m[1] === 'СКФ'; };
+    var src = function (d) { return drainDays[d] && !bloodDays[d] ? 'drain' : drainDays[d] && bloodDays[d] ? 'both' : 'blood'; };
+    if (pn[0] === 'Биохимия') {
+      var dr = [];
+      rows.forEach(function (r) { if (!isCr(r)) return; var keep = [], dd = []; r.it.forEach(function (i) { (src(i[0].slice(0, 10)) === 'drain' ? dd : keep).push(i); }); r.it = keep; if (dd.length) dr.push({ m: [r.m[0], r.m[1], ''], it: dd }); });
+      rows = rows.filter(function (r) { return r.it.length; });
+      if (dr.length) out.push(wmpGroup(LL('Креатинин из дренажа', 'Drain creatinine'), dr));
+    }
+    if (rows.length) out.push(wmpGroup(pn[0], rows, src));
+  });
+  return out;
+}
+function wmpGroup(title, rows, src) {
+  var day = rows.map(function (r) { return r.it[r.it.length - 1][0].slice(0, 10); }).sort().pop(), last = '';
+  var chips = rows.map(function (r) {
+    var l = r.it[r.it.length - 1], ld = l[0].slice(0, 10), prev = r.it.filter(function (i) { return i[0].slice(0, 10) < ld; }).pop(), old = ld < day;
+    if (!old && l[0] > last) last = l[0];
+    var nm = r.m[1] + (src && (r.m[1] === 'креатинин') && src(ld) === 'both' ? LL(' (источник?)', ' (source?)') : '');
+    var c = wmChip([nm, wmxFmt(l[1])], r.m[2] || '');
+    var extra = (old ? '<i class="wm-pv old">' + wmpDay(ld) + '</i>' : '') + (prev ? '<i class="wm-pv" title="' + esc(fmtDate(prev[0].slice(0, 10)) + ' ' + prev[0].slice(11, 16)) + '">' + wmpDay(prev[0]) + ': ' + esc(wmxFmt(prev[1])) + '</i>' : '');
+    return { old: old, h: c.replace(/<\/span>$/, extra + '</span>') };
+  });
+  chips.sort(function (a, b) { return (a.old ? 1 : 0) - (b.old ? 1 : 0); });
+  return '<span class="wm-g wm-gp"><span class="wm-gh">' + esc(title) + ' <i class="wm-d">' + wmpDay(day) + (last ? ' ' + last.slice(11, 16) : '') + '</i>:</span>' + chips.map(function (c) { return c.h; }).join('') + '</span>';
+}
+function wmxOf(pid) { return ((DB.cols || {}).wardx || []).filter(function (r) { return r.id === pid; })[0] || null; }
 function thSort(scope, k, label) {
   var s = S.sort[scope] || {}; var on = s.k === k;
   return '<th class="s" aria-sort="' + (on ? (s.d > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" class="th" data-act="sort" data-scope="' + scope + '" data-k="' + k + '">' + esc(label) + (on ? (s.d > 0 ? ' ↑' : ' ↓') : '') + '</button></th>';
@@ -5980,6 +6143,7 @@ function render() {
   if (S.tnt) h += renderTntSet();
   if (!S.drawer && S.wipeAsk !== false && needWipe()) h += renderWipe();
   if (S.rec) h += renderRecord();
+  if (S.wmx) h += renderWmx();
   if (S.gdView && S.rec) h += renderGd();
   if (S.qlink) h += renderQLink();
   if (S.asEdit) h += renderAsEdit();
@@ -6136,6 +6300,7 @@ document.addEventListener('click', function (ev) {
   var NEED = { qlnew: 'edit', qllink: 'edit', qldel: 'edit', savep: 'edit', saverec: 'edit', delp: 'delete', delrec: 'delete', esave: 'edit', edelete: 'delete', enrgo: 'edit', enroll: 'edit', rand: 'rand', unlockf: 'unlock', impgo: 'edit', imp: 'edit', newp: 'edit', newrec: 'edit', newreg: 'edit', newstudy: 'edit', qbsave: 'edit', qbnew: 'edit', fillsave: 'edit', cmtadd: 'edit', labsdone: 'edit', reset: 'admin', restore: 'admin', tplsave: 'edit', qsched: 'edit', qnow: 'edit', toreg: 'edit', addlinked: 'edit' };
   if (msAct(a, g)) return;
   if (rotAct(a, g)) return;
+  if (wmxAct(a, g)) return;
   if (meAct(a, g)) return;
   if (S.qhelp && a !== 'qhelp') S.qhelp = null;
   if (NEED[a] && !can(NEED[a])) { toast(LL('Недостаточно прав для роли «', 'Not allowed for role "') + (SESSION ? roleName(SESSION.role) : '') + LL('»', '"')); return; }
@@ -6519,7 +6684,7 @@ document.addEventListener('keydown', function (ev) {
     if (ev.key === 'Escape') { S.inline = null; render(); }
     return;
   }
-  if (ev.key === 'Escape') { if (S.gdView) S.gdView = null; else if (S.lpop) S.lpop = null; else if (S.pick) S.pick = null; else if (S.menu) S.menu = null; else if (S.edit) S.edit = null; else if (S.rec) S.rec = null; else if (S.qhelp) S.qhelp = null; else if (S.leave) S.leave = null; else if (S.drawer) { if (drDirty(S.drawer)) { var lvx = document.createElement('button'); lvx.setAttribute('data-act', 'close'); S.leave = { el: lvx }; } else S.drawer = null; } else if (S.qid) { S.qid = null; S.qbk = null; } else if (S.inline) S.inline = null; render(); return; }
+  if (ev.key === 'Escape') { if (S.wmx) S.wmx = null; else if (S.gdView) S.gdView = null; else if (S.lpop) S.lpop = null; else if (S.pick) S.pick = null; else if (S.menu) S.menu = null; else if (S.edit) S.edit = null; else if (S.rec) S.rec = null; else if (S.qhelp) S.qhelp = null; else if (S.leave) S.leave = null; else if (S.drawer) { if (drDirty(S.drawer)) { var lvx = document.createElement('button'); lvx.setAttribute('data-act', 'close'); S.leave = { el: lvx }; } else S.drawer = null; } else if (S.qid) { S.qid = null; S.qbk = null; } else if (S.inline) S.inline = null; render(); return; }
   if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('tr[data-act]')) { ev.preventDefault(); ev.target.click(); }
 });
 document.addEventListener('input', function (ev) {
