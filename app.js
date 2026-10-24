@@ -5196,8 +5196,9 @@ function briefText() {
   if (b.mdt.length) out.push('МДГ сегодня:\n' + b.mdt.map(function (x) { return '- ' + x; }).join('\n'));
   if (b.due.length) out.push('Просрочено:\n' + b.due.map(function (x) { return '- ' + x; }).join('\n'));
   if (b.cps.length) out.push('Исследования:\n' + b.cps.map(function (x) { return '- ' + x; }).join('\n'));
-  var inDept = DB.cols.planner.filter(function (r) { return inWard(r); });
-  out.push('В отделении сейчас: ' + inDept.length + (inDept.length ? ' (' + inDept.map(function (r) { return pubName(r.fio, r.pid) + (r.surgeryDate ? ', операция ' + fmtDate(r.surgeryDate) : '') ; }).join('; ') + ')' : ''));
+  var inDept = DB.cols.planner.filter(function (r) { return inWard(r); }), wD2 = wardDmed();
+  if (wD2) out.push('В отделении сейчас (DMED, монитор): ' + wD2.length + (wD2.length ? ' (' + wD2.map(function (w) { return pubName(w.name, w.pid) + (w.op ? ', операция ' + fmtDate(w.op) : '') + (w.icu ? ', ЦАРИТ' : ''); }).join('; ') + ')' : ''));
+  else out.push('В отделении сейчас: ' + inDept.length + (inDept.length ? ' (' + inDept.map(function (r) { return pubName(r.fio, r.pid) + (r.surgeryDate ? ', операция ' + fmtDate(r.surgeryDate) : '') ; }).join('; ') + ')' : ''));
   var q = qiCalc(DB.patients.filter(function (p) { return p.d.date && p.d.date >= isoOf(addDays(isoOf(new Date()), -365)); }));
   out.push('Показатели качества за 12 мес: операций ' + q.n + '; CD III+ ' + q.cd3[0] + '/' + q.cd3[1] + '; несостоятельность ' + q.leak[0] + '/' + q.leak[1] + '; конверсия ' + q.conv[0] + '/' + q.conv[1] + '; R0 ' + q.r0[0] + '/' + q.r0[1] + '; 12+ л/у ' + q.ln[0] + '/' + q.ln[1]);
   return out.join('\n\n');
@@ -5572,6 +5573,13 @@ function briefing(forAI) {
   out.sum = briefSum(nm);
   return out;
 }
+/* кто в отделении: факт по последнему монитору DMED (c_ward), планировщик только запасной вариант (правило Ахрора 24.10.2026) */
+function wardDmed(td) {
+  td = td || isoOf(new Date());
+  var reps = ((DB.cols || {}).ward || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)) || String(b.at || '').localeCompare(String(a.at || '')); }), r = reps[0];
+  if (!r || !r.items || !r.date || r.date > td || ddays(r.date, td) > 2) return null;
+  return r.items.map(function (it) { var ops = (it.op || []).map(function (o) { return o.date; }).filter(function (d) { return d && d <= td; }).sort(); return { pid: it.pid, name: it.name, icu: it.icu, op: ops.length ? ops[ops.length - 1] : '' }; });
+}
 function inWard(r, td) {
   td = td || isoOf(new Date());
   if (r.status === 'Отменено' || r.status === 'Завершено' || (r.discharge && r.discharge < td)) return false;
@@ -5585,10 +5593,16 @@ function briefSum(nm) {
   var post = ward.filter(function (r) { return r.surgeryDate && r.surgeryDate <= td; }).sort(function (a, b) { return a.surgeryDate < b.surgeryDate ? -1 : 1; });
   var pre = ward.filter(function (r) { return !r.surgeryDate || r.surgeryDate > td; });
   var opWhat = function (r) { return [r.dx, r.surgeon ? ov(r.surgeon) : ''].filter(Boolean).join(', '); };
+  var W = wardDmed(td);
+  if (W) {
+    var itW = function (w, x) { return { k: 'pat', act: 'openp', id: w.pid, name: nm(w.name, w.pid), x: x || '' }; };
+    post = W.filter(function (w) { return w.op; }).sort(function (a, b) { return a.op < b.op ? -1 : 1; });
+    pre = W.filter(function (w) { return !w.op; });
+  }
   var S2 = {
-    ward: ward.length,
-    post: post.map(function (r) { var d = -daysTo(r.surgeryDate); return it(r, d === 0 ? LL('день операции', 'day of surgery') : d + LL(' сут', ' POD')); }),
-    pre: pre.map(function (r) { return it(r, r.surgeryDate ? LL('операция ', 'surgery ') + fmtDate(r.surgeryDate) : LL('дата операции не назначена', 'no surgery date')); }),
+    ward: W ? W.length : ward.length,
+    post: W ? post.map(function (w) { var d = -daysTo(w.op); return itW(w, (d === 0 ? LL('день операции', 'day of surgery') : d + LL(' сут', ' POD')) + (w.icu ? LL(', ЦАРИТ', ', ICU') : '')); }) : post.map(function (r) { var d = -daysTo(r.surgeryDate); return it(r, d === 0 ? LL('день операции', 'day of surgery') : d + LL(' сут', ' POD')); }),
+    pre: W ? pre.map(function (w) { return itW(w, LL('операции в DMED нет', 'no surgery in DMED')); }) : pre.map(function (r) { return it(r, r.surgeryDate ? LL('операция ', 'surgery ') + fmtDate(r.surgeryDate) : LL('дата операции не назначена', 'no surgery date')); }),
     opsT: P.filter(function (r) { return live(r) && r.surgeryDate === td; }).map(function (r) { return it(r, opWhat(r)); }),
     opsTm: P.filter(function (r) { return live(r) && r.surgeryDate === tm; }).map(function (r) { return it(r, opWhat(r)); }),
     adm: P.filter(function (r) { return live(r) && r.date === td && r.status !== 'Завершено'; }).map(function (r) { return it(r, r.dx || ''); }),
@@ -5838,7 +5852,7 @@ function renderHome() {
   var td = isoOf(new Date()), ws = weekStart(), we = new Date(ws); we.setDate(we.getDate() + 6);
   var wsI = isoOf(ws), weI = isoOf(we), hr = new Date().getHours(), b = briefing();
   var greet = hr < 5 ? LL('Доброй ночи', 'Good night') : hr < 12 ? LL('Доброе утро', 'Good morning') : hr < 18 ? LL('Добрый день', 'Good afternoon') : LL('Добрый вечер', 'Good evening');
-  var inDept = DB.cols.planner.filter(function (r) { return inWard(r, td); }).length + DB.patients.filter(function (p) { return cardInWard(p, td); }).length;
+  var wD = wardDmed(td), inDept = wD ? wD.length : DB.cols.planner.filter(function (r) { return inWard(r, td); }).length + DB.patients.filter(function (p) { return cardInWard(p, td); }).length;
   var opsWeek = DB.cols.planner.filter(function (r) { return r.surgeryDate >= wsI && r.surgeryDate <= weI && r.status !== 'Отменено'; }).concat(cardOpsIn(wsI, weI));
   var mdtWait = DB.cols.mdt.filter(mdtWaiting).length;
   var dateStr = new Date().toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -5857,7 +5871,7 @@ function renderHome() {
   function sec(title, icon, body, n) { return '<div class="bs"><div class="bs-h">' + ico(icon, 15) + '<b>' + title + '</b><span class="cnt">' + n + '</span></div>' + body + '</div>'; }
   var labsBody = b.labs.length ? b.labs.map(function (x) { return '<div class="bi bi-' + x.st + '"><span class="pod">' + x.pod + '<i>' + LL('сут', 'POD') + '</i></span><div class="bi-t"><b>' + esc(x.name || x.who) + '</b><span>' + esc(x.op) + ' · ' + x.route + ' · ' + LL('окно ', 'window ') + x.win[0] + '-' + x.win[1] + LL(' сут', ' d') + (x.noRoute ? ' · <button type="button" class="linkbtn" data-act="openrec" data-k="planner" data-id="' + x.rid + '">' + LL('указать путь', 'set route') + '</button>' : '') + '</span></div><span class="bi-s">' + x.stTxt + '</span>' + (can('edit') ? '<button type="button" class="btn small" data-act="labsdone" data-id="' + x.rid + '">' + ico('check', 14) + LL('Взяты', 'Taken') + '</button>' : '') + '</div>'; }).join('') : '<p class="bnone">' + LL('Сегодня контрольные анализы никому не положены.', 'No control labs due today.') + '</p>';
   h += '<section class="panel brief wide"><div class="ph"><h2>' + LL('Брифинг на сегодня', 'Today\'s briefing') + '</h2><button type="button" class="btn small ai" data-act="aiopen">' + ico('sparkle', 14) + LL('Разбор ИИ', 'AI review') + '</button></div>';
-  h += '<div class="bsum">' + briefSumLines(b.sum).map(function (l) { return '<div class="sl"><span class="sl-ic">' + ico(l[0], 15) + '</span><div class="sl-b"><div class="sl-t">' + l[1] + '</div>' + (l[2] && l[2].length ? '<div class="bchips">' + l[2].map(function (x) { return '<button type="button" class="bchip" data-act="openrec" data-k="' + x.k + '" data-id="' + x.id + '"><b>' + esc(x.name) + '</b>' + (x.x ? '<span>' + esc(x.x) + '</span>' : '') + '</button>'; }).join('') + '</div>' : '') + '</div></div>'; }).join('') + '</div>';
+  h += '<div class="bsum">' + briefSumLines(b.sum).map(function (l) { return '<div class="sl"><span class="sl-ic">' + ico(l[0], 15) + '</span><div class="sl-b"><div class="sl-t">' + l[1] + '</div>' + (l[2] && l[2].length ? '<div class="bchips">' + l[2].map(function (x) { return '<button type="button" class="bchip" data-act="' + (x.act || 'openrec') + '" data-k="' + x.k + '" data-id="' + esc(x.id || '') + '"><b>' + esc(x.name) + '</b>' + (x.x ? '<span>' + esc(x.x) + '</span>' : '') + '</button>'; }).join('') + '</div>' : '') + '</div></div>'; }).join('') + '</div>';
   h += aiInline('home', aiViewCtx('home'), 'Главное на сегодня для врачей сектора: 3-5 коротких пунктов по срочности (кому что сделать, кого проверить, риски). Только то, что требует действия.', LL('ИИ: главное на сегодня', 'AI: what matters today'));
   h += '<div class="bgrid"><div>';
   h += sec(LL('Контрольные анализы после операции', 'Post-op control labs'), 'flask', labsBody, b.labs.length) + '</div><div>';
