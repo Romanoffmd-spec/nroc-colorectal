@@ -1467,7 +1467,7 @@ function wardMonitor() {
   h += '<div class="wm-grid">' + (r.items || []).map(function (it) {
     var row = function (lab, body) { return body ? '<div class="wm-r"><div class="wm-l">' + lab + '</div>' + body + '</div>' : ''; };
     return '<article class="wm-c' + (it.icu ? ' icu' : '') + '"><div class="wm-top"><button type="button" class="wm-n" data-act="wmx" data-id="' + esc(it.pid || '') + '" title="' + esc(LL('Мониторная карточка: динамика назначений и анализов', 'Monitor card')) + '">' + esc(it.name) + '</button><span class="muted">' + esc(it.age || '') + '</span>' + (it.icu ? '<span class="wm-icu">' + esc(it.icu) + '</span>' : '') + wmRes(it.pid) + '</div>' + wmPod(it)
-      + row(LL('Анализы сегодня', 'Labs today') + (it.todayLabel ? ' (' + esc(it.todayLabel) + ')' : ''), (it.today || []).map(wmAny).join(''))
+      + row(LL('Анализы сегодня', 'Labs today') + (it.todayLabel ? ' (' + esc(it.todayLabel) + ')' : ''), (it.today || []).map(function (t) { var wx = wmxOf(it.pid); if (wx && !Array.isArray(t[1]) && !/ожида/i.test(String(t[1]))) { var gh = wmpToday(wx, String(t[0])); if (gh) return gh; } return wmAny(t); }).join(''))
       + (wmxOf(it.pid) ? row(LL('Последние анализы', 'Latest labs') + ' <span class="wm-src">' + LL('все показатели, рядом прошлое значение', 'all values, previous next to each') + '</span>', wmpPanels(wmxOf(it.pid)).join('')) : '')
       + (!wmxOf(it.pid) && it.last && it.last.length ? row(LL('Последние контрольные анализы', 'Latest control labs'), it.last.map(function (x) { if (Array.isArray(x[1])) return wmGrp(x); var c = wmChip([x[0], x[1]]); return x[2] ? c.replace(/<\/span>$/, ' <i class="wm-d">' + esc(x[2]) + '</i></span>') : c; }).join('')) : (it.prev ? row(LL('Контрольные анализы за ', 'Control labs on ') + esc(it.prev.date), (it.prev.vals || []).map(wmChip).join('')) : ''))
       + row(LL('Контрольные анализы назначены на завтра', 'Control labs ordered for tomorrow'), it.tomorrow ? '<div class="wm-meds">' + esc(it.tomorrow) + '</div>' : '')
@@ -1602,7 +1602,7 @@ var WMP = [
 ];
 function wmpSrcDays(x) { var o = { drain: {}, blood: {} }; (x.asg || []).forEach(function (a) { if (a.ty !== 10) return; (a.r || []).forEach(function (r) { var d = r[0].slice(0, 10); if (/дренаж|брюшной полости|жидкост/i.test(a.nm)) o.drain[d] = 1; if (/БХ|биохим|Б\/х|БАК|креатинин крови/i.test(a.nm)) o.blood[d] = 1; }); }); return o; }
 function wmpDay(s) { return s.slice(8, 10) + '.' + s.slice(5, 7); }
-function wmpPanels(x) {
+function wmpPanels(x, raw) {
   var labs = x.labs || [], out = [];
   var sd = wmpSrcDays(x), drainDays = sd.drain, bloodDays = sd.blood;
   WMP.forEach(function (pn) {
@@ -1619,11 +1619,19 @@ function wmpPanels(x) {
       var dr = [];
       rows.forEach(function (r) { if (!isCr(r)) return; var keep = [], dd = []; r.it.forEach(function (i) { (src(i[0].slice(0, 10)) === 'drain' ? dd : keep).push(i); }); r.it = keep; if (dd.length) dr.push({ m: [r.m[0], r.m[1], ''], it: dd }); });
       rows = rows.filter(function (r) { return r.it.length; });
-      if (dr.length) out.push(wmpGroup(LL('Креатинин из дренажа', 'Drain creatinine'), dr));
+      if (dr.length) out.push(raw ? { t: 'drain', title: LL('Креатинин из дренажа', 'Drain creatinine'), rows: dr } : wmpGroup(LL('Креатинин из дренажа', 'Drain creatinine'), dr));
     }
-    if (rows.length) out.push(wmpGroup(pn[0], rows, src));
+    if (rows.length) out.push(raw ? { t: pn[0], title: pn[0], rows: rows, src: src } : wmpGroup(pn[0], rows, src));
   });
   return out;
+}
+/* «Анализы сегодня»: готовый сегодня анализ показываем сразу результатами этой панели за сегодня */
+function wmpToday(x, nm) {
+  var td = isoOf(new Date()), key = /дренаж|брюшной полости|жидкост/i.test(nm) ? 'drain' : /ОАМ|моч/i.test(nm) ? 'ОАМ' : /коагул/i.test(nm) ? 'Коагулограмма' : /ОАК|кров[иь] общ/i.test(nm) ? 'ОАК' : /БХ|БАК|биохим|Б\/х|креатинин|альбумин|электролит|глюкоз|СРБ|прокальц/i.test(nm) ? 'Биохимия' : null;
+  if (!key) return null;
+  var g = wmpPanels(x, true).filter(function (o) { return o.t === key; })[0]; if (!g) return null;
+  var rows = g.rows.filter(function (r) { return r.it[r.it.length - 1][0].slice(0, 10) === td; });
+  return rows.length ? wmpGroup(nm, rows, g.src) : null;
 }
 function wmpGroup(title, rows, src) {
   var day = rows.map(function (r) { return r.it[r.it.length - 1][0].slice(0, 10); }).sort().pop(), last = '';
