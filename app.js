@@ -2596,13 +2596,15 @@ function gdMob() { return /iP(ad|hone|od)|Android/.test(navigator.userAgent) || 
 function gdId(s) { s = String(s || '').trim(); var m = /\/d\/([\w-]{20,})/.exec(s) || /[?&]id=([\w-]{20,})/.exec(s) || /folders\/([\w-]{20,})/.exec(s); if (m) return m[1]; return /^[\w-]{20,}$/.test(s) ? s : ''; }
 function gdKind(f) { var n = String(f.name || '').toLowerCase(); if (f.kind === 'folder') return 'folder'; if (/\.pptx?$/.test(n) || f.kind === 'pres') return 'pres'; if (/\.pdf$/.test(n)) return 'pdf'; if (/\.docx?$/.test(n)) return 'doc'; if (/\.xlsx?$/.test(n)) return 'sheet'; if (/\.(jpe?g|png|heic)$/.test(n)) return 'img'; if (/\.(mp4|avi|mov)$/.test(n)) return 'video'; return f.kind || 'file'; }
 function gdKindName(k) { return { pres: LL('Презентация', 'Slides'), pdf: 'PDF', doc: 'Word', sheet: LL('Таблица', 'Sheet'), folder: LL('Папка', 'Folder'), img: LL('Фото', 'Image'), video: LL('Видео', 'Video') }[k] || LL('Файл', 'File'); }
+/* Google-аккаунт для файлов МДГ: при нескольких аккаунтах в браузере Google сам выбирает последний, и файл может открыться в чужом или разлогиненном аккаунте. Номер (0, 1...) или почта, хранится в этом браузере. */
+function gdAcct() { try { var a = localStorage.getItem('gdAcct'); return a === null ? '0' : a; } catch (e) { return '0'; } }
 function gdUrl(f, embed) {
-  var k = gdKind(f), q = embed ? 'rm=minimal&' : '';
-  if (k === 'folder') return 'https://drive.google.com/drive/folders/' + f.id;
+  var k = gdKind(f), au = gdAcct(), q = (embed ? 'rm=minimal&' : '') + (au !== '' ? 'authuser=' + encodeURIComponent(au) + '&' : '');
+  if (k === 'folder') return 'https://drive.google.com/drive/folders/' + f.id + (au !== '' ? '?authuser=' + encodeURIComponent(au) : '');
   if (k === 'pres') return 'https://docs.google.com/presentation/d/' + f.id + '/edit?' + q + 'rtpof=true&sd=true';
   if (k === 'doc') return 'https://docs.google.com/document/d/' + f.id + '/edit?' + q + 'rtpof=true&sd=true';
   if (k === 'sheet') return 'https://docs.google.com/spreadsheets/d/' + f.id + '/edit?' + q + 'rtpof=true&sd=true';
-  return 'https://drive.google.com/file/d/' + f.id + (embed ? '/preview' : '/view');
+  return 'https://drive.google.com/file/d/' + f.id + (embed ? '/preview' : '/view') + (au !== '' ? '?authuser=' + encodeURIComponent(au) : '');
 }
 function gdCanEdit(f) { var k = gdKind(f); return k === 'pres' || k === 'doc' || k === 'sheet'; }
 function presLinks(r) {
@@ -2620,8 +2622,8 @@ function presCard(r) {
       + '<button type="button" class="iconbtn" data-act="gddel" data-i="' + i + '" aria-label="' + LL('Отвязать файл', 'Unlink file') + '" title="' + LL('Отвязать (файл на Drive останется)', 'Unlink (file stays on Drive)') + '">' + ico('x', 16) + '</button></span></div>';
   }).join('') + '</div>' : '<p class="muted small">' + LL('Файлы не привязаны. Подготовьте презентацию в папке Colorectal MDT и вставьте ссылку ниже.', 'No files linked yet. Prepare the slides in the Colorectal MDT folder and paste the link below.') + '</p>';
   h += '<div class="gdadd"><input id="gdlink" type="url" inputmode="url" placeholder="' + LL('Ссылка на файл или папку Google Drive', 'Google Drive file or folder link') + '" aria-label="' + LL('Ссылка Google Drive', 'Google Drive link') + '"><input id="gdname" type="text" placeholder="' + LL('Название (необязательно)', 'Name (optional)') + '" aria-label="' + LL('Название', 'Name') + '"><button type="button" class="btn small" data-act="gdadd">' + ico('plus', 14) + LL('Привязать', 'Link') + '</button></div>';
-  h += '<div class="gdfoot"><a href="https://drive.google.com/drive/folders/' + MDT_DRIVE + '" target="_blank" rel="noopener">' + ico('ext', 13) + LL('Папка Colorectal MDT', 'Colorectal MDT folder') + '</a><a href="https://docs.google.com/presentation/create?folder=' + MDT_DRIVE + '" target="_blank" rel="noopener">' + ico('plus', 13) + LL('Новая презентация в папке', 'New slides in the folder') + '</a></div>';
-  h += '<p class="hint">' + LL('Правка идёт в самом файле на Google Drive: изменения сохраняются там сразу и видны всем, у кого есть доступ к папке. Нужен вход в Google-аккаунт с доступом к папке.', 'Edits go into the file on Google Drive itself and are saved there instantly for everyone with access to the folder. Requires a Google account with access.') + '</p></section>';
+  h += '<div class="gdfoot"><a href="https://drive.google.com/drive/folders/' + MDT_DRIVE + '" target="_blank" rel="noopener">' + ico('ext', 13) + LL('Папка Colorectal MDT', 'Colorectal MDT folder') + '</a><a href="https://docs.google.com/presentation/create?folder=' + MDT_DRIVE + '" target="_blank" rel="noopener">' + ico('plus', 13) + LL('Новая презентация в папке', 'New slides in the folder') + '</a><button type="button" class="btn small" data-act="gdacct" title="' + LL('Какой Google-аккаунт этого браузера открывает файлы', 'Which Google account of this browser opens the files') + '">' + LL('Google-аккаунт: ', 'Google account: ') + esc(gdAcct() === '' ? LL('авто', 'auto') : gdAcct()) + '</button></div>';
+  h += '<p class="hint">' + LL('Файл открывается в новой вкладке Google Презентаций, правка идёт в самом файле на Drive и сразу видна всем, у кого есть доступ к папке. Если Google просит войти или пишет «нет доступа», выберите аккаунт с доступом к папке кнопкой «Google-аккаунт».', 'Edits go into the file on Google Drive itself and are saved there instantly for everyone with access to the folder. Requires a Google account with access.') + '</p></section>';
   return h;
 }
 function renderGd() {
@@ -6436,7 +6438,8 @@ document.addEventListener('click', function (ev) {
       if (ak === 'redcap' && pp.d.date) { pre2.opDate = pp.d.date; pre2.contact = isoOf(addDays(pp.d.date, 30)); }
       openRec(ak, null, pre2); break;
     }
-    case 'gdopen': { var gf = (S.rec.r.pres || [])[+g('i')]; if (!gf) break; if (gdMob() || !gdCanEdit(gf) && gdKind(gf) !== 'pdf') window.open(gdUrl(gf), '_blank', 'noopener'); else { S.gdView = gf; render(); } break; }
+    case 'gdopen': { var gf = (S.rec.r.pres || [])[+g('i')]; if (!gf) break; window.open(gdUrl(gf), 'adal_gd_' + gf.id); break; }
+    case 'gdacct': { var ga = window.prompt(LL('Google-аккаунт для файлов МДГ в этом браузере: номер (0 первый, 1 второй...) или почта. Пусто: выбирает Google.', 'Google account for MDT files in this browser: index (0, 1...) or email. Empty: let Google choose.'), gdAcct()); if (ga === null) break; try { localStorage.setItem('gdAcct', ga.trim()); } catch (e) {} render(); break; }
     case 'gdclose': S.gdView = null; render(); break;
     case 'gddel': { var gl = (S.rec.r.pres || []).slice(); gl.splice(+g('i'), 1); S.rec.r.pres = gl; render(); break; }
     case 'gdadd': { var gin = document.getElementById('gdlink'), gnm = document.getElementById('gdname'), gid = gdId(gin && gin.value); if (!gid) { toast(LL('Не вижу ссылку Google Drive', 'Not a Google Drive link')); break; } var gfo = /folders\//.test(gin.value), gpr = /presentation\//.test(gin.value); if ((S.rec.r.pres || []).some(function (x) { return x.id === gid; })) { toast(LL('Этот файл уже привязан', 'Already linked')); break; } S.rec.r.pres = (S.rec.r.pres || []).concat([{ id: gid, name: (gnm && gnm.value.trim()) || (gfo ? LL('Папка', 'Folder') : LL('Презентация', 'Slides')), kind: gfo ? 'folder' : (gpr || !/\.(pdf|docx?|xlsx?|jpe?g|png|mp4|avi)$/i.test((gnm && gnm.value) || '')) ? 'pres' : '', at: nowIso(), by: me() }]); render(); break; }
