@@ -1461,7 +1461,7 @@ function wmPod(it) {
 function wardMonitor() {
   var reps = ((DB.cols || {}).ward || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)) || String(b.at || '').localeCompare(String(a.at || '')); }), r = reps[0];
   var td = isoOf(new Date()), early = new Date().getHours() < 9;
-  var h = '<section class="wm' + (early ? ' wm-hot' : '') + '"><div class="wm-h"><div><b>' + LL('Монитор отделения', 'Ward monitor') + '</b><span>' + LL('анализы и назначения', 'labs and orders') + (r ? ' · <b class="wm-last">' + LL('ПОСЛЕДНИЙ АПДЕЙТ:', 'LAST UPDATE:') + '</b> ' + fmtDate(r.date) + (r.at ? ', ' + String(r.at).slice(11, 16) : '') : '') + '</span></div>' + (early ? '<span class="wm-badge"><i></i>' + LL('до операций, обход', 'before surgery, rounds') + '</span>' : '') + '</div>';
+  var h = '<section class="wm' + (early ? ' wm-hot' : '') + '"><div class="wm-h"><div><b>' + LL('Монитор отделения', 'Ward monitor') + '</b><span>' + LL('анализы и назначения', 'labs and orders') + (r ? ' · <b class="wm-last">' + LL('ПОСЛЕДНИЙ АПДЕЙТ:', 'LAST UPDATE:') + '</b> ' + fmtDate(r.date) + (r.at ? ', ' + String(r.at).slice(11, 16) : '') : '') + '</span></div>' + '<span class="wm-hr">' + (early ? '<span class="wm-badge"><i></i>' + LL('до операций, обход', 'before surgery, rounds') + '</span>' : '') + (r && r.report ? '<button type="button" class="wm-dl" data-act="wmrep" title="' + LL('Текстовый отчёт по отделению за ', 'Ward report for ') + fmtDate(r.date) + '">' + ico('note', 14) + LL('Скачать отчёт (Word)', 'Download report (Word)') + '</button>' : '') + '</span></div>';
   if (!r) return h + '<p class="wm-empty">' + LL('Сводки пока нет. Обновляется по запросу.', 'No summary yet.') + '</p></section>';
   if (r.date !== td) h += '<p class="wm-old">' + LL('Сводка за ', 'Summary for ') + fmtDate(r.date) + LL(', на сегодня ещё не обновлена', ', not updated today') + '</p>';
   h += '<div class="wm-grid">' + (r.items || []).map(function (it) {
@@ -1584,9 +1584,18 @@ function renderWmx() {
   if (hist.length) h += '<div class="wmx-sec"><div class="wmx-st">' + ico('note', 15) + LL('Наблюдение и заметки по дням', 'Daily notes') + '</div><div class="wmx-tl">' + hist.slice(0, 14).map(function (o) { return '<div class="d"><div class="dd">' + fmtDate(o.date) + '</div><div class="dt">' + (o.it.post ? '<p class="ps">' + esc(o.it.post) + '</p>' : '') + (o.it.note && o.it.note !== o.it.post ? '<p>' + esc(String(o.it.note).replace(o.it.post || '\u0000', '').trim()) + '</p>' : '') + '</div></div>'; }).join('') + '</div></div>';
   return h + '</div></section>';
 }
+/* текстовый отчёт по отделению (r.report, тот же текст, что уходит Ахрору в чат): строки в абзацы, **жирный**, пустая строка = отступ */
+function wmRepHtml(t) {
+  return String(t || '').split(/\r?\n/).map(function (ln) {
+    if (!ln.trim()) return '<p>&nbsp;</p>';
+    var e = esc(ln).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    return '<p>' + e + '</p>';
+  }).join('');
+}
 function wmxAct(a, g) {
   switch (a) {
     case 'wmx': S.wmx = g('id'); render(); return true;
+    case 'wmrep': { var wr = ((DB.cols || {}).ward || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)) || String(b.at || '').localeCompare(String(a.at || '')); })[0]; if (!wr || !wr.report) { toast(LL('Отчёта к этой сводке нет', 'No report for this summary')); return true; } downloadBlob(('Отчёт по отделению ' + fmtDate(wr.date)).replace(/[\\\/:*?"<>|]+/g, ' ') + '.docx', docxFromHtml(wmRepHtml(wr.report))); return true; }
     case 'wmxclose': S.wmx = null; render(); return true;
     case 'wmxp': S.wmx = null; openPatient(g('id')); return true;
     case 'wmxall': UI.wmxAll = !UI.wmxAll; saveUI(); render(); return true;
