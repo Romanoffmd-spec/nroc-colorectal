@@ -4877,26 +4877,50 @@ function cloudInit() {
   loadScript(base + 'firebase-app-compat.js').then(function () { return Promise.all([loadScript(base + 'firebase-auth-compat.js'), loadScript(base + 'firebase-firestore-compat.js')]); }).then(function () {
     CLOUD.fb = window.firebase; CLOUD.fb.initializeApp(CLOUD.cfg); CLOUD.db = CLOUD.fb.firestore(); CLOUD.ready = true;
     CLOUD.fb.auth().onAuthStateChanged(function (u) {
-      if (!u) { CLOUD.authed = false; if (SESSION) setSession(null); authPrefill(); render(); return; }
-      if (SESSION && SESSION.id !== u.uid) setSession(null);
-      CLOUD.db.collection('users').doc(u.uid).get().then(function (d) {
-        var p = d.exists ? d.data() : null;
-        if (!p) { CLOUD.fb.auth().signOut(); return; }
-        if (p.status !== 'active') { S.auth = S.auth || { mode: 'login' }; S.auth.mode = 'wait'; S.auth.busy = false; CLOUD.fb.auth().signOut(); render(); return; }
-        CLOUD.authed = true; if (CLOUD.pfPending) profPush(); setSession({ id: u.uid, email: u.email, name: p.name, role: p.role, admin: !!p.admin }); S.auth = null; if (S.view === 'portal') S.view = 'home';
-        cloudListen(); aiLoadShared(); qlListen(); render();
-      });
+      if (!u) { CLOUD.authed = false; usersUnlisten(); if (SESSION) setSession(null); if (!S.auth || S.auth.mode !== 'wait') authPrefill(); render(); return; }
+      if (CLOUD.reg) return; /* идёт регистрация: заявку запишет cloudRegister, потом сам выйдет */
+      cloudOnUser(u);
     });
     render();
   }).catch(function () { CLOUD.err = LL('Не удалось загрузить Firebase: проверьте интернет', 'Could not load Firebase: check internet'); render(); });
 }
 function cfgAdmins() { return (CLOUD.cfg && CLOUD.cfg.admins || []).map(function (x) { return String(x).toLowerCase(); }); }
+/* профиль пользователя в users: если его нет (регистрация прервалась), создаём заявку */
+function cloudProfile(u, info) {
+  var ref = CLOUD.db.collection('users').doc(u.uid);
+  return ref.get().then(function (d) {
+    if (d.exists) return d.data();
+    var email = String(u.email || '').toLowerCase(), adm = cfgAdmins().indexOf(email) >= 0;
+    var p = { name: (info && info.name) || u.displayName || email, email: email, role: (info && info.role) || 'resident', status: adm ? 'active' : 'pending', admin: adm, created: nowIso() };
+    return ref.set(p).then(function () { return p; });
+  });
+}
+function authWait(status) {
+  var a = S.auth || (S.auth = { mode: 'login', role: 'doctor' });
+  a.busy = false; a.pass = a.pass2 = '';
+  if (status === 'rejected') { a.mode = 'login'; a.show = true; a.err = LL('Доступ отключён администратором', 'Access has been disabled by the administrator'); }
+  else { a.mode = 'wait'; a.err = ''; }
+  render();
+}
+function cloudOnUser(u) {
+  if (SESSION && SESSION.id !== u.uid) setSession(null);
+  cloudProfile(u).then(function (p) {
+    if (p.status !== 'active') { authWait(p.status); CLOUD.fb.auth().signOut(); return; }
+    CLOUD.authed = true; if (CLOUD.pfPending) profPush(); setSession({ id: u.uid, email: u.email, name: p.name, role: p.role, admin: !!p.admin }); S.auth = null; if (S.view === 'portal') S.view = 'home';
+    cloudListen(); aiLoadShared(); qlListen(); usersListen(); render();
+  }).catch(function (e) { var a = S.auth || (S.auth = { mode: 'login', role: 'doctor' }); a.busy = false; a.show = true; a.err = authErr(e && e.code); CLOUD.fb.auth().signOut(); render(); });
+}
 function cloudRegister(email, pass, name, role) {
   if (!CLOUD.ready) { S.auth.busy = false; S.auth.err = LL('Облако ещё подключается, попробуйте через секунду', 'Cloud is still connecting, try again'); render(); return; }
-  var adm = cfgAdmins().indexOf(email) >= 0;
-  CLOUD.fb.auth().createUserWithEmailAndPassword(email, pass).then(function (cr) {
-    return CLOUD.db.collection('users').doc(cr.user.uid).set({ name: name, email: email, role: role, status: adm ? 'active' : 'pending', admin: adm, created: nowIso() });
-  }).then(function () { if (!adm) { S.auth.mode = 'wait'; S.auth.busy = false; CLOUD.fb.auth().signOut(); render(); } }).catch(function (e) { S.auth.busy = false; S.auth.err = authErr(e.code); render(); });
+  var auth = CLOUD.fb.auth(), info = { name: name, role: role };
+  CLOUD.reg = true;
+  /* почта уже есть (прошлая регистрация не дописала заявку): входим этим паролем и дописываем */
+  auth.createUserWithEmailAndPassword(email, pass).catch(function (e) {
+    if (e && e.code === 'auth/email-already-in-use') return auth.signInWithEmailAndPassword(email, pass).catch(function () { throw { code: 'auth/email-already-in-use' }; });
+    throw e;
+  }).then(function (cr) {
+    return cloudProfile(cr.user, info).then(function (p) { CLOUD.reg = false; if (p.status === 'active') cloudOnUser(cr.user); else { auth.signOut(); authWait(p.status); } });
+  }).catch(function (e) { CLOUD.reg = false; if (auth.currentUser) auth.signOut(); S.auth.busy = false; S.auth.err = authErr(e && e.code); render(); });
 }
 function cloudLogin(email, pass) {
   if (!CLOUD.ready) { S.auth.busy = false; S.auth.err = LL('Облако ещё подключается, попробуйте через секунду', 'Cloud is still connecting, try again'); render(); return; }
@@ -4966,18 +4990,30 @@ function cloudListen() {
     if (!busy) render(); else CLOUD.stale = true;
   }, function (e) { CLOUD.err = e.code || e.message; render(); });
 }
+/* список пользователей для администратора обновляется в реальном времени */
+function usersListen() {
+  if (!CLOUD.on || CLOUD.uUnsub || !isAdmin()) return;
+  CLOUD.uUnsub = CLOUD.db.collection('users').onSnapshot(function (s) {
+    var a = []; s.forEach(function (d) { var x = d.data(); x.id = d.id; a.push(x); }); S.users = a;
+    var busy = S.drawer || S.rec || S.edit || S.enr || S.fill || S.msEdit || S.msCite || S.cmNew || S.zot;
+    if (!busy) render();
+  }, function (e) { CLOUD.uUnsub = null; toast(e.code || e.message); });
+}
+function usersUnlisten() { if (CLOUD.uUnsub) { CLOUD.uUnsub(); CLOUD.uUnsub = null; } S.users = null; }
+function usersPending() { return (S.users || []).filter(function (u) { return u.status === 'pending'; }).length; }
 function cloudUsers(cb) {
   if (!CLOUD.on) { cb(localUsers()); return; }
   CLOUD.db.collection('users').get().then(function (s) { var a = []; s.forEach(function (d) { var x = d.data(); x.id = d.id; a.push(x); }); cb(a); }).catch(function (e) { toast(e.code || e.message); cb([]); });
 }
 function setUser(id, patch) {
   if (!CLOUD.on) { var us = localUsers(); us.forEach(function (u) { if (u.id === id) Object.keys(patch).forEach(function (k) { u[k] = patch[k]; }); }); saveLocalUsers(us); S.users = us; render(); return; }
-  CLOUD.db.collection('users').doc(id).update(patch).then(function () { cloudUsers(function (a) { S.users = a; render(); }); });
+  CLOUD.db.collection('users').doc(id).update(patch).then(function () { if (!CLOUD.uUnsub) cloudUsers(function (a) { S.users = a; render(); }); }).catch(function (e) { toast(e.code || e.message); });
 }
 function renderUsers() {
   if (!isAdmin()) return '<div class="page"><div class="empty">' + LL('Раздел доступен только администратору', 'Administrators only') + '</div></div>';
   if (!S.users && !CLOUD.on) S.users = localUsers();
-  if (!S.users) { cloudUsers(function (a) { S.users = a; render(); }); return '<div class="page"><div class="empty">' + LL('Загрузка…', 'Loading…') + '</div></div>'; }
+  if (CLOUD.on) usersListen();
+  if (!S.users) { if (!CLOUD.uUnsub) cloudUsers(function (a) { S.users = a; render(); }); return '<div class="page"><div class="empty">' + LL('Загрузка…', 'Loading…') + '</div></div>'; }
   var h = pageHead(LL('Администрирование', 'Administration'), LL('Пользователи', 'Users'), LL('Новые регистрации ждут подтверждения администратором. Врач: полный доступ (ввод, правка, удаление, рандомизация, одобрение регистров). Резидент: ввод и правка, комментарии, заявки на регистры. Студент: только обезличенные данные и комментарии.', 'New sign-ups wait for admin approval. Doctor: full access (entry, edit, delete, randomisation, approvals). Resident: entry and edit, comments, registry requests. Student: anonymised data and comments only.'), '');
   var list = S.users.slice().sort(function (a, b) { return (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1); });
   h += '<div class="tablewrap"><table class="grid"><thead><tr><th>' + LL('Пользователь', 'User') + '</th><th>' + LL('Почта', 'Email') + '</th><th>' + LL('Права', 'Rights') + '</th><th>' + LL('Статус', 'Status') + '</th><th></th></tr></thead><tbody>';
@@ -6205,7 +6241,7 @@ function renderTop() {
     var unr = inboxUnread();
     h += '<div class="pop right" role="menu"><button type="button" class="pop-user" data-act="metab" data-v="over" title="' + LL('Открыть личный кабинет', 'Open my account') + '"><span class="av">' + esc(initials(me())) + '</span><div><b>' + esc(me()) + '</b><em>' + esc(SESSION.email) + '</em><span class="tag">' + (SESSION.admin ? LL('Администратор', 'Admin') + ' · ' : '') + roleName(SESSION.role) + '</span></div></button>';
     h += '<button type="button" class="opt" data-act="metab" data-v="over">' + ico('user', 16) + LL('Личный кабинет', 'My account') + '</button><button type="button" class="opt" data-act="metab" data-v="inbox">' + ico('bell', 16) + LL('Входящие', 'Inbox') + (unr ? '<i class="badge">' + unr + '</i>' : '') + '</button><button type="button" class="opt" data-act="metab" data-v="proj">' + ico('folder', 16) + LL('Мои проекты', 'My projects') + '</button><button type="button" class="opt" data-act="metab" data-v="prof">' + ico('lock', 16) + LL('Профиль и настройки', 'Profile and settings') + '</button><div class="pop-sep"></div>';
-    if (isAdmin()) h += '<button type="button" class="opt" data-act="view" data-v="users">' + ico('users', 16) + LL('Пользователи', 'Users') + '</button><button type="button" class="opt" data-act="cloudsetup">' + ico('cloud', 16) + LL('Облако (Firebase)', 'Cloud (Firebase)') + '</button>';
+    if (isAdmin()) h += '<button type="button" class="opt" data-act="view" data-v="users">' + ico('users', 16) + LL('Пользователи', 'Users') + (usersPending() ? ' (' + usersPending() + ')' : '') + '</button><button type="button" class="opt" data-act="cloudsetup">' + ico('cloud', 16) + LL('Облако (Firebase)', 'Cloud (Firebase)') + '</button>';
     h += '<button type="button" class="opt" data-act="backup">' + ico('download', 16) + t('menu.backup') + '</button>';
     if (isAdmin()) h += '<button type="button" class="opt" data-act="restore">' + ico('upload', 16) + t('menu.restore') + '</button><button type="button" class="opt danger" data-act="reset">' + ico('alert', 16) + t('menu.reset') + '</button>';
     h += '<button type="button" class="opt" data-act="logout">' + ico('logout', 16) + LL('Выйти', 'Sign out') + '</button></div>';
@@ -6234,7 +6270,7 @@ function renderSide() {
   var qd = qDueAll(0).length;
   h += navBtn('q', 'clipboard', LL('Анкеты', 'Questionnaires'), undefined, qd || null);
   ['mm', 'pubs', 'goals'].forEach(function (k) { h += navBtn('col:' + k, COLS[k].icon, L(COLS[k].title), DB.cols[k].length); });
-  if (isAdmin()) { h += '<div class="side-h">' + LL('Администрирование', 'Admin') + '</div>' + navBtn('users', 'shield', LL('Пользователи', 'Users')); }
+  if (isAdmin()) { h += '<div class="side-h">' + LL('Администрирование', 'Admin') + '</div>' + navBtn('users', 'shield', LL('Пользователи', 'Users'), undefined, usersPending() || ''); }
   h += '<div class="side-foot"><span class="dot-live' + (CLOUD.on ? ' cloud' : '') + '"></span>' + (CLOUD.on ? LL('Облако · общая база', 'Cloud · shared database') : LL('Локально в этом браузере', 'Local, this browser')) + '</div></div></nav>';
   return h;
 }
@@ -6340,7 +6376,7 @@ document.addEventListener('click', function (ev) {
     case 'menu': S.menu = S.menu === g('id') ? null : g('id'); render(); break;
     case 'kpiflt': { S.drawer = null; S.rec = null; S.edit = null; S.qb = null; S.menu = null; S.cmd = null; UI.fltBy = UI.fltBy || {}; var kf = {}; String(g('f') || '').split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) kf[kv.slice(0, i)] = kv.slice(i + 1); }); UI.fltBy[g('v')] = kf; UI.dfltBy = UI.dfltBy || {}; UI.dfltBy[g('v')] = {}; setView(g('v')); break; }
     case 'allcards': S.drawer = null; S.rec = null; S.edit = null; S.qb = null; S.menu = null; UI.fltBy = UI.fltBy || {}; UI.fltBy['reg:all'] = {}; setView('reg:all'); break;
-    case 'view': { S.cmd = null; if (g('v') && root.querySelector('.mnav [data-v="' + g('v') + '"], .t2-brand[data-v="' + g('v') + '"]')) { S.drawer = null; S.rec = null; S.edit = null; S.qb = null; } if (g('v') === 'users') S.users = null; var vv = g('v'), rg = vv.indexOf('reg:') === 0 ? regOf(vv.slice(4)) : null; if (rg) { UI.open = UI.open || {}; ancestors(rg).concat([rg]).forEach(function (a) { if (kids(a.id, a.kind === 'study').length) UI.open[a.id] = true; }); if (rg.kind === 'study') UI.open.studies = true; } setView(vv); break; }
+    case 'view': { S.cmd = null; if (g('v') && root.querySelector('.mnav [data-v="' + g('v') + '"], .t2-brand[data-v="' + g('v') + '"]')) { S.drawer = null; S.rec = null; S.edit = null; S.qb = null; } if (g('v') === 'users' && !CLOUD.on) S.users = null; var vv = g('v'), rg = vv.indexOf('reg:') === 0 ? regOf(vv.slice(4)) : null; if (rg) { UI.open = UI.open || {}; ancestors(rg).concat([rg]).forEach(function (a) { if (kids(a.id, a.kind === 'study').length) UI.open[a.id] = true; }); if (rg.kind === 'study') UI.open.studies = true; } setView(vv); break; }
     case 'openp': if (ev.target.closest('button') && ev.target.closest('button') !== tg) return; openPatient(g('id')); break;
     case 'newp': openPatient(null); break;
     case 'close': S.drawer = null; render(); break;
