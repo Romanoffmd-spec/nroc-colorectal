@@ -3,6 +3,7 @@
 
 /* ======================= i18n ======================= */
 var DICT = window.I18N.ui, OPT = window.I18N.opt;
+[['flt.anast', 'Анастомоз', 'Anastomosis'], ['flt.anKr', 'колоректальный, все', 'colorectal, all'], ['flt.anKrS', 'с превентивной стомой', 'with diverting stoma'], ['flt.anKrN', 'без стомы', 'no stoma']].forEach(function (x) { if (!DICT[x[0]]) DICT[x[0]] = [x[1], x[2]]; });
 var LANG = 'ru';
 function t(k, a) {
   var e = DICT[k]; var s = e ? (LANG === 'en' ? e[1] : e[0]) : k;
@@ -1344,7 +1345,7 @@ function listForReg() {
   var list = DB.patients.slice();
   if (reg) list = list.filter(function (p) { return inReg(p, reg); });
   var fl = fltOf();
-  FILTERS.forEach(function (g) { var v = fl[g.id]; if (!v) return; var o = g.opts.filter(function (x) { return x[0] === v; })[0]; if (o) list = list.filter(function (p) { return o[2](p.d); }); });
+  FILTERS.forEach(function (g) { var v = fl[g.id]; if (!v) return; var o = g.opts.filter(function (x) { return x[0] === v; })[0]; if (o) list = list.filter(function (p) { return o[2](p.d, p); }); });
   if (dfltOn()) list = list.filter(dfltPat);
   if (fl.stg) list = list.filter(function (p) { return stagesDone(p) === (fl.stg === 'done'); });
   if (fl.ph) list = list.filter(function (p) { return patPhase(p) === fl.ph; });
@@ -1357,8 +1358,18 @@ var FILTERS = [
   { id: 'access', label: 'flt.access', opts: [['mis', 'flt.mis', function (d) { return MIS.indexOf(d.access) >= 0; }], ['open', 'flt.open', function (d) { return d.access === 'Открытый'; }], ['ta', 'flt.ta', function (d) { return /TaTME/.test(d.access || ''); }], ['conv', 'flt.conv', function (d) { return d.conv === 'Да'; }]] },
   { id: 'stoma', label: 'flt.stoma', opts: [['ileo', 'flt.ileo', function (d) { return /илеостома/.test(d.stoma || ''); }], ['colo', 'flt.colo', function (d) { return /колостома|сигмостома|трансверзостома/.test(d.stoma || ''); }], ['none', 'flt.noStoma', function (d) { return d.stoma === 'Нет'; }]] },
   { id: 'cx', label: 'flt.cx', opts: [['any', 'flt.anyCx', function (d) { return ['cd1', 'cd2', 'cd3', 'cd4', 'cd5'].some(function (k) { return has(d[k]); }); }], ['cd3', 'flt.cd3', function (d) { return has(d.cd3) || has(d.cd4) || has(d.cd5); }], ['nocx', 'flt.nocx', function (d) { return !!d.proc && !['cd1', 'cd2', 'cd3', 'cd4', 'cd5'].some(function (k) { return has(d[k]); }); }]] },
+  { id: 'anast', label: 'flt.anast', opts: [['kr', 'flt.anKr', function (d, p) { return krAnast(p); }], ['krS', 'flt.anKrS', function (d, p) { return krAnast(p) && d.stoma !== 'Нет' && has(d.stoma); }], ['krN', 'flt.anKrN', function (d, p) { return krAnast(p) && d.stoma === 'Нет'; }]] },
   { id: 'urg', label: 'flt.urg', opts: [['el', 'flt.elective', function (d) { return d.urg === 'Плановая'; }], ['em', 'flt.emergency', function (d) { return d.urg === 'Экстренная'; }]] }
 ];
+/* колоректальный (колоанальный) анастомоз на прямой кишке без постоянной стомы */
+function krAnast(p) {
+  var d = p && p.d; if (!d || d.loc !== 'Прямая кишка') return false;
+  var ar = P_AR.indexOf(d.proc) >= 0, ev = P_EVISC.indexOf(d.proc) >= 0 && d.anast === 'Да';
+  if (!(ar || ev) || d.anast === 'Нет') return false;
+  if (/Концевая/.test(d.stoma || '')) return false;
+  var d0 = epDate(p);
+  return !episodesOf(p).some(function (x) { return x !== p && epDate(x) >= d0 && (P_APR.concat(P_HART).indexOf(x.d.proc) >= 0 || /Концевая/.test(x.d.stoma || '')); });
+}
 function renderFilters() {
   var fl = fltOf(), any = false;
   var h = '<div class="filters" role="group" aria-label="' + t('flt.title') + '"><span class="flabel">' + ico('filter', 15) + t('flt.title') + '</span>';
