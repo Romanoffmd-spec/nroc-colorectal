@@ -3138,6 +3138,7 @@ var ANON = { fio: 1, ib: 1, iin: 1, phone: 1, address: 1 };
 var PII = { fio: 1, ib: 1, iin: 1, phone: 1, address: 1, nation: 1 };
 function fieldOpts(x) { return x.options || (x.optionsFn ? x.optionsFn({}) : []) || []; }
 function nodeCodes() { var o = []; LN_ST.forEach(function (st) { if (st[3] === 2) { o.push(st[0] + ' rt'); o.push(st[0] + ' lt'); } else o.push(st[0]); }); return o; }
+function arrOf(v) { return Array.isArray(v) ? v : (v === undefined || v === null || v === '') ? [] : String(v).split(/\s*;\s*/).filter(Boolean); }
 function exportCols(list, reg, o) {
   var cols = [{ id: 'record_id', lab: 'ID', get: function (p) { return p.id; }, cb: ['record_id', 'ID', LL('идентификатор', 'identifier'), ''] }];
   var seen = {};
@@ -3146,8 +3147,8 @@ function exportCols(list, reg, o) {
     if (x.type === 'files') { if (o.mode === 'labels') cols.push({ id: x.id, lab: L(x.label), get: function (p) { return (p.d[x.id] || []).map(function (z) { return z.name; }).join('; '); }, cb: [x.id, L(x.label), LL('файлы', 'files'), ''] }); return; }
     var opts = x.type === 'nodes' ? nodeCodes() : fieldOpts(x), lab = L(x.label);
     if (x.type === 'multi' || x.type === 'nodes') {
-      if (o.mode === 'codes') opts.forEach(function (op, i) { var vid = x.id + '___' + (i + 1); cols.push({ id: vid, lab: lab + ': ' + ov(op), get: function (p) { return (p.d[x.id] || []).indexOf(op) >= 0 ? 1 : 0; }, cb: [vid, lab + ': ' + ov(op), 'checkbox', LL('0 = нет; 1 = да', '0 = no; 1 = yes')] }); });
-      else cols.push({ id: x.id, lab: lab, get: function (p) { return (p.d[x.id] || []).map(ov).join('; '); }, cb: [x.id, lab, LL('несколько значений', 'multiple choice'), opts.map(ov).join('; ')] });
+      if (o.mode === 'codes') opts.forEach(function (op, i) { var vid = x.id + '___' + (i + 1); cols.push({ id: vid, lab: lab + ': ' + ov(op), get: function (p) { return arrOf(p.d[x.id]).indexOf(op) >= 0 ? 1 : 0; }, cb: [vid, lab + ': ' + ov(op), 'checkbox', LL('0 = нет; 1 = да', '0 = no; 1 = yes')] }); });
+      else cols.push({ id: x.id, lab: lab, get: function (p) { return arrOf(p.d[x.id]).map(ov).join('; '); }, cb: [x.id, lab, LL('несколько значений', 'multiple choice'), opts.map(ov).join('; ')] });
       return;
     }
     if (x.type === 'sel' || x.type === 'seg') {
